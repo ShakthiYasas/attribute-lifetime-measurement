@@ -1,5 +1,5 @@
-import CarPark
-from Configuration import CarParkConfiguration
+from carpark.carPark import CarPark
+from configuration import CarParkConfiguration
 
 class CarParkFactory:
     carpark = None

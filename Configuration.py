@@ -1,5 +1,5 @@
 import math
-import Constants as const
+import constants as const
 
 class Configuration:
     """Base class for Configuartions"""
@@ -27,10 +27,11 @@ class CarParkConfiguration(Configuration):
         if(sampling_rate != None and sampling_rate > 0 and sampling_rate <= self.total_time):
             self.sampling_rate = sampling_rate
         
-        self.no_of_refreshes =  self.total_time/self.sampling_rate
+        self.no_of_refreshes =  int(self.total_time/self.sampling_rate)
 
-        print('Configuration:\n\tSample Size = '+self.sample_size+'\n\tStandard Distruntion = '+self.standard_deviation
-        +'\n\tTotal Time = '+int(math.ceil(self.total_time/60000))+const.mins
-        +'\n\tSkew = '+self.skew
-        +'\n\tSampling Interval = '+self.sampling_rate)
+        print('Configuration:\n\tSample Size = '+str(self.sample_size)+'\n\tStandard Distruntion = '+str(self.standard_deviation)
+        +'\n\tTotal Time = '+str(int(math.ceil(self.total_time/60000)))+const.mins
+        +'\n\tSkew = '+str(self.skew)
+        +'\n\tSampling Interval = '+str(self.sampling_rate)
+        +'\n\tNo of Refreshes = '+str(self.no_of_refreshes))
 

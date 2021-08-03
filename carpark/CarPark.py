@@ -1,16 +1,16 @@
-from Configuration import CarParkConfiguration
-from Distribution import NormalDistribution
+from configuration import CarParkConfiguration
+from distribution import NormalDistribution
 
 class CarPark:
     configuration = None
     distribution = None
 
-    def __inti__(self):
+    def __init__(self):
         print('Initializing Carpark')
         self.configuration = CarParkConfiguration()
         self.distribution = NormalDistribution(self.configuration)
     
-    def __inti__(self,configuration):
+    def __init__(self,configuration):
         if(isinstance(configuration,CarParkConfiguration)):
             self.configuration = configuration
         else:
