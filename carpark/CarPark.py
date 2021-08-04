@@ -1,5 +1,5 @@
 from configuration import CarParkConfiguration
-from distribution import NormalDistribution
+from distribution import NormalDistribution, RandomDistribution
 
 class CarPark:
     configuration = None
@@ -17,10 +17,13 @@ class CarPark:
             print('Provided configuration is invalid. Proceeding with default!')
             self.configuration = CarParkConfiguration()
 
-        self.distribution = NormalDistribution(self.configuration)
+        if(self.configuration.variation != 0):
+            self.distribution = NormalDistribution(self.configuration)
+        else:
+            self.distribution = RandomDistribution(self.configuration)
 
-    def get_current_status(self, milisecond_diff):
+    def get_current_status(self, milisecond_diff) -> dict:
         current_time_step = milisecond_diff/self.configuration.sampling_rate
-        return self.distribution.get_occupancy_level(current_time_step)
+        return {'current_availability': self.distribution.get_occupancy_level(current_time_step)} 
         
     
