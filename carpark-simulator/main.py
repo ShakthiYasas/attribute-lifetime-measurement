@@ -19,7 +19,7 @@ default_config = config['DEFAULT']
 class CarParkContext(Resource):
     configuration = CarParkConfiguration(sample_size = int(default_config['SampleSize']), standard_deviation = float(default_config['StandardDeviation']), 
         total_time = float(default_config['TotalTime']), skew = float(default_config['Skew']), sampling_rate = float(default_config['SamplingRate']), 
-        variation=default_config['ValueChange'], planningPeriod=default_config['PlanningPeriod'], selectedPeriods=list(map(lambda x: int(x) in default_config['SelectedPeriods'])))
+        variation=default_config['ValueChange'], planningPeriod=default_config['PlanningPeriod'], selectedPeriods=list(map(lambda x: int(x) in default_config['SelectedPeriods'].split(','))))
     carpark_factory = CarParkFactory(configuration)
     carpark = carpark_factory.get_carpark()
 
