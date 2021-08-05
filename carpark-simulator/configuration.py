@@ -15,8 +15,11 @@ class CarParkConfiguration(Configuration):
     no_of_refreshes = 0 # number of times the car park has refreshed data during the total time period
     variation=1 #-1 for decreasing, 0 for random, +1 for increasing
     median=0
+    planning_period = 60000 # Default 1 minute period
+    selected_periods = []
 
-    def __init__(self, sample_size = None, standard_deviation = None, total_time = None, skew = None, sampling_rate = None, variation = None):
+    def __init__(self, sample_size = None, standard_deviation = None, total_time = None, skew = None, sampling_rate = None, variation = None,
+        planning_period = None, selected_periods = None):
         
         if(sample_size != None and sample_size > 0):
             self.sample_size = sample_size
@@ -30,6 +33,18 @@ class CarParkConfiguration(Configuration):
             self.sampling_rate = sampling_rate
         if(variation != None):
             self.variation = const.variations[variation.lower()]
+        if(planning_period != None and planning_period > self.sampling_rate):
+            self.planningPeriod = planning_period
+        if(selected_periods != None):
+            if(selected_periods == '*'):
+                self.selected_periods.append((1,self.no_of_refreshes))
+            else:
+                no_of_sections = self.total_time/self.planningPeriod
+                if(all(i <= no_of_sections for i in selected_periods)):
+                    for selected in selected_periods:
+                        low_bound = (planning_period*(selected-1))/self.sampling_rate
+                        up_bound = planning_period*selected/self.sampling_rate
+                        self.selected_periods.append((round(low_bound),round(up_bound)))
         
         self.no_of_refreshes =  int(self.total_time/self.sampling_rate)
         self.median = self.no_of_refreshes/2

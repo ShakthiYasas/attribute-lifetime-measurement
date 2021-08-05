@@ -17,6 +17,8 @@ class NormalDistribution(Distribution):
     variation = 0
 
     def __init__(self, configuration):
+        self.seletced_periods = configuration.selected_periods
+
         if(isinstance(configuration,CarParkConfiguration)):
             print('Starting to create a skewed normal distribution.')
             linspace = np.linspace(start=0, stop=configuration.sample_size, num=configuration.no_of_refreshes)
@@ -25,6 +27,11 @@ class NormalDistribution(Distribution):
             distributions = normalizing_distribution(init_dist, configuration.sample_size)
             self.time_step = distributions[0]
             self.occupancy = distributions[1]
+
+            if(not(configuration.selected_periods[0] == 1 and configuration.selected_periods[1] == configuration.no_of_refreshes)):
+                res = trim_distribution(configuration.selected_periods,self.occupancy)
+                self.time_step = res[0]
+                self.occupancy = res[1]
             
             print('Random skewed distribution created.')
         else:
@@ -75,6 +82,11 @@ class RandomDistribution(Distribution):
                         current_frequency = 0
                         current_index = idx
                         break
+            
+            if(not(configuration.selected_periods[0] == 1 and configuration.selected_periods[1] == configuration.no_of_refreshes)):
+                res = trim_distribution(configuration.selected_periods,self.occupancy)
+                self.time_step = res[0]
+                self.occupancy = res[1]
 
         except(Exception):
             print('End of distribution')
@@ -89,6 +101,7 @@ class RandomDistribution(Distribution):
             return self.occupancy[idx-1]
         else:
             return self.occupancy[idx]
+        
 
 # Static Method
 def normalizing_distribution(init_dist, sample_size):
@@ -111,3 +124,10 @@ def normalizing_distribution(init_dist, sample_size):
             time_step = time_step + 1
 
     return (time_step_list, occupancy_list)
+
+def trim_distribution(selections, dist):
+    occupancy = []
+    for sel in selections:
+        occupancy.extend(dist[sel[0],sel[1]+1])
+    time_step = range(1,len(occupancy)+1)
+    return (occupancy,time_step)
