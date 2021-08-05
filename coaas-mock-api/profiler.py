@@ -1,6 +1,7 @@
 import time
 import datetime
 import threading
+from event import post_event
 
 class Profiler:
     db = None
@@ -8,16 +9,23 @@ class Profiler:
     lookup = {}
     interval = 1
     last_time = datetime.now()
+    threadpool = []
 
     def __init__(self, attributes, db, window):
-        self.db = db 
-        self.window = window
-        self.most_recently_used = [[]] * len(attributes)
         index = 0
+        self.db = db   
+        self.window = window
+        self.mean = [0] * len(attributes)
+        self.most_recently_used = [[]] * len(attributes)
+        
         for att in attributes:
             self.lookup[att] = index
             index+=1
-        self.mean = [0] * len(attributes)
+        
+        for att in attributes:
+            th = MyThread(self.lookup[att], att, self)
+            self.threadpool.append(th)
+            th.start()
 
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True               
@@ -32,9 +40,10 @@ class Profiler:
         curr_time = datetime.now()
         for row in self.most_recently_used:
             for stamp in row:
-                diff = ((curr_time - stamp[1]).microseconds)/1000
-                if(diff >= self.window):
-                    row.remove(stamp)
+                if(len(stamp) != 0):
+                    diff = ((curr_time - stamp[1]).microseconds)/1000
+                    if(diff >= self.window):
+                        row.remove(stamp)
 
     def reactive_push(self, response) -> None:
         curr_time = datetime.now()
@@ -71,3 +80,24 @@ class Profiler:
         return {
             'mean_lifetimes': self.mean
             }
+
+
+class MyThread (threading.Thread):
+    def __init__(self, thread_id, name, caller):
+        threading.Thread.__init__(self)
+        self.thread_id = thread_id
+        self.caller = caller
+        self.name = name
+
+    def run(self):
+        self.refresh()
+
+    def refresh(self):
+        while True:
+            post_event("need_to_refresh", self.name)
+            means = getattr(self.caller,'mean')
+            time.sleep(means[self.thread_id]/1000)
+            
+            
+
+        

@@ -1,14 +1,15 @@
-import datetime
 from strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
 from util import run_in_parallel
+from event import subscribe
 
 class Greedy(Strategy):
     def __init__(self, attributes, url, db):
         self.url = url
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window)
+        subscribe("need_to_refresh", self.refresh_cache)
         
         response = self.requester.get_response(url)
         self.cache_memory.save(response)
@@ -27,10 +28,11 @@ class Greedy(Strategy):
     def get_current_profile(self):
         self.profiler.get_details()
 
-    def refresh_cache(self) -> None:
+    def refresh_cache(self, attribute) -> None:
         response = self.requester.get_response(self.url)
-        run_in_parallel(self.profiler.push(datetime.now(), response), self.cache_memory.save(response))
-        self.profiler.mean[0] # currently only 1 attribute
+        fetched = {attribute : response[attribute]}
+        run_in_parallel(self.cache_memory.save(fetched),self.profiler.reactive_push(fetched))
 
+        
         
         
