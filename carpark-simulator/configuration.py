@@ -9,8 +9,8 @@ class Configuration:
 class CarParkConfiguration(Configuration):
     sample_size = 100 # total available (constrait).
     total_time = 600000 # In miliseconds. 10 minutes.
-    skew = 0 # median skewness 
-    standard_deviation = 2 # Using the emperical rule of 95% representation
+    skew = [0] # median skewness 
+    standard_deviation = [2] # Using the emperical rule of 95% representation
     sampling_rate = 1000 # sampling every 1000ms = 1s
     no_of_refreshes = 0 # number of times the car park has refreshed data during the total time period
     variation=1 #-1 for decreasing, 0 for random, +1 for increasing
@@ -23,12 +23,12 @@ class CarParkConfiguration(Configuration):
         
         if(sample_size != None and sample_size > 0):
             self.sample_size = sample_size
-        if(standard_deviation != None and standard_deviation > 0):
-            self.standard_deviation = standard_deviation
+        if(standard_deviation != None):
+            self.standard_deviation = list(map(lambda x: float(x) if float(x) > 0 in standard_deviation.split(',') else 2.0))
         if(total_time != None and total_time > 60000):
             self.total_time = total_time
         if(skew != None):
-            self.skew = skew
+            self.skew = list(map(lambda x : float(x) in skew.split(',')))
         if(sampling_rate != None and sampling_rate > 0 and sampling_rate <= self.total_time):
             self.sampling_rate = sampling_rate
         if(variation != None):

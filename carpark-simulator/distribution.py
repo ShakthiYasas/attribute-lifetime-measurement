@@ -16,13 +16,13 @@ class NormalDistribution(Distribution):
     sample_size = 0
     variation = 0
 
-    def __init__(self, configuration):
+    def __init__(self, configuration, index):
         self.seletced_periods = configuration.selected_periods
 
         if(isinstance(configuration,CarParkConfiguration)):
             print('Starting to create a skewed normal distribution.')
             linspace = np.linspace(start=0, stop=configuration.sample_size, num=configuration.no_of_refreshes)
-            init_dist = skewnorm.pdf(linspace, a=configuration.skew, scale=configuration.standard_deviation)
+            init_dist = skewnorm.pdf(linspace, a=configuration.skew[index], scale=configuration.standard_deviation[index])
 
             distributions = normalizing_distribution(init_dist, configuration.sample_size)
             self.time_step = distributions[0]
@@ -56,11 +56,10 @@ class RandomDistribution(Distribution):
     time_step = []
     occupancy = []
 
-    def __init__(self, configuration):
+    def __init__(self, configuration, index):
         print('Starting to create a random normal distribution.')
         number_of_data = (configuration.sample_size)**2
-        print(number_of_data)
-        init_dist = np.random.normal(0, configuration.standard_deviation, number_of_data)
+        init_dist = np.random.normal(0, configuration.standard_deviation[index], number_of_data)
         sorted_array = np.sort(init_dist)
 
         min_value = sorted_array[0]
