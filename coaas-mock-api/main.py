@@ -5,10 +5,10 @@ import configparser
 from datetime import datetime
 from flask import Flask, request
 from cache import Cache
-from response import parse_response
+from lib.response import parse_response
 from flask_restful import Resource, Api
 from strategies.strategyfactory import StrategyFactory
-from mongoclient import MongoClient
+from lib.mongoclient import MongoClient
 
 app = Flask(__name__)
 api = Api(app)

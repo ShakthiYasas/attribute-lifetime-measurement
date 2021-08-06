@@ -1,15 +1,15 @@
 import time
 import datetime
 import threading
-from event import post_event
+from lib.event import post_event
 
 class Profiler:
     db = None
     mean = []
     lookup = {}
     interval = 1
-    last_time = datetime.now()
     threadpool = []
+    last_time = datetime.now()
 
     def __init__(self, attributes, db, window):
         index = 0
@@ -22,11 +22,6 @@ class Profiler:
             self.lookup[att] = index
             index+=1
         
-        for att in attributes:
-            th = MyThread(self.lookup[att], att, self)
-            self.threadpool.append(th)
-            th.start()
-
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True               
         thread.start() 
@@ -35,6 +30,12 @@ class Profiler:
         while True:
             self.clear_expired()
             time.sleep(self.interval)
+
+    def auto_cache_refresh_for_greedy(self, attributes) -> None:
+        for att in attributes:
+            th = MyThread(self.lookup[att], att, self)
+            self.threadpool.append(th)
+            th.start()
 
     def clear_expired(self) -> None:
         curr_time = datetime.now()
@@ -78,9 +79,9 @@ class Profiler:
 
     def get_details(self) -> dict:
         return {
-            'mean_lifetimes': self.mean
+            'mean_lifetimes': self.mean,
+            'most_recent': self.most_recently_used
             }
-
 
 class MyThread (threading.Thread):
     def __init__(self, thread_id, name, caller):

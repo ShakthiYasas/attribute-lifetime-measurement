@@ -1,14 +1,15 @@
 from strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
-from util import run_in_parallel
-from event import subscribe
+from lib.util import run_in_parallel
+from lib.event import subscribe
 
 class Greedy(Strategy):
     def __init__(self, attributes, url, db):
         self.url = url
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window)
+        self.profiler.auto_cache_refresh_for_greedy(attributes)
         subscribe("need_to_refresh", self.refresh_cache)
         
         response = self.requester.get_response(url)

@@ -3,7 +3,7 @@ import traceback
 import configparser
 from flask import Flask
 from constants import seconds_in_day
-from response import parse_response
+from lib.response import parse_response
 from flask_restful import Resource, Api
 from carpark.carParkFactory import CarParkFactory
 from configuration import CarParkConfiguration

@@ -1,6 +1,6 @@
 import json
 import requests
-from util import without_keys
+from lib.util import without_keys
 
 invalid = {'time_stamp'}
 
