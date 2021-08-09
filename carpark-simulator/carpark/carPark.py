@@ -18,11 +18,10 @@ class CarPark:
             print('Provided configuration is invalid. Proceeding with default!')
             self.configuration = CarParkConfiguration()
 
-        if(self.configuration.variation != 0):
-            for count in range(0,len(self.configuration.skew)):
+        for count in range(0,len(self.configuration.skew)):
+            if(self.configuration.variation[count] != 0):
                 self.distribution.append(NormalDistribution(self.configuration, count))
-        else:
-            for count in range(0,len(self.configuration.skew)):
+            else:
                 self.distribution.append(RandomDistribution(self.configuration, count))
 
     def get_current_status(self, milisecond_diff) -> dict:

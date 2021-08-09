@@ -13,7 +13,7 @@ class CarParkConfiguration(Configuration):
     standard_deviation = [2] # Using the emperical rule of 95% representation
     sampling_rate = 1000 # sampling every 1000ms = 1s
     no_of_refreshes = 0 # number of times the car park has refreshed data during the total time period
-    variation=1 #-1 for decreasing, 0 for random, +1 for increasing
+    variation=[] #-1 for decreasing, 0 for random, +1 for increasing
     median=0
     planning_period = 60000 # Default 1 minute period
     selected_periods = []
@@ -24,30 +24,40 @@ class CarParkConfiguration(Configuration):
         if(sample_size != None and sample_size > 0):
             self.sample_size = sample_size
         if(standard_deviation != None):
-            self.standard_deviation = list(map(lambda x: float(x) if float(x) > 0 in standard_deviation.split(',') else 2.0))
+            tk = standard_deviation.split(',')
+            self.standard_deviation = list(map(lambda x: float(x) if float(x) > 0 else 2.0, tk ))
         if(total_time != None and total_time > 60000):
             self.total_time = total_time
         if(skew != None):
-            self.skew = list(map(lambda x : float(x) in skew.split(',')))
+            self.skew = list(map(lambda x : float(x), skew.split(',')))
         if(sampling_rate != None and sampling_rate > 0 and sampling_rate <= self.total_time):
-            self.sampling_rate = sampling_rate
+            self.sampling_rate = int(sampling_rate)
         if(variation != None):
-            self.variation = const.variations[variation.lower()]
-        if(planning_period != None and planning_period > self.sampling_rate):
-            self.planningPeriod = planning_period
+            for var in variation:
+                self.variation.append(const.variations[var.lower()])
+        else:
+            self.variation.append(1)
+        if(planning_period != None and int(planning_period) > self.sampling_rate):
+            self.planningPeriod = int(planning_period)
+
+        self.no_of_refreshes =  int(self.total_time/self.sampling_rate)
+        self.median = self.no_of_refreshes/2
+
         if(selected_periods != None):
             if(selected_periods == '*'):
                 self.selected_periods.append((1,self.no_of_refreshes))
             else:
                 no_of_sections = self.total_time/self.planningPeriod
+                selected_periods = list(map(lambda x: int(x), selected_periods.split(',')))
                 if(all(i <= no_of_sections for i in selected_periods)):
                     for selected in selected_periods:
                         low_bound = (planning_period*(selected-1))/self.sampling_rate
                         up_bound = planning_period*selected/self.sampling_rate
                         self.selected_periods.append((round(low_bound),round(up_bound)))
+        else:
+            self.selected_periods.append((1,self.no_of_refreshes))
+
         
-        self.no_of_refreshes =  int(self.total_time/self.sampling_rate)
-        self.median = self.no_of_refreshes/2
 
         print('Configuration:\n\tSample Size = '+str(self.sample_size)+'\n\tStandard Distruntion = '+str(self.standard_deviation)
         +'\n\tTotal Time = '+str(int(math.ceil(self.total_time/60000)))+const.mins

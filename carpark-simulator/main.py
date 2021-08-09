@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('..')))
+
 import datetime
 import traceback
 import configparser
@@ -19,7 +22,7 @@ default_config = config['DEFAULT']
 class CarParkContext(Resource):
     configuration = CarParkConfiguration(sample_size = int(default_config['SampleSize']), standard_deviation = default_config['StandardDeviation'], 
         total_time = float(default_config['TotalTime']), skew = default_config['Skew'], sampling_rate = float(default_config['SamplingRate']), 
-        variation=default_config['ValueChange'], planningPeriod=default_config['PlanningPeriod'], selectedPeriods=list(map(lambda x: int(x) in default_config['SelectedPeriods'].split(','))))
+        variation=default_config['ValueChange'].split(','), planning_period = default_config['PlanningPeriod'], selected_periods = default_config['SelectedPeriods'])
     carpark_factory = CarParkFactory(configuration)
     carpark = carpark_factory.get_carpark()
 
