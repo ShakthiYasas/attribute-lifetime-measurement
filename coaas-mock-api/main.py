@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('..')))
+
 import time
 import json
 import traceback
@@ -20,7 +23,7 @@ db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class PlatformMock(Resource):
     strategy = default_config['Strategy'].lower()
-    strategy_factory = StrategyFactory(strategy, default_config['Strategy'].lower().split(','), db)
+    strategy_factory = StrategyFactory(strategy, default_config['Strategy'].lower().split(','), default_config['BaseURL'], db)
     selected_algo = strategy_factory.selected_algo
 
     selected_algo.moving_window = int(default_config['MovingWindow'])

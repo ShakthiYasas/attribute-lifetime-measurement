@@ -1,5 +1,5 @@
 import time
-import datetime
+from datetime import datetime
 import threading
 from lib.event import post_event
 

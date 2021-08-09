@@ -1,5 +1,5 @@
 import datetime
-from strategy import Strategy
+from strategies.strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
 from lib.util import run_in_parallel

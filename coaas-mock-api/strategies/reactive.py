@@ -1,4 +1,4 @@
-from strategy import Strategy
+from strategies.strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
 
