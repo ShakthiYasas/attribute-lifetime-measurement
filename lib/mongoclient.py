@@ -3,7 +3,7 @@ import pymongo
 class MongoClient:
   db = None
 
-  def __inti__(self, connection, database):
+  def __init__(self, connection, database):
     myclient = pymongo.MongoClient(connection)
     self.db = myclient[database]
   
