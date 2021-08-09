@@ -42,7 +42,7 @@ class PlatformMock(Resource):
             data = self.selected_algo.get_result(default_config['BaseURL'], json_obj)
     
             elapsed_time = time.time() - start
-            db.insert_one(self.strategy+'-responses', {'session': self.current_session, 'time': elapsed_time})
+            db.insert_one(self.strategy+'-responses', {'session': self.current_session, 'strategy': self.strategy, 'time': elapsed_time})
 
             return parse_response(data), 200  # return data and 200 OK code
         except(Exception):
