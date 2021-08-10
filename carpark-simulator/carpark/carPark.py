@@ -41,5 +41,10 @@ class CarPark:
         for dist in self.distribution:
             plt.plot(dist.time_step, dist.occupancy)
             
+            f = open(self.configuration.current_session+'-simulation-area_'+str(self.distribution.index(dist)+1)+'_availability', "a")
+            for idx in range(0,len(dist.time_step)):
+                f.write(str(dist.time_step[idx]*self.configuration.sampling_rate),str(dist.occupancy))
+            f.close()
+  
         plt.savefig(str(self.configuration.current_session)+'-distribution.png')
 
