@@ -1,7 +1,7 @@
-from math import dist, trunc
+from math import trunc
 import numpy as np
 from scipy.stats import skewnorm
-from matplotlib.pyplot import plot
+from scipy.ndimage import gaussian_filter1d
 
 from error import ValueConfigurationError
 from configuration import CarParkConfiguration
@@ -26,7 +26,7 @@ class NormalDistribution(Distribution):
         
             distributions = normalizing_distribution(init_dist, configuration.sample_size)
             self.time_step = distributions[0]
-            self.occupancy = distributions[1]
+            self.occupancy = smooth(distributions[1],configuration.standard_deviation[index])
 
             if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
                 res = trim_distribution(configuration.selected_periods,self.occupancy)
@@ -92,8 +92,7 @@ class RandomDistribution(Distribution):
         except(Exception):
             print('End of distribution')
 
-        self.occupancy = list(map(lambda x: configuration.sample_size if x > configuration.sample_size else x, self.occupancy))
-        plot(self.time_step, self.occupancy)
+        self.occupancy = list(map(lambda x: configuration.sample_size if x > configuration.sample_size else x, smooth(self.occupancy, configuration.standard_deviation[index])))
 
     def get_occupancy_level(self, step):
         closest_step = min(self.time_step, key=lambda x:abs(x-step))
@@ -160,3 +159,7 @@ def trim_distribution(selections, dist):
         occupancy.extend(dist[sel[0]:sel[1]+1])
     time_step = range(1,len(occupancy)+1)
     return (occupancy,time_step)
+
+def smooth(x,std):
+    y = gaussian_filter1d(x, std)
+    return list(map(lambda z : round(z), y))

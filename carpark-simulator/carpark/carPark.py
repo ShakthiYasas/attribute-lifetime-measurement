@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from configuration import CarParkConfiguration
 from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution
 
@@ -20,7 +21,11 @@ class CarPark:
                 self.distribution.append(NormalDistribution(self.configuration, count))
             else:
                 self.distribution.append(SuperImposedDistribution(self.configuration, count))
-                
+
+        self.print_distrubtions()
+        print('Car park service running!')
+
+
     def get_current_status(self, milisecond_diff) -> dict:
         current_time_step = milisecond_diff/self.configuration.sampling_rate
         response_obj = dict()
@@ -29,4 +34,12 @@ class CarPark:
 
         return response_obj
         
-    
+    def print_distrubtions(self):
+        plt.xlabel('Time Step')
+        plt.ylabel('occupancy')
+        
+        for dist in self.distribution:
+            plt.plot(dist.time_step, dist.occupancy)
+            
+        plt.savefig(str(self.configuration.current_session)+'-distribution.png')
+

@@ -18,9 +18,10 @@ class CarParkConfiguration(Configuration):
     planning_period = 60000 # Default 1 minute period
     selected_periods = []
 
-    def __init__(self, sample_size = None, standard_deviation = None, total_time = None, skew = None, sampling_rate = None, variation = None,
+    def __init__(self, current_session, sample_size = None, standard_deviation = None, total_time = None, skew = None, sampling_rate = None, variation = None,
         planning_period = None, selected_periods = None):
         
+        self.current_session = current_session
         if(sample_size != None and sample_size > 0):
             self.sample_size = sample_size
         if(standard_deviation != None):
