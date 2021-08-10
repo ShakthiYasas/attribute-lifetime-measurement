@@ -25,10 +25,14 @@ db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 class PlatformMock(Resource):
     strategy = default_config['Strategy'].lower()
     strategy_factory = StrategyFactory(strategy, default_config['Strategy'].lower().split(','), default_config['BaseURL'], db)
-    selected_algo = strategy_factory.selected_algo
 
+    current_session = db.insert_one(strategy+'-sessions', {'strategy': strategy, 'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
+    
+    selected_algo = strategy_factory.selected_algo
+    selected_algo.session = str(current_session)
     selected_algo.moving_window = int(default_config['MovingWindow'])
     selected_algo.attributes = int(default_config['NoOfAttributes'])
+
     if(strategy != 'reactive'):
         cache_size = int(default_config['CacheSize'])
         if(cache_size < selected_algo.attributes):
@@ -37,8 +41,6 @@ class PlatformMock(Resource):
         
         selected_algo.cache_memory = Cache(cache_size)
 
-    current_session = db.insert_one(strategy+'-sessions', {'strategy': strategy, 'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
-
     def post(self):
         try:
             start = time.time()
@@ -46,7 +48,7 @@ class PlatformMock(Resource):
             data = self.selected_algo.get_result(default_config['BaseURL'], json_obj, str(self.current_session))
     
             elapsed_time = time.time() - start
-            response = parse_response(data, str(self.current_session))
+            response = parse_response(data, str(self.current_session), str(self.current_session))
             db.insert_one(self.strategy+'-responses', {'session': str(self.current_session), 'strategy': self.strategy, 'data': response, 'time': elapsed_time})
 
             return response, 200  # return data and 200 OK code

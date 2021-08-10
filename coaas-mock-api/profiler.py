@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('..')))
+
 import time
 from datetime import datetime
 import threading
@@ -5,16 +8,18 @@ from lib.event import post_event
 
 class Profiler:
     db = None
+    session = ''
     mean = []
     lookup = {}
     interval = 1
     threadpool = []
     last_time = datetime.now()
 
-    def __init__(self, attributes, db, window):
+    def __init__(self, attributes, db, window, session):
         index = 0
         self.db = db   
         self.window = window
+        self.session = session
         self.mean = [0] * len(attributes)
         self.most_recently_used = [[]] * len(attributes)
         
@@ -73,7 +78,8 @@ class Profiler:
                         local_sum += item[2]
             
             mean = total_sum/count
-            self.mean[idx] = mean    
+            self.mean[idx] = mean
+            self.db.insert_one(key+'-lifetime',{'session': self.session, 'lifetime:':mean, 'time': curr_time})    
         
         self.last_time = curr_time
 
@@ -99,6 +105,3 @@ class MyThread (threading.Thread):
             means = getattr(self.caller,'mean')
             time.sleep(means[self.thread_id]/1000)
             
-            
-
-        
