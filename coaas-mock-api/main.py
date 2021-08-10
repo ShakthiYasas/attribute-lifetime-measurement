@@ -43,7 +43,7 @@ class PlatformMock(Resource):
         try:
             start = time.time()
             json_obj = json.loads(request.json())
-            data = self.selected_algo.get_result(default_config['BaseURL'], json_obj)
+            data = self.selected_algo.get_result(default_config['BaseURL'], json_obj, str(self.current_session))
     
             elapsed_time = time.time() - start
             response = parse_response(data, str(self.current_session))

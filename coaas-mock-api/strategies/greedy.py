@@ -15,7 +15,7 @@ class Greedy(Strategy):
         response = self.requester.get_response(url)
         self.cache_memory.save(response)
 
-    def get_result(self, url = None, json = None):       
+    def get_result(self, url = None, json = None, session = None):       
         response = self.cache_memory.get_values()
         if(len(json) != 0):
             modified_response = {}

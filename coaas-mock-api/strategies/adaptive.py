@@ -5,8 +5,11 @@ from restapiwrapper import Requester
 from lib.util import run_in_parallel
 
 class Adaptive(Strategy):   
+    db_insatnce = None
+
     def __init__(self, attributes, url, db):
         self.url = url
+        self.db_insatnce = db
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window)
         self.lookup = self.profiler.lookup
@@ -14,12 +17,13 @@ class Adaptive(Strategy):
         response = self.requester.get_response(url)
         self.cache_memory.save(response)
 
-    def get_result(self, url = None, json = None):       
+    def get_result(self, url = None, json = None, session = None):       
         response = self.cache_memory.get_values()
         prof = self.profiler.get_details()
         now = datetime.now()
 
         refetching = []
+        query = []
         if(len(json) != 0):
             # check freshness of the given attributes
             for item in json:
@@ -31,6 +35,9 @@ class Adaptive(Strategy):
                     time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
                     if(now > time_at_expire):
                         refetching.append(item.attribute)
+                        query.append({'session': session, 'attribute': item.attribute, 'isHit': False})
+                    else:
+                        query.append({'session': session, 'attribute': item.attribute, 'isHit': True})
         else:
             # check freshness of all attributes 
             for item in json:
@@ -41,7 +48,10 @@ class Adaptive(Strategy):
                 time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
                 if(now > time_at_expire):
                     refetching.append(item.attribute)
-        
+                    query.append({'session': session, 'attribute': item.attribute, 'isHit': False})
+                else:
+                    query.append({'session': session, 'attribute': item.attribute, 'isHit': True})
+
         self.refresh_cache(refetching)
         response = self.cache_memory.get_values()
 
@@ -52,6 +62,7 @@ class Adaptive(Strategy):
                     modified_response[item.attribute] = response[item.attribute]
             response = modified_response
 
+        self.db_insatnce.insert_many('adaptive-hits', query)
         return response
 
     def get_current_profile(self):

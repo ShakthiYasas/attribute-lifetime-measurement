@@ -8,7 +8,7 @@ class Reactive(Strategy):
         self.profiler = Profiler(attributes, db, self.moving_window)
         self.url = url
 
-    def get_result(self, url = None, json = None):   
+    def get_result(self, url = None, json = None, session = None):   
         response = ''
         if(url == None): 
             response = self.requester.get_response(self.url)
