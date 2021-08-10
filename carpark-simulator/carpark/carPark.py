@@ -39,11 +39,16 @@ class CarPark:
         plt.ylabel('occupancy')
         
         for dist in self.distribution:
+            idx = self.distribution.index(dist)
+            if(self.configuration.variation[idx] < 0):
+                dist.occupancy = list(map(lambda x : self.configuration.sample_size - x, dist.occupancy))
+
             plt.plot(dist.time_step, dist.occupancy)
             
-            f = open(self.configuration.current_session+'-simulation-area_'+str(self.distribution.index(dist)+1)+'_availability', "a")
+            f = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'_availability', "a")
+            f.write('time_step,occupancy\n')
             for idx in range(0,len(dist.time_step)):
-                f.write(str(dist.time_step[idx]*self.configuration.sampling_rate),str(dist.occupancy))
+                f.write(str(dist.time_step[idx]*self.configuration.sampling_rate)+','+str(dist.occupancy[idx])+'\n')
             f.close()
   
         plt.savefig(str(self.configuration.current_session)+'-distribution.png')

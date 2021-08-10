@@ -8,13 +8,15 @@ class Adaptive(Strategy):
     db_insatnce = None
 
     def __init__(self, attributes, url, db):
+        print('Initializing Adaptive Profile')
         self.url = url
         self.db_insatnce = db
         self.requester = Requester()
-        self.profiler = Profiler(attributes, db, self.moving_window)
+        self.profiler = Profiler(attributes, db, self.moving_window, self.session)
         self.lookup = self.profiler.lookup
-        
-        response = self.requester.get_response(url)
+    
+    def init_cache(self):
+        response = self.requester.get_response(self.url)
         self.cache_memory.save(response)
 
     def get_result(self, url = None, json = None, session = None):       

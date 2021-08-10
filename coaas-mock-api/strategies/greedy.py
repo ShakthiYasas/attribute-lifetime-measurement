@@ -6,13 +6,15 @@ from lib.event import subscribe
 
 class Greedy(Strategy):
     def __init__(self, attributes, url, db):
+        print('Initializing Greedy Profile')
         self.url = url
         self.requester = Requester()
-        self.profiler = Profiler(attributes, db, self.moving_window)
+        self.profiler = Profiler(attributes, db, self.moving_window, self.session)
         self.profiler.auto_cache_refresh_for_greedy(attributes)
         subscribe("need_to_refresh", self.refresh_cache)
         
-        response = self.requester.get_response(url)
+    def init_cache(self):
+        response = self.requester.get_response(self.url)
         self.cache_memory.save(response)
 
     def get_result(self, url = None, json = None, session = None):       

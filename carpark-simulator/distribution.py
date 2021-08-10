@@ -14,10 +14,10 @@ class NormalDistribution(Distribution):
     def __init__(self, configuration, index):
         self.time_step = []
         self.occupancy = []
-        self.sample_size = 0
-        self.variation = 0
-
+        
+        self.sample_size = configuration.sample_size
         self.seletced_periods = configuration.selected_periods
+        self.variation = configuration.variation[index]
 
         if(isinstance(configuration,CarParkConfiguration)):
             print('Starting to create a skewed normal distribution.')
@@ -59,6 +59,8 @@ class RandomDistribution(Distribution):
 
         self.time_step = []
         self.occupancy = []
+        self.sample_size = configuration.sample_size
+        self.variation = configuration.variation[index]
 
         number_of_data = (configuration.sample_size)**2
         init_dist = np.random.normal(0, configuration.standard_deviation[index], number_of_data)
@@ -98,14 +100,23 @@ class RandomDistribution(Distribution):
         closest_step = min(self.time_step, key=lambda x:abs(x-step))
         idx = self.time_step.index(closest_step)
         if(closest_step>step):
-            return self.occupancy[idx-1]
+            if(self.variation>0):
+                return self.occupancy[idx-1]
+            else:
+                return self.sample_size - self.occupancy[idx-1]
         else:
-            return self.occupancy[idx]
+            if(self.variation>0):
+                return self.occupancy[idx]
+            else:
+                return self.sample_size - self.occupancy[idx]
 
 class SuperImposedDistribution(Distribution):
         def __init__(self, configuration, index):  
             self.time_step = []
             self.occupancy = []
+            
+            self.sample_size = configuration.sample_size
+            self.variation = configuration.variation[index]
 
             random = RandomDistribution(configuration, index)
             norm = NormalDistribution(configuration, index)
@@ -113,6 +124,21 @@ class SuperImposedDistribution(Distribution):
             res = super_impose(random, norm)
             self.time_step = res[0]
             self.occupancy = res[1]
+
+        def get_occupancy_level(self, step):
+            closest_step = min(self.time_step, key=lambda x:abs(x-step))
+            idx = self.time_step.index(closest_step)
+
+            if(closest_step>step):
+                if(self.variation>0):
+                    return self.occupancy[idx-1]
+                else:
+                    return self.sample_size - self.occupancy[idx-1]
+            else:
+                if(self.variation>0):
+                    return self.occupancy[idx]
+                else:
+                    return self.sample_size - self.occupancy[idx]
 
 #Static Method
 def super_impose(dist1, dist2):

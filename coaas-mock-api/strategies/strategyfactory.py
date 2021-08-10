@@ -8,11 +8,11 @@ class StrategyFactory:
 
     def __init__(self, strat_name, attributes, url, db):
         if(strat_name in strategy):
-            if('reactive'):
+            if(strat_name == 'reactive'):
                 self.selected_algo = Reactive(attributes, url, db)
-            if('adaptive'):
+            if(strat_name == 'adaptive'):
                 self.selected_algo =  Adaptive(attributes, url, db)
-            if('greedy'):
+            if(strat_name == 'greedy'):
                 self.selected_algo =  Greedy(attributes, url, db)
         else:
             self.selected_algo =  Reactive(attributes, url, db)

@@ -4,8 +4,9 @@ from restapiwrapper import Requester
 
 class Reactive(Strategy):
     def __init__(self, attributes, url, db):
+        print('Initializing Reactive Profile')
         self.requester = Requester()
-        self.profiler = Profiler(attributes, db, self.moving_window)
+        self.profiler = Profiler(attributes, db, self.moving_window, self.session)
         self.url = url
 
     def get_result(self, url = None, json = None, session = None):   

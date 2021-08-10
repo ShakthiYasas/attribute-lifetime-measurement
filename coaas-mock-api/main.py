@@ -40,6 +40,7 @@ class PlatformMock(Resource):
             print('Initializing cache with '+ str(selected_algo.attributes) + ' slots.')
         
         selected_algo.cache_memory = Cache(cache_size)
+        selected_algo.init_cache()
 
     def post(self):
         try:
