@@ -13,7 +13,7 @@ class CarParkConfiguration(Configuration):
     standard_deviation = [2] # Using the emperical rule of 95% representation
     sampling_rate = 1000 # sampling every 1000ms = 1s
     no_of_refreshes = 0 # number of times the car park has refreshed data during the total time period
-    variation=[] #-1 for decreasing, 0 for random, +1 for increasing
+    variation=[] #-2 for super decreasing, -1 for decreasing, 0 for random, +1 for increasing, +2 for super-increasing
     median=0
     planning_period = 60000 # Default 1 minute period
     selected_periods = []

@@ -1,15 +1,9 @@
 from configuration import CarParkConfiguration
-from distribution import NormalDistribution, RandomDistribution
+from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution
 
 class CarPark:
     configuration = None
     distribution = []
-
-    def __init__(self):
-        print('Initializing Carpark')
-        self.configuration = CarParkConfiguration()
-        for count in range(0,len(self.configuration.skew)):
-            self.distribution.append(NormalDistribution(self.configuration, count))
     
     def __init__(self,configuration):
         if(isinstance(configuration,CarParkConfiguration)):
@@ -18,12 +12,15 @@ class CarPark:
             print('Provided configuration is invalid. Proceeding with default!')
             self.configuration = CarParkConfiguration()
 
+        print('Initializing Carpark')
         for count in range(0,len(self.configuration.skew)):
-            if(self.configuration.variation[count] != 0):
+            if(self.configuration.variation[count] == 0):
+                self.distribution.append(RandomDistribution(self.configuration, count))
+            elif(abs(self.configuration.variation[count]) == 1):
                 self.distribution.append(NormalDistribution(self.configuration, count))
             else:
-                self.distribution.append(RandomDistribution(self.configuration, count))
-
+                self.distribution.append(SuperImposedDistribution(self.configuration, count))
+                
     def get_current_status(self, milisecond_diff) -> dict:
         current_time_step = milisecond_diff/self.configuration.sampling_rate
         response_obj = dict()
