@@ -10,6 +10,10 @@ class MongoClient:
   def read_last(self, collection, sorting_col = '_id'):
     col = self.db[collection]
     return col.find().sort(sorting_col,-1).limit(1)
+
+  def read_all(self, collection, condition, sorting_col = '_id'):
+    col = self.db[collection]
+    return col.find(condition).sort(sorting_col,-1)
     
   def insert_one(self, collection, data):
     col = self.db[collection]

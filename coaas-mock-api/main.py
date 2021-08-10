@@ -5,13 +5,14 @@ import time
 import json
 import traceback
 import configparser
-from datetime import datetime
-from flask import Flask, request
 from cache import Cache
-from lib.response import parse_response
-from flask_restful import Resource, Api
-from strategies.strategyfactory import StrategyFactory
+from datetime import datetime
+import matplotlib.pyplot as plt
+from flask import Flask, request
 from lib.mongoclient import MongoClient
+from flask_restful import Resource, Api
+from lib.response import parse_response
+from strategies.strategyfactory import StrategyFactory
 
 app = Flask(__name__)
 api = Api(app)
@@ -45,12 +46,33 @@ class PlatformMock(Resource):
             data = self.selected_algo.get_result(default_config['BaseURL'], json_obj)
     
             elapsed_time = time.time() - start
-            db.insert_one(self.strategy+'-responses', {'session': self.current_session, 'strategy': self.strategy, 'time': elapsed_time})
+            response = parse_response(data, str(self.current_session))
+            db.insert_one(self.strategy+'-responses', {'session': str(self.current_session), 'strategy': self.strategy, 'data': response, 'time': elapsed_time})
 
-            return parse_response(data), 200  # return data and 200 OK code
+            return response, 200  # return data and 200 OK code
         except(Exception):
             print('An error occured : ' + traceback.format_exc())
             return parse_response({'message':'An error occured'}), 400  # return message and 400 Error code
+
+    def get(self):
+        session = request.args.get('session')
+
+        plt.xlabel('Request')
+        plt.ylabel('Response Time')
+        
+        responses = db.read_all(self.strategy+'-responses', {'session': str(self.current_session) if session == None else session, 'strategy': self.strategy})
+
+        requests = []
+        responsetimes = []
+        for res in responses:
+            requests.append(str(res._id))
+            responsetimes.append(res.time)
+
+        plt.plot(requests, responsetimes)  
+        filename = str(self.current_session)+'-responsetime.png'
+        plt.savefig(filename)
+
+        return {'fileName': filename}, 200 # file saved
 
 api.add_resource(PlatformMock, '/contexts')
 
