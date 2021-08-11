@@ -12,10 +12,11 @@ class Adaptive(Strategy):
         self.url = url
         self.db_insatnce = db
         self.requester = Requester()
-        self.profiler = Profiler(attributes, db, self.moving_window, self.session)
+        self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())
         self.lookup = self.profiler.lookup
     
     def init_cache(self):
+        self.profiler.session = self.session
         response = self.requester.get_response(self.url)
         self.cache_memory.save(response)
 
@@ -79,4 +80,7 @@ class Adaptive(Strategy):
                 modified_response[att] = response[att]
         response = modified_response
 
-        run_in_parallel(self.cache_memory.save(response),self.profiler.reactive_push(response))
+        self.profiler.reactive_push(response)
+        self.cache_memory.save(response)
+
+        #run_in_parallel(self.cache_memory.save(response),self.profiler.reactive_push(response))

@@ -8,18 +8,18 @@ from lib.event import post_event
 
 class Profiler:
     db = None
-    session = ''
     mean = []
     lookup = {}
     interval = 1
     threadpool = []
     last_time = datetime.now()
 
-    def __init__(self, attributes, db, window, session):
+    def __init__(self, attributes, db, window, caller_name, session = None):
         index = 0
         self.db = db   
         self.window = window
         self.session = session
+        self.caller_name = caller_name
         self.mean = [0] * len(attributes)
         self.most_recently_used = [[]] * len(attributes)
         
@@ -53,17 +53,22 @@ class Profiler:
 
     def reactive_push(self, response) -> None:
         curr_time = datetime.now()
-        duration = ((self.last_time - curr_time).microseconds)/1000
 
         for key,value in response.items():
             idx = self.lookup[key]
             lst_vals = self.most_recently_used[idx]
+            duration = 0 
+            if not lst_vals:
+                duration = ((self.last_time - curr_time).microseconds)/1000
+            else:
+                duration = ((lst_vals[-1][1] - curr_time).microseconds)/1000
             lst_vals.append((value, curr_time, duration))
 
             count = 0
             total_sum = 0
             local_sum = 0
             curr_val = None
+
             for item in lst_vals:
                 if(curr_val == None):
                     curr_val = item[0]
@@ -76,10 +81,13 @@ class Profiler:
                         local_sum = item[2]
                     else:
                         local_sum += item[2]
-            
-            mean = total_sum/count
+
+            total_sum += local_sum
+            count += 1
+            mean = total_sum/count             
+
             self.mean[idx] = mean
-            self.db.insert_one(key+'-lifetime',{'session': self.session, 'lifetime:':mean, 'time': curr_time})    
+            self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time})    
         
         self.last_time = curr_time
 

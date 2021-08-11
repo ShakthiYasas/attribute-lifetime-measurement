@@ -24,14 +24,14 @@ db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class PlatformMock(Resource):
     strategy = default_config['Strategy'].lower()
-    strategy_factory = StrategyFactory(strategy, default_config['Strategy'].lower().split(','), default_config['BaseURL'], db)
-
     current_session = db.insert_one(strategy+'-sessions', {'strategy': strategy, 'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
     
+    strategy_factory = StrategyFactory(strategy, default_config['Attributes'].lower().split(','), default_config['BaseURL'], db)
+
     selected_algo = strategy_factory.selected_algo
-    selected_algo.session = str(current_session)
-    selected_algo.moving_window = int(default_config['MovingWindow'])
-    selected_algo.attributes = int(default_config['NoOfAttributes'])
+    setattr(selected_algo, 'session', str(current_session))
+    setattr(selected_algo, 'moving_window', int(default_config['MovingWindow']))
+    setattr(selected_algo, 'attributes', int(default_config['NoOfAttributes']))
 
     if(strategy != 'reactive'):
         cache_size = int(default_config['CacheSize'])
@@ -39,7 +39,7 @@ class PlatformMock(Resource):
             cache_size = selected_algo.attributes
             print('Initializing cache with '+ str(selected_algo.attributes) + ' slots.')
         
-        selected_algo.cache_memory = Cache(cache_size)
+        setattr(selected_algo, 'cache_memory', Cache(cache_size))
         selected_algo.init_cache()
 
     def post(self):
