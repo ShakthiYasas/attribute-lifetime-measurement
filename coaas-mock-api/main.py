@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.abspath(os.path.join('..')))
+sys.path.append(os.path.abspath(os.path.join('.')))
 
 import time
 import json
@@ -18,7 +18,7 @@ app = Flask(__name__)
 api = Api(app)
 
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(os.getcwd()+'/coaas-mock-api/config.ini')
 default_config = config['DEFAULT']
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 

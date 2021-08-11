@@ -1,24 +1,26 @@
 import sys, os
-sys.path.append(os.path.abspath(os.path.join('..')))
+sys.path.append(os.path.abspath(os.path.join('.')))
 
 import traceback
 import configparser
 from flask import Flask
 from datetime import datetime
 from constants import seconds_in_day
-from lib.mongoclient import MongoClient
-from lib.response import parse_response
 from flask_restful import Resource, Api
 from configuration import CarParkConfiguration
 from carpark.carParkFactory import CarParkFactory
+
+from lib.mongoclient import MongoClient
+from lib.response import parse_response
 
 app = Flask(__name__)
 api = Api(app)
 start_time = datetime.now()
 
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(os.getcwd()+'/carpark-simulator/config.ini')
 default_config = config['DEFAULT']
+
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class CarParkContext(Resource):
