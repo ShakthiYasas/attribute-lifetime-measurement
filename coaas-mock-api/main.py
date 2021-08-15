@@ -45,11 +45,11 @@ class PlatformMock(Resource):
     def post(self):
         try:
             start = time.time()
-            json_obj = json.loads(request.json())
+            json_obj = request.get_json()
             data = self.selected_algo.get_result(default_config['BaseURL'], json_obj, str(self.current_session))
     
             elapsed_time = time.time() - start
-            response = parse_response(data, str(self.current_session), str(self.current_session))
+            response = parse_response(data, str(self.current_session))
             db.insert_one(self.strategy+'-responses', {'session': str(self.current_session), 'strategy': self.strategy, 'data': response, 'time': elapsed_time})
 
             return response, 200  # return data and 200 OK code

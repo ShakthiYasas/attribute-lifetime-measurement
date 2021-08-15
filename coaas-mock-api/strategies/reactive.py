@@ -22,8 +22,8 @@ class Reactive(Strategy):
         if(len(json) != 0):
             modified_response = {}
             for item in json:
-                if(item.attribute in response):
-                    modified_response[item.attribute] = response[item.attribute]
+                if(item['attribute'] in response):
+                    modified_response[item['attribute']] = response[item['attribute']]
             response = modified_response
 
         # push to profiler

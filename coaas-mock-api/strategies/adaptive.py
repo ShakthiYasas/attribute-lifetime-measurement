@@ -1,8 +1,8 @@
-import datetime
+from datetime import datetime
 from strategies.strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
-from lib.util import run_in_parallel
+#from lib.util import run_in_parallel
 
 class Adaptive(Strategy):   
     db_insatnce = None
@@ -13,47 +13,48 @@ class Adaptive(Strategy):
         self.db_insatnce = db
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())
-        self.lookup = self.profiler.lookup
     
     def init_cache(self):
         self.profiler.session = self.session
         response = self.requester.get_response(self.url)
+        self.profiler.reactive_push(response)
         self.cache_memory.save(response)
 
     def get_result(self, url = None, json = None, session = None):       
         response = self.cache_memory.get_values()
-        prof = self.profiler.get_details()
         now = datetime.now()
 
         refetching = []
         query = []
         if(len(json) != 0):
             # check freshness of the given attributes
+            print(self.profiler.most_recently_used)
             for item in json:
-                if(item.attribute in response):
-                    idx = self.lookup[item.attribute]
-                    last_fecth = prof.most_recent[idx][-1]
-                    mean_for_att = prof.mean_lifetimes[idx]
-                    expire_time = mean_for_att * (1 - item.freshness)
+                if(item['attribute'] in response):
+                    idx = self.profiler.lookup[item['attribute']]
+                    print('index'+str(idx))
+                    last_fecth = self.profiler.most_recently_used[idx][-1]
+                    mean_for_att = self.profiler.mean[idx]
+                    expire_time = mean_for_att * (1 - item['freshness'])
                     time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
                     if(now > time_at_expire):
-                        refetching.append(item.attribute)
-                        query.append({'session': session, 'attribute': item.attribute, 'isHit': False})
+                        refetching.append(item['attribute'])
+                        query.append({'session': session, 'attribute': item['attribute'], 'isHit': False})
                     else:
-                        query.append({'session': session, 'attribute': item.attribute, 'isHit': True})
+                        query.append({'session': session, 'attribute': item['attribute'], 'isHit': True})
         else:
             # check freshness of all attributes 
             for item in json:
-                idx = self.lookup[item.attribute]
-                last_fecth = prof.most_recent[idx][-1]
-                mean_for_att = prof.mean_lifetimes[idx]
-                expire_time = mean_for_att * (1 - item.freshness)
+                idx = self.profiler.lookup[item['attribute']]
+                last_fecth = self.profiler.most_recently_used[idx][-1]
+                mean_for_att = self.profiler.mean[idx]
+                expire_time = mean_for_att * (1 - item['freshness'])
                 time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
                 if(now > time_at_expire):
-                    refetching.append(item.attribute)
-                    query.append({'session': session, 'attribute': item.attribute, 'isHit': False})
+                    refetching.append(item['attribute'])
+                    query.append({'session': session, 'attribute': item['attribute'], 'isHit': False})
                 else:
-                    query.append({'session': session, 'attribute': item.attribute, 'isHit': True})
+                    query.append({'session': session, 'attribute': item['attribute'], 'isHit': True})
 
         self.refresh_cache(refetching)
         response = self.cache_memory.get_values()
@@ -61,8 +62,8 @@ class Adaptive(Strategy):
         if(len(json) != 0):
             modified_response = {}
             for item in json:
-                if(item.attribute in response):
-                    modified_response[item.attribute] = response[item.attribute]
+                if(item['attribute'] in response):
+                    modified_response[item['attribute']] = response[item['attribute']]
             response = modified_response
 
         self.db_insatnce.insert_many('adaptive-hits', query)

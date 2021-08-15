@@ -1,7 +1,7 @@
 from strategies.strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
-from lib.util import run_in_parallel
+#from lib.util import run_in_parallel
 from lib.event import subscribe
 
 class Greedy(Strategy):
@@ -15,6 +15,7 @@ class Greedy(Strategy):
     def init_cache(self):
         self.profiler.session = self.session
         response = self.requester.get_response(self.url)
+        self.profiler.reactive_push(response)
         self.cache_memory.save(response)
         
         self.profiler.auto_cache_refresh_for_greedy(self.att) 
@@ -25,8 +26,8 @@ class Greedy(Strategy):
         if(len(json) != 0):
             modified_response = {}
             for item in json:
-                if(item.attribute in response):
-                    modified_response[item.attribute] = response[item.attribute]
+                if(item['attribute'] in response):
+                    modified_response[item['attribute']] = response[item['attribute']]
             response = modified_response
 
         return response
