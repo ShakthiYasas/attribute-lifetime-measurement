@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from strategies.strategy import Strategy
 from profiler import Profiler
 from restapiwrapper import Requester
@@ -7,10 +7,11 @@ from restapiwrapper import Requester
 class Adaptive(Strategy):   
     db_insatnce = None
 
-    def __init__(self, attributes, url, db):
+    def __init__(self, attributes, url, db, window):
         print('Initializing Adaptive Profile')
         self.url = url
         self.db_insatnce = db
+        self.moving_window = window
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())
     
@@ -22,18 +23,17 @@ class Adaptive(Strategy):
 
     def get_result(self, url = None, json = None, session = None):       
         response = self.cache_memory.get_values()
-        now = datetime.now()
+        now = datetime.datetime.now()
 
         refetching = []
         query = []
         if(len(json) != 0):
             # check freshness of the given attributes
-            print(self.profiler.most_recently_used)
             for item in json:
                 if(item['attribute'] in response):
                     idx = self.profiler.lookup[item['attribute']]
-                    print('index'+str(idx))
-                    last_fecth = self.profiler.most_recently_used[idx][-1]
+                    l_f = self.profiler.most_recently_used[idx]
+                    last_fecth = self.profiler.last_time if not l_f else l_f[-1][1]
                     mean_for_att = self.profiler.mean[idx]
                     expire_time = mean_for_att * (1 - item['freshness'])
                     time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
@@ -46,7 +46,8 @@ class Adaptive(Strategy):
             # check freshness of all attributes 
             for item in json:
                 idx = self.profiler.lookup[item['attribute']]
-                last_fecth = self.profiler.most_recently_used[idx][-1]
+                l_f = self.profiler.most_recently_used[idx]
+                last_fecth = self.profiler.last_time if not l_f else l_f[-1][1]
                 mean_for_att = self.profiler.mean[idx]
                 expire_time = mean_for_att * (1 - item['freshness'])
                 time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)

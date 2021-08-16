@@ -26,11 +26,10 @@ class PlatformMock(Resource):
     strategy = default_config['Strategy'].lower()
     current_session = db.insert_one(strategy+'-sessions', {'strategy': strategy, 'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
     
-    strategy_factory = StrategyFactory(strategy, default_config['Attributes'].lower().split(','), default_config['BaseURL'], db)
+    strategy_factory = StrategyFactory(strategy, default_config['Attributes'].lower().split(','), default_config['BaseURL'], db, int(default_config['MovingWindow']))
 
     selected_algo = strategy_factory.selected_algo
     setattr(selected_algo, 'session', str(current_session))
-    setattr(selected_algo, 'moving_window', int(default_config['MovingWindow']))
     setattr(selected_algo, 'attributes', int(default_config['NoOfAttributes']))
 
     if(strategy != 'reactive'):
@@ -59,6 +58,8 @@ class PlatformMock(Resource):
 
     def get(self):
         session = request.args.get('session')
+        if(session == None):
+            session = str(db.read_last(self.strategy+'-sessions')._id)
 
         plt.xlabel('Request')
         plt.ylabel('Response Time')

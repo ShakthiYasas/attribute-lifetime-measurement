@@ -5,10 +5,11 @@ from restapiwrapper import Requester
 from lib.event import subscribe
 
 class Greedy(Strategy):
-    def __init__(self, attributes, url, db):
+    def __init__(self, attributes, url, db, window):
         print('Initializing Greedy Profile')
         self.url = url
         self.att = attributes
+        self.moving_window = window
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())       
 

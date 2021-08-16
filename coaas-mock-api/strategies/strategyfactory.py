@@ -6,13 +6,13 @@ from strategies.greedy import Greedy
 class StrategyFactory:
     selected_algo = None
 
-    def __init__(self, strat_name, attributes, url, db):
+    def __init__(self, strat_name, attributes, url, db, window):
         if(strat_name in strategy):
             if(strat_name == 'reactive'):
-                self.selected_algo = Reactive(attributes, url, db)
+                self.selected_algo = Reactive(attributes, url, db, window)
             if(strat_name == 'adaptive'):
-                self.selected_algo =  Adaptive(attributes, url, db)
+                self.selected_algo =  Adaptive(attributes, url, db, window)
             if(strat_name == 'greedy'):
-                self.selected_algo =  Greedy(attributes, url, db)
+                self.selected_algo =  Greedy(attributes, url, db, window)
         else:
-            self.selected_algo =  Reactive(attributes, url, db)
+            self.selected_algo =  Reactive(attributes, url, db, window)

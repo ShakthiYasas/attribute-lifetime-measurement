@@ -3,8 +3,9 @@ from profiler import Profiler
 from restapiwrapper import Requester
 
 class Reactive(Strategy):
-    def __init__(self, attributes, url, db):
+    def __init__(self, attributes, url, db, window):
         print('Initializing Reactive Profile')
+        self.moving_window = window
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())
         self.url = url

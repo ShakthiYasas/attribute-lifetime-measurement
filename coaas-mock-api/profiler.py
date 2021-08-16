@@ -2,7 +2,7 @@ import sys, os
 sys.path.append(os.path.abspath(os.path.join('..')))
 
 import time
-from datetime import datetime
+import datetime
 import threading
 from lib.event import post_event
 
@@ -12,7 +12,7 @@ class Profiler:
     lookup = {}
     interval = 1
     threadpool = []
-    last_time = datetime.now()
+    last_time = datetime.datetime.now()
 
     def __init__(self, attributes, db, window, caller_name, session = None):
         index = 0
@@ -43,16 +43,14 @@ class Profiler:
             th.start()
 
     def clear_expired(self) -> None:
-        curr_time = datetime.now()
+        exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
         for row in self.most_recently_used:
             for stamp in row:
-                if(len(stamp) != 0):
-                    diff = ((curr_time - stamp[1]).microseconds)/1000
-                    if(diff >= self.window):
-                        row.remove(stamp)
+                if(len(stamp) != 0 and stamp[1] < exp_time):
+                    row.remove(stamp)
 
     def reactive_push(self, response) -> None:
-        curr_time = datetime.now()
+        curr_time = datetime.datetime.now()
 
         for key,value in response.items():
             idx = self.lookup[key]
@@ -62,14 +60,14 @@ class Profiler:
                 duration = ((self.last_time - curr_time).microseconds)/1000
             else:
                 duration = ((lst_vals[-1][1] - curr_time).microseconds)/1000
-            lst_vals.append((value, curr_time, duration))
+            self.most_recently_used[idx].append((value, curr_time, duration))
 
             count = 0
             total_sum = 0
             local_sum = 0
             curr_val = None
 
-            for item in lst_vals:
+            for item in self.most_recently_used[idx]:
                 if(curr_val == None):
                     curr_val = item[0]
                     local_sum = item[2]
