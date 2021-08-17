@@ -1,4 +1,5 @@
 from math import trunc
+from dateutil import parser
 from profiler import Profiler
 from datetime import datetime
 from lib.event import subscribe
@@ -20,7 +21,7 @@ class Greedy(Strategy):
         response = self.requester.get_response(self.url)
 
         self.meta = response['meta']
-        self.meta['start_time'] = datetime.datetime.strptime(self.meta['start_time'])
+        self.meta['start_time'] = parser.parse(self.meta['start_time'])
 
         del response['meta']
         time_diff = datetime.now() - self.meta['start_time']

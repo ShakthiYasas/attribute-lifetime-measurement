@@ -1,5 +1,6 @@
 import datetime
 from math import trunc
+from dateutil import parser
 from profiler import Profiler
 from restapiwrapper import Requester
 from strategies.strategy import Strategy
@@ -22,7 +23,7 @@ class Adaptive(Strategy):
         response = self.requester.get_response(self.url)
         
         self.meta = response['meta']
-        self.meta['start_time'] = datetime.datetime.strptime(self.meta['start_time'])
+        self.meta['start_time'] = parser.parse(self.meta['start_time'])
         
         del response['meta']
         time_diff = datetime.datetime.now() - self.meta['start_time']

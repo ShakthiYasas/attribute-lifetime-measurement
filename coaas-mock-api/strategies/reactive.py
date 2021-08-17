@@ -1,4 +1,5 @@
 from math import trunc
+from dateutil import parser
 from datetime import datetime
 from profiler import Profiler
 from restapiwrapper import Requester
@@ -25,7 +26,7 @@ class Reactive(Strategy):
 
         if(self.meta == None):
             self.meta = response['meta']
-            self.meta['start_time'] = datetime.strptime(self.meta['start_time'])
+            self.meta['start_time'] = parser.parse(self.meta['start_time'])
 
         del response['meta']
         time_diff = datetime.now() - self.meta['start_time']
