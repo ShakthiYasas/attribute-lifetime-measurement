@@ -1,15 +1,17 @@
 import datetime
-from strategies.strategy import Strategy
+from math import trunc
 from profiler import Profiler
 from restapiwrapper import Requester
+from strategies.strategy import Strategy
 #from lib.util import run_in_parallel
 
 class Adaptive(Strategy):   
     db_insatnce = None
 
     def __init__(self, attributes, url, db, window):
-        print('Initializing Adaptive Profile')
+        print('Initializing Adaptive Profile') 
         self.url = url
+        self.meta = None
         self.db_insatnce = db
         self.moving_window = window
         self.requester = Requester()
@@ -18,6 +20,15 @@ class Adaptive(Strategy):
     def init_cache(self):
         self.profiler.session = self.session
         response = self.requester.get_response(self.url)
+        
+        self.meta = response['meta']
+        self.meta['start_time'] = datetime.datetime.strptime(self.meta['start_time'])
+        
+        del response['meta']
+        time_diff = datetime.datetime.now() - self.meta['start_time']
+        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
+        response['step'] = trunc(milisecond_diff/self.meta['sampling_rate'])
+
         self.profiler.reactive_push(response)
         self.cache_memory.save(response)
 
@@ -59,9 +70,14 @@ class Adaptive(Strategy):
 
         self.refresh_cache(refetching)
         response = self.cache_memory.get_values()
+        
+        time_diff = now - self.meta['start_time']
+        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
 
         if(len(json) != 0):
-            modified_response = {}
+            modified_response = {
+                'step': trunc(milisecond_diff/self.meta['sampling_rate'])
+            }
             for item in json:
                 if(item['attribute'] in response):
                     modified_response[item['attribute']] = response[item['attribute']]
@@ -75,8 +91,13 @@ class Adaptive(Strategy):
 
     def refresh_cache(self, attributes) -> None:
         response = self.requester.get_response(self.url)
+        del response['meta']
+        time_diff = datetime.datetime.now() - self.meta['start_time']
+        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
         
-        modified_response = {}
+        modified_response = {
+            'step': trunc(milisecond_diff/self.meta['sampling_rate'])
+        }
         for att in attributes:
             if(att in response):
                 modified_response[att] = response[att]

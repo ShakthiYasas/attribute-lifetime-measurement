@@ -51,8 +51,13 @@ class Profiler:
 
     def reactive_push(self, response) -> None:
         curr_time = datetime.datetime.now()
+        current_step = 0
 
         for key,value in response.items():
+            if(key == 'step'):
+                current_step = value
+                continue
+
             idx = self.lookup[key]
             lst_vals = self.most_recently_used[idx]
             duration = 0 
@@ -85,7 +90,8 @@ class Profiler:
             mean = total_sum/count             
 
             self.mean[idx] = mean
-            self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time})    
+
+            self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': current_step})    
         
         self.last_time = curr_time
 
