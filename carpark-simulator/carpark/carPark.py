@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from configuration import CarParkConfiguration
-from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution
+from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution, LinearDistribution, StaticDistribution
 
 class CarPark:
     configuration = None
@@ -16,15 +16,18 @@ class CarPark:
         print('Initializing Carpark')
         for count in range(0,len(self.configuration.skew)):
             if(self.configuration.variation[count] == 0):
-                self.distribution.append(RandomDistribution(self.configuration, count))
+                self.distribution.append(RandomDistribution(self.configuration, count, configuration.random_noise))
             elif(abs(self.configuration.variation[count]) == 1):
-                self.distribution.append(NormalDistribution(self.configuration, count))
-            else:
-                self.distribution.append(SuperImposedDistribution(self.configuration, count))
+                self.distribution.append(NormalDistribution(self.configuration, count, configuration.random_noise))
+            elif(abs(self.configuration.variation[count]) == 2):
+                self.distribution.append(SuperImposedDistribution(self.configuration, count, configuration.random_noise))
+            elif(self.configuration.variation[count] == 5):
+                self.distribution.append(LinearDistribution(self.configuration, configuration.random_noise))
+            elif(self.configuration.variation[count] == 6):
+                self.distribution.append(StaticDistribution(self.configuration, configuration.random_noise))
 
         self.print_distrubtions()
         print('Car park service running!')
-
 
     def get_current_status(self, milisecond_diff) -> dict:
         current_time_step = milisecond_diff/self.configuration.sampling_rate

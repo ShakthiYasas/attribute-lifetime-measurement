@@ -30,7 +30,8 @@ class CarParkContext(Resource):
         standard_deviation = default_config['StandardDeviation'], total_time = float(default_config['TotalTime']), 
         skew = default_config['Skew'], sampling_rate = float(default_config['SamplingRate']), 
         variation=default_config['ValueChange'].split(','), planning_period = default_config['PlanningPeriod'], 
-        selected_periods = default_config['SelectedPeriods'])
+        selected_periods = default_config['SelectedPeriods'], random_noise = True if default_config['RandomNoise'] == 'True' else False,
+        noise_percentage = float(default_config['NoisePercentage']), min_occupancy = float(default_config['MinOccupancy']))
     carpark_factory = CarParkFactory(configuration)
     carpark = carpark_factory.get_carpark()
 

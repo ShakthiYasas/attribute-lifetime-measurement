@@ -1,5 +1,7 @@
-from math import trunc
+import random
 import numpy as np
+from matplotlib import mlab
+from math import trunc
 from scipy.stats import skewnorm
 from scipy.ndimage import gaussian_filter1d
 
@@ -11,7 +13,7 @@ class Distribution(object):
     pass
 
 class NormalDistribution(Distribution):
-    def __init__(self, configuration, index):
+    def __init__(self, configuration, index, noise=False):
         self.time_step = []
         self.occupancy = []
         
@@ -33,6 +35,9 @@ class NormalDistribution(Distribution):
                 self.time_step = res[0]
                 self.occupancy = res[1]
             
+            if(noise):
+                self.occupancy = randomnoiser(self.occupancy, configuration.sample_size, configuration.noise_percentage)
+
             print('Random skewed distribution created.')
         else:
             raise ValueConfigurationError()
@@ -53,7 +58,7 @@ class NormalDistribution(Distribution):
                 return self.sample_size - self.occupancy[idx]
 
 class RandomDistribution(Distribution):
-    def __init__(self, configuration, index):
+    def __init__(self, configuration, index, noise=False):
 
         print('Starting to create a random normal distribution.')
 
@@ -91,10 +96,14 @@ class RandomDistribution(Distribution):
                 self.time_step = res[0]
                 self.occupancy = res[1]
 
+            self.occupancy = smooth(self.occupancy, configuration.standard_deviation[index])
+            
         except(Exception):
             print('End of distribution')
 
         self.occupancy = list(map(lambda x: configuration.sample_size if x > configuration.sample_size else x, smooth(self.occupancy, configuration.standard_deviation[index])))
+        if(noise):
+                self.occupancy = randomnoiser(self.occupancy, self.sample_size, configuration.noise_percentage)
 
     def get_occupancy_level(self, step):
         closest_step = min(self.time_step, key=lambda x:abs(x-step))
@@ -111,7 +120,7 @@ class RandomDistribution(Distribution):
                 return self.sample_size - self.occupancy[idx]
 
 class SuperImposedDistribution(Distribution):
-        def __init__(self, configuration, index):  
+        def __init__(self, configuration, index, noise=False):  
             self.time_step = []
             self.occupancy = []
             
@@ -139,6 +148,63 @@ class SuperImposedDistribution(Distribution):
                     return self.occupancy[idx]
                 else:
                     return self.sample_size - self.occupancy[idx]
+
+class StaticDistribution(Distribution):
+    def __init__(self, configuration, noise = False):
+        if(isinstance(configuration,CarParkConfiguration)):
+            print('Starting to create a static linear distribution.')
+            self.time_step = range(0, configuration.no_of_refreshes)
+            self.occupancy = [configuration.min_occupancy] * configuration.no_of_refreshes
+
+            if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
+                res = trim_distribution(configuration.selected_periods,self.occupancy)
+                self.time_step = res[0]
+                self.occupancy = res[1]
+            
+            if(noise):
+                self.occupancy = randomnoiser(self.occupancy, configuration.sample_size, configuration.noise_percentage)
+
+            print('Linear distribution created.')
+        else:
+            raise ValueConfigurationError()
+
+    def get_occupancy_level(self, step = None):
+        return self.occupancy[0]
+
+class LinearDistribution(Distribution):
+    def __init__(self, configuration, noise=False):
+        if(isinstance(configuration,CarParkConfiguration)):
+            print('Starting to create a linear distribution.')
+            self.time_step = range(0, configuration.no_of_refreshes)
+            gradient = (configuration.sample_size - configuration.min_occupancy)/configuration.no_of_refreshes
+            self.occupancy = np.arange(configuration.min_occupancy, configuration.sample_size, gradient)
+
+            if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
+                res = trim_distribution(configuration.selected_periods,self.occupancy)
+                self.time_step = res[0]
+                self.occupancy = res[1]
+            
+            if(noise):
+                self.occupancy = randomnoiser(self.occupancy, configuration.sample_size, configuration.noise_percentage)
+
+            print('Linear distribution created.')
+        else:
+            raise ValueConfigurationError()
+
+    def get_occupancy_level(self, step):
+        closest_step = min(self.time_step, key=lambda x:abs(x-step))
+        idx = self.time_step.index(closest_step)
+
+        if(closest_step>step):
+            if(self.variation>0):
+                return self.occupancy[idx-1]
+            else:
+                return self.sample_size - self.occupancy[idx-1]
+        else:
+            if(self.variation>0):
+                return self.occupancy[idx]
+            else:
+                return self.sample_size - self.occupancy[idx]
 
 #Static Method
 def super_impose(dist1, dist2):
@@ -189,3 +255,21 @@ def trim_distribution(selections, dist):
 def smooth(x,std):
     y = gaussian_filter1d(x, std)
     return list(map(lambda z : round(z), y))
+
+def randomnoiser(x, up_bound, coverage):
+    if(coverage <= 1.0 and coverage > 0.0):  
+        noise = np.random.normal(0,2,len(x))   
+        indexes = random.sample(range(len(x)), round(len(x)*coverage))
+        for i in indexes:
+            noise[i] = 0
+        return list(map(lambda z : check_value(round(x[z] + noise[z]), up_bound), range(0,len(x)))) 
+    else:
+        return x
+
+def check_value(x, up_bound):
+    if(x<0):
+        return 0
+    elif(x>up_bound):
+        return up_bound
+    else:
+        return x

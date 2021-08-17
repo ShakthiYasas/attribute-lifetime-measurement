@@ -19,7 +19,7 @@ class CarParkConfiguration(Configuration):
     selected_periods = []
 
     def __init__(self, current_session, sample_size = None, standard_deviation = None, total_time = None, skew = None, sampling_rate = None, variation = None,
-        planning_period = None, selected_periods = None):
+        planning_period = None, selected_periods = None, random_noise = False, noise_percentage = 0.0, min_occupancy = 0):
         
         self.current_session = current_session
         if(sample_size != None and sample_size > 0):
@@ -41,6 +41,9 @@ class CarParkConfiguration(Configuration):
         if(planning_period != None and int(planning_period) > self.sampling_rate):
             self.planningPeriod = int(planning_period)
 
+        self.random_noise = random_noise
+        self.min_occupancy = min_occupancy
+        self.noise_percentage = 1.0 - noise_percentage
         self.no_of_refreshes =  int(self.total_time/self.sampling_rate)
         self.median = self.no_of_refreshes/2
 
