@@ -45,11 +45,23 @@ class CarPark:
 
             plt.plot(dist.time_step, dist.occupancy)
             
-            f = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'_availability', "a")
-            f.write('time_step,occupancy\n')
+            life_file = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'lifetimes.csv', "a")
+            life_file.write('start,end,occupancy,life\n')
+
+            start, end = 0, 0
+            curr_value = dist.occupancy[0]
             for idx in range(0,len(dist.time_step)):
-                f.write(str(dist.time_step[idx]*self.configuration.sampling_rate)+','+str(dist.occupancy[idx])+'\n')
-            f.close()
+                end = idx
+                if(start != end and curr_value != dist.occupancy[end]):
+                    life = (dist.time_step[end] - dist.time_step[start])*self.configuration.sampling_rate
+                    life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx])+','+str(life)+'\n')
+                    start = end
+                    curr_value = dist.occupancy[end]
+                elif(idx == len(dist.time_step)-1):
+                    life = (dist.time_step[end] - dist.time_step[start])*self.configuration.sampling_rate
+                    life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx])+','+str(life)+'\n')
+
+            life_file.close()
   
         plt.savefig(str(self.configuration.current_session)+'-distribution.png')
 

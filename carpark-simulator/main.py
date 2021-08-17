@@ -26,11 +26,18 @@ db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 class CarParkContext(Resource):
     current_session = db.insert_one('simulator-sessions', {'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
 
-    configuration = CarParkConfiguration(current_session, sample_size = int(default_config['SampleSize']), standard_deviation = default_config['StandardDeviation'], 
-        total_time = float(default_config['TotalTime']), skew = default_config['Skew'], sampling_rate = float(default_config['SamplingRate']), 
-        variation=default_config['ValueChange'].split(','), planning_period = default_config['PlanningPeriod'], selected_periods = default_config['SelectedPeriods'])
+    configuration = CarParkConfiguration(current_session, sample_size = int(default_config['SampleSize']), 
+        standard_deviation = default_config['StandardDeviation'], total_time = float(default_config['TotalTime']), 
+        skew = default_config['Skew'], sampling_rate = float(default_config['SamplingRate']), 
+        variation=default_config['ValueChange'].split(','), planning_period = default_config['PlanningPeriod'], 
+        selected_periods = default_config['SelectedPeriods'])
     carpark_factory = CarParkFactory(configuration)
     carpark = carpark_factory.get_carpark()
+
+    meta = {
+        'start_time': str(start_time),
+        'sampling_rate': float(default_config['SamplingRate'])
+    }
 
     def get(self):
         try:   
@@ -39,7 +46,7 @@ class CarParkContext(Resource):
             milisecond_diff = (time_diff.days * seconds_in_day + time_diff.seconds)*1000
 
             data = self.carpark.get_current_status(milisecond_diff)
-            return parse_response(data), 200  # return data and 200 OK code
+            return parse_response(data, meta=self.meta), 200  # return data and 200 OK code
 
         except(Exception):
             print('An error occured : ' + traceback.format_exc())
