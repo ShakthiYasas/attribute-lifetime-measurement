@@ -59,7 +59,7 @@ class Greedy(Strategy):
 
         time_diff = datetime.now() - self.meta['start_time']
         milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
-        
+
         fetched = {
             attribute : response[attribute],
             'step': trunc(milisecond_diff/self.meta['sampling_rate'])

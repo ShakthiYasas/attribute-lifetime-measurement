@@ -10,7 +10,7 @@ class Profiler:
     db = None
     mean = []
     lookup = {}
-    interval = 1
+    interval = 1.0
     threadpool = []
     last_time = datetime.datetime.now()
 
@@ -51,20 +51,19 @@ class Profiler:
 
     def reactive_push(self, response) -> None:
         curr_time = datetime.datetime.now()
-        current_step = 0
+        current_step = response['step']
 
         for key,value in response.items():
             if(key == 'step'):
-                current_step = value
                 continue
 
             idx = self.lookup[key]
             lst_vals = self.most_recently_used[idx]
             duration = 0 
             if not lst_vals:
-                duration = ((self.last_time - curr_time).microseconds)/1000
+                duration = ((self.last_time - curr_time).microseconds)/1000.0
             else:
-                duration = ((lst_vals[-1][1] - curr_time).microseconds)/1000
+                duration = ((lst_vals[-1][1] - curr_time).microseconds)/1000.0
             self.most_recently_used[idx].append((value, curr_time, duration))
 
             count = 0
