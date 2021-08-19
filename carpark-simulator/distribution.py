@@ -177,7 +177,9 @@ class LinearDistribution(Distribution):
             print('Starting to create a linear distribution.')
             self.time_step = range(0, configuration.no_of_refreshes)
             gradient = (configuration.sample_size - configuration.min_occupancy)/configuration.no_of_refreshes
-            self.occupancy = np.arange(configuration.min_occupancy, configuration.sample_size, gradient)
+            occupancy = np.arange(configuration.min_occupancy, configuration.sample_size, gradient)
+
+            self.occupancy = list(map(lambda z : round(z), occupancy))
 
             if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
                 res = trim_distribution(configuration.selected_periods,self.occupancy)
