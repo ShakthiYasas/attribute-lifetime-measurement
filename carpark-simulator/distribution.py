@@ -198,15 +198,9 @@ class LinearDistribution(Distribution):
         idx = self.time_step.index(closest_step)
 
         if(closest_step>step):
-            if(self.variation>0):
-                return self.occupancy[idx-1]
-            else:
-                return self.sample_size - self.occupancy[idx-1]
+            return self.occupancy[idx-1]
         else:
-            if(self.variation>0):
-                return self.occupancy[idx]
-            else:
-                return self.sample_size - self.occupancy[idx]
+            return self.occupancy[idx]
 
 #Static Method
 def super_impose(dist1, dist2):
