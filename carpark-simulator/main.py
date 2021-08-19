@@ -43,10 +43,10 @@ class CarParkContext(Resource):
     def get(self):
         try:   
             curr_time = datetime.now()
-            time_diff = curr_time - start_time
-            milisecond_diff = (time_diff.days * seconds_in_day + time_diff.seconds)*1000
+            time_diff = (curr_time - start_time).total_seconds()*1000
+            #milisecond_diff = (time_diff.days * seconds_in_day + time_diff.seconds)*1000
 
-            data = self.carpark.get_current_status(milisecond_diff)
+            data = self.carpark.get_current_status(time_diff)
             return parse_response(data, meta=self.meta), 200  # return data and 200 OK code
 
         except(Exception):

@@ -61,9 +61,9 @@ class Profiler:
             lst_vals = self.most_recently_used[idx]
             duration = 0 
             if not lst_vals:
-                duration = ((self.last_time - curr_time).microseconds)/1000.0
+                duration = ((curr_time - self.last_time).total_seconds())*1000.0
             else:
-                duration = ((lst_vals[-1][1] - curr_time).microseconds)/1000.0
+                duration = ((curr_time - lst_vals[-1][1]).total_seconds())*1000.0
             self.most_recently_used[idx].append((value, curr_time, duration))
 
             count = 0

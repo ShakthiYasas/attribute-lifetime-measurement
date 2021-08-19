@@ -24,9 +24,9 @@ class Greedy(Strategy):
         self.meta['start_time'] = parser.parse(self.meta['start_time'])
 
         del response['meta']
-        time_diff = datetime.now() - self.meta['start_time']
-        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
-        response['step'] = trunc(milisecond_diff/self.meta['sampling_rate'])
+        time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
+        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
+        response['step'] = trunc(time_diff/self.meta['sampling_rate'])
 
         self.profiler.reactive_push(response)
         self.cache_memory.save(response)
@@ -37,12 +37,12 @@ class Greedy(Strategy):
     def get_result(self, url = None, json = None, session = None):       
         response = self.cache_memory.get_values()
        
-        time_diff = datetime.now() - self.meta['start_time']
-        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
+        time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
+        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
         
         if(len(json) != 0):
             modified_response = {
-                'step': trunc(milisecond_diff/self.meta['sampling_rate'])
+                'step': trunc(time_diff/self.meta['sampling_rate'])
             }
             for item in json:
                 if(item['attribute'] in response):
@@ -57,12 +57,12 @@ class Greedy(Strategy):
     def refresh_cache(self, attribute) -> None:
         response = self.requester.get_response(self.url)
 
-        time_diff = datetime.now() - self.meta['start_time']
-        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
+        time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
+        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
 
         fetched = {
             attribute : response[attribute],
-            'step': trunc(milisecond_diff/self.meta['sampling_rate'])
+            'step': trunc(time_diff/self.meta['sampling_rate'])
         }
         self.profiler.reactive_push(fetched)
         self.cache_memory.save(fetched)

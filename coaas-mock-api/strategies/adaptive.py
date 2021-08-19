@@ -26,9 +26,8 @@ class Adaptive(Strategy):
         self.meta['start_time'] = parser.parse(self.meta['start_time'])
         
         del response['meta']
-        time_diff = datetime.datetime.now() - self.meta['start_time']
-        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
-        response['step'] = trunc(milisecond_diff/self.meta['sampling_rate'])
+        time_diff = (datetime.datetime.now() - self.meta['start_time']).total_seconds()*1000
+        response['step'] = trunc(time_diff/self.meta['sampling_rate'])
 
         self.profiler.reactive_push(response)
         self.cache_memory.save(response)
@@ -72,12 +71,12 @@ class Adaptive(Strategy):
         self.refresh_cache(refetching)
         response = self.cache_memory.get_values()
         
-        time_diff = now - self.meta['start_time']
-        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
+        time_diff = (now - self.meta['start_time']).total_seconds()*1000
+        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
 
         if(len(json) != 0):
             modified_response = {
-                'step': trunc(milisecond_diff/self.meta['sampling_rate'])
+                'step': trunc(time_diff/self.meta['sampling_rate'])
             }
             for item in json:
                 if(item['attribute'] in response):
@@ -93,11 +92,11 @@ class Adaptive(Strategy):
     def refresh_cache(self, attributes) -> None:
         response = self.requester.get_response(self.url)
         del response['meta']
-        time_diff = datetime.datetime.now() - self.meta['start_time']
-        milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
+        time_diff = (datetime.datetime.now() - self.meta['start_time']).total_seconds()*1000
+        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
         
         modified_response = {
-            'step': trunc(milisecond_diff/self.meta['sampling_rate'])
+            'step': trunc(time_diff/self.meta['sampling_rate'])
         }
         for att in attributes:
             if(att in response):
