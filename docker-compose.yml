@@ -1,0 +1,15 @@
+version: "1.1"
+services:
+    cpsim:
+        image: carpark-sim:latest
+        container_name: "cpsim"
+        ports:
+          - "5000:5000"
+    
+    cmock:
+        image: cmock:latest
+        container_name: "cmock"
+        ports:
+          - "5001:5001"
+        depends_on:
+            - cpsim

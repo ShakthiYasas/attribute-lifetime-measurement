@@ -1,25 +1,20 @@
-FROM python:3.8.2
+FROM ubuntu:16.04
 
-# Set up and activate virtual environment
-ENV VIRTUAL_ENV "/venv"
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH "$VIRTUAL_ENV/bin:$PATH"
+# Copying the requirements file to install them
+COPY . /app/mock
+RUN cp -r ../lib/ /app/]
 
-# Python commands run inside the virtual environment
-RUN python -m pip install \
-        numpy \
-        scipy \
-        matplotlib \
-        traceback \ 
-        configparser \ 
-        flask \ 
-        flask_restful \ 
-        json \ 
-        threading \ 
-        pymongo \
-        multiprocessing
+# Change working directory
+WORKDIR /app/mock
 
-WORKDIR /usr/src/app
-COPY . .
-COPY .\lib .
-CMD ["main.py"]
+# Installing python
+RUN apt-get update -y && \
+    apt-get install -y python3 python-pip
+
+# Install the libaries in reqiurements.txt
+RUN pip install -r requirements.txt
+
+ENTRYPOINT [ "python" ]
+
+# Run simulator
+CMD [ "main.py" ]
