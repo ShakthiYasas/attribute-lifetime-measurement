@@ -1,11 +1,7 @@
-numpy
-scipy
-matplotlib
-traceback
 configparser
 Flask
 Flask_restful
-pymongo
 numpy
 matplotlib
 scipy
+pymongo

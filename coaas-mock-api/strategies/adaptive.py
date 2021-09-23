@@ -4,7 +4,6 @@ from dateutil import parser
 from profiler import Profiler
 from restapiwrapper import Requester
 from strategies.strategy import Strategy
-#from lib.util import run_in_parallel
 
 class Adaptive(Strategy):   
     db_insatnce = None

@@ -15,12 +15,14 @@ from lib.response import parse_response
 
 app = Flask(__name__)
 api = Api(app)
-start_time = datetime.now()
 
+# Global Variables
+start_time = datetime.now()
 config = configparser.ConfigParser()
 config.read('config.ini')
 default_config = config['DEFAULT']
 
+# Creating a DB client
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class CarParkContext(Resource):
@@ -35,6 +37,7 @@ class CarParkContext(Resource):
         selected_periods = default_config['SelectedPeriods'], random_noise = True if default_config['RandomNoise'] == 'True' else False,
         noise_percentage = float(default_config['NoisePercentage']), min_occupancy = float(default_config['MinOccupancy']))
     
+    # Requesting a car park instance from factory
     carpark_factory = CarParkFactory(configuration)
     carpark = carpark_factory.get_carpark()
 
@@ -43,19 +46,23 @@ class CarParkContext(Resource):
         'sampling_rate': float(default_config['SamplingRate'])
     }
 
+    # GET Endpoint 
     def get(self):
         try:   
+            # Calculating the current time step from start
             curr_time = datetime.now()
             time_diff = (curr_time - start_time).total_seconds()*1000
+            
+            # Retriving the measurement
             data = self.carpark.get_current_status(time_diff)
             
-            #return data and 200 OK code
+            # Return data and 200 OK code
             return parse_response(data, meta=self.meta), 200  
 
         except(Exception):
             print('An error occured : ' + traceback.format_exc())
 
-            # return message and 400 Error code
+            # Return message and 400 Error code
             return parse_response({'message':'An error occured'}), 400  
 
 api.add_resource(CarParkContext, '/carparks')

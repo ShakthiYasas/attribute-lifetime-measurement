@@ -2,7 +2,7 @@ FROM ubuntu:16.04
 
 # Copying the requirements file to install them
 COPY . /app/mock
-RUN cp -r ../lib/ /app/]
+RUN cp -r ../lib/ /app/
 
 # Change working directory
 WORKDIR /app/mock

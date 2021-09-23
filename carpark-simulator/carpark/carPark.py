@@ -3,6 +3,7 @@ from configuration import CarParkConfiguration
 from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution, LinearDistribution, StaticDistribution
 
 class CarPark:
+    # Class variables
     configuration = None
     distribution = []
     
@@ -14,6 +15,8 @@ class CarPark:
             self.configuration = CarParkConfiguration()
 
         print('Initializing Carpark')
+        # Selecting the correct type occupancy data distbution for the car park
+        # based on configuration.
         for count in range(0,len(self.configuration.skew)):
             if(self.configuration.variation[count] == 0):
                 self.distribution.append(RandomDistribution(self.configuration, count, configuration.random_noise))
@@ -29,6 +32,7 @@ class CarPark:
         self.print_distrubtions()
         print('Car park service running!')
 
+    # Produces the current occupancy
     def get_current_status(self, milisecond_diff) -> dict:
         current_time_step = milisecond_diff/self.configuration.sampling_rate
         response_obj = dict()
@@ -37,6 +41,10 @@ class CarPark:
 
         return response_obj
         
+    # Generates a, 
+    #  - Graphical visualization of the generated data distribution
+    #  - CSV file of the discrete lifetimes
+    # The files are saved within the container (or the directory)
     def print_distrubtions(self):
         plt.xlabel('Time Step')
         plt.ylabel('occupancy')
@@ -48,6 +56,7 @@ class CarPark:
 
             plt.plot(dist.time_step, dist.occupancy)
             
+            # Saving the CSV file
             life_file = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'lifetimes.csv', "a")
             life_file.write('start,end,occupancy,life\n')
 
@@ -65,6 +74,7 @@ class CarPark:
                     life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx])+','+str(life)+'\n')
 
             life_file.close()
-  
+
+        # Generating the graphical representation
         plt.savefig(str(self.configuration.current_session)+'-distribution.png')
 

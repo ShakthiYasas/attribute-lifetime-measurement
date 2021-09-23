@@ -2,18 +2,18 @@ FROM ubuntu
 
 # Copying the requirements file to install them
 COPY . /app/sim
-RUN cp -r ../lib/ /app/]
-
-# Change working directory
-WORKDIR /app/sim
+RUN cp -r ../lib/ /app/
 
 # Installing python
 RUN apt-get update -y
 RUN apt-get install -y python3 python3-pip
-
-# Install the libaries in reqiurements.txt
 RUN pip3 install --upgrade setuptools
 RUN pip3 install --upgrade pip
+
+# Change working directory
+WORKDIR /app/sim
+
+# Install the libaries in reqiurements.txt
 RUN pip3 install -r requirements.txt
 
 ENTRYPOINT [ "python" ]
