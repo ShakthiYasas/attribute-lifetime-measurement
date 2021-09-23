@@ -14,12 +14,9 @@ from strategies.strategy import Strategy
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):   
-    db_insatnce = None
-
     def __init__(self, attributes, url, db, window):
         self.url = url
         self.meta = None
-        self.db_insatnce = db
         self.moving_window = window
 
         self.requester = Requester()
@@ -121,10 +118,11 @@ class Adaptive(Strategy):
     # Refreshing selected cached items 
     # Parameters: attributes = list of cached context attributes which requires refreshing
     def refresh_cache(self, attributes) -> None:
+        # Retrive raw context from provider
         response = self.requester.get_response(self.url)
+        
         del response['meta']
         time_diff = (datetime.datetime.now() - self.meta['start_time']).total_seconds()*1000
-        
         modified_response = {
             'step': trunc(time_diff/self.meta['sampling_rate'])
         }

@@ -16,7 +16,7 @@ class Reactive(Strategy):
         self.url = url
         self.meta = None 
         self.moving_window = window
-        
+
         self.requester = Requester()
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())     
 
@@ -52,5 +52,6 @@ class Reactive(Strategy):
         self.profiler.reactive_push(response)
         return response
 
+    # Returns the current statistics from the profiler
     def get_current_profile(self):
         self.profiler.get_details()
