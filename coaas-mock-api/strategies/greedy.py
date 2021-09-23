@@ -25,7 +25,6 @@ class Greedy(Strategy):
 
         del response['meta']
         time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
-        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
         response['step'] = trunc(time_diff/self.meta['sampling_rate'])
 
         self.profiler.reactive_push(response)
@@ -35,21 +34,16 @@ class Greedy(Strategy):
         subscribe("need_to_refresh", self.refresh_cache)
 
     def get_result(self, url = None, json = None, session = None):       
-        response = self.cache_memory.get_values()
-       
         time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
-        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
-        
-        if(len(json) != 0):
-            modified_response = {
-                'step': trunc(time_diff/self.meta['sampling_rate'])
-            }
-            for item in json:
-                if(item['attribute'] in response):
-                    modified_response[item['attribute']] = response[item['attribute']]
-            response = modified_response
+        output = {'step': trunc(time_diff/self.meta['sampling_rate'])}
 
-        return response
+        if(len(json) != 0):
+            for item in json:
+                cached_item  = self.cache_memory.get_value_by_key(item['attribute'])
+                if(cached_item != None):
+                    output[item['attribute']] = cached_item
+
+        return output
 
     def get_current_profile(self):
         self.profiler.get_details()
@@ -58,7 +52,6 @@ class Greedy(Strategy):
         response = self.requester.get_response(self.url)
 
         time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
-        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
 
         fetched = {
             attribute : response[attribute],

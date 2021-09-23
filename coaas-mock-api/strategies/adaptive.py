@@ -31,16 +31,15 @@ class Adaptive(Strategy):
         self.profiler.reactive_push(response)
         self.cache_memory.save(response)
 
-    def get_result(self, url = None, json = None, session = None):       
-        response = self.cache_memory.get_values()
+    def get_result(self, url = None, json = None, session = None):               
+        query = []
+        refetching = []
         now = datetime.datetime.now()
 
-        refetching = []
-        query = []
         if(len(json) != 0):
             # check freshness of the given attributes
             for item in json:
-                if(item['attribute'] in response):
+                if(self.cache_memory.get_value_by_key(item['attribute']) != None):
                     idx = self.profiler.lookup[item['attribute']]
                     l_f = self.profiler.most_recently_used[idx]
                     last_fecth = self.profiler.last_time if not l_f else l_f[-1][1]
@@ -68,22 +67,19 @@ class Adaptive(Strategy):
                     query.append({'session': session, 'attribute': item['attribute'], 'isHit': True})
 
         self.refresh_cache(refetching)
-        response = self.cache_memory.get_values()
-        
-        time_diff = (now - self.meta['start_time']).total_seconds()*1000
-        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
 
-        if(len(json) != 0):
-            modified_response = {
-                'step': trunc(time_diff/self.meta['sampling_rate'])
-            }
+        time_diff = (now - self.meta['start_time']).total_seconds()*1000
+        output = {'step': trunc(time_diff/self.meta['sampling_rate'])}
+
+        if(len(json) != 0):       
             for item in json:
-                if(item['attribute'] in response):
-                    modified_response[item['attribute']] = response[item['attribute']]
-            response = modified_response
+                cached_item  = self.cache_memory.get_value_by_key(item['attribute'])
+                if(cached_item != None):
+                    output[item['attribute']] = cached_item
 
         self.db_insatnce.insert_many('adaptive-hits', query)
-        return response
+        
+        return output
 
     def get_current_profile(self):
         self.profiler.get_details()
@@ -92,7 +88,6 @@ class Adaptive(Strategy):
         response = self.requester.get_response(self.url)
         del response['meta']
         time_diff = (datetime.datetime.now() - self.meta['start_time']).total_seconds()*1000
-        #milisecond_diff = (time_diff.days * 86400 + time_diff.seconds)*1000
         
         modified_response = {
             'step': trunc(time_diff/self.meta['sampling_rate'])

@@ -9,10 +9,14 @@ from lib.event import post_event
 class Profiler:
     # Class variables
     db = None
-    mean = []
-    lookup = {}
-    interval = 1.0
+
+    lookup = {} # Index look up for each context attribute
+    mean = [] # Contains the current average inferred lifetime of each attribute
+    
+    # Static configurations for background threads 
+    interval = 1.0 # 1 Second
     threadpool = []
+
     last_time = datetime.datetime.now()
 
     def __init__(self, attributes, db, window, caller_name, session = None):
@@ -21,10 +25,11 @@ class Profiler:
         self.db = db   
         self.window = window
         self.session = session
-        self.caller_name = caller_name
-        self.mean = [0] * len(attributes)
-        self.most_recently_used = [[]] * len(attributes)
+        self.caller_name = caller_name # Retrieval strategy
+        self.mean = [0] * len(attributes) # Mean lifetime of all attributes initialized to 0
+        self.most_recently_used = [[]] * len(attributes) # Zero matrix initialized
         
+        # Entring values to lookup table
         for att in attributes:
             self.lookup[att] = index
             index+=1
@@ -51,57 +56,70 @@ class Profiler:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
         for row in self.most_recently_used:
             for stamp in row:
+                # If value of older than the oldest in the current window, clear it from the matrix
                 if(len(stamp) != 0 and stamp[1] < exp_time):
                     row.remove(stamp)
 
-    # Recative push recomputes the moving avergae lifetime of the 
+    # Reactive push recomputes the moving avergae lifetime of the 
     # responses recived and refreshes the cache entry.
     def reactive_push(self, response) -> None:
         curr_time = datetime.datetime.now()
-        current_step = response['step']
-
+        
+        # Updating the statistics of all the attributes that has been retrived
         for key,value in response.items():
             if(key == 'step'):
                 continue
 
             idx = self.lookup[key]
             lst_vals = self.most_recently_used[idx]
+            
+            # Calculating the time gap with last retrieval
             duration = 0 
             if not lst_vals:
                 duration = ((curr_time - self.last_time).total_seconds())*1000.0
             else:
                 duration = ((curr_time - lst_vals[-1][1]).total_seconds())*1000.0
+            
+            # Update the most recent data matrix with the recent retrieval 
             self.most_recently_used[idx].append((value, curr_time, duration))
-
-            count = 0
-            total_sum = 0
-            local_sum = 0
-            curr_val = None
-
-            for item in self.most_recently_used[idx]:
-                if(curr_val == None):
-                    curr_val = item[0]
-                    local_sum = item[2]
-                else:
-                    if(item[0] != curr_val):
-                        count += 1
-                        total_sum += local_sum
-                        curr_val = item[0]
-                        local_sum = item[2]
-                    else:
-                        local_sum += item[2]
-
-            total_sum += local_sum
-            count += 1
-            mean = total_sum/count             
-
+            
+            # Calculate the new moving average lifetime
+            mean = self.calculate_meanlife(idx)
+            
             self.mean[idx] = mean
-
-            self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': current_step})    
+            self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': response['step']})    
         
         self.last_time = curr_time
 
+    # Calculates the moving average lifetime of a context attribute
+    def calculate_meanlife(self, idx) -> float:
+        count = 0
+        total_sum = 0
+        local_sum = 0
+        curr_val = None
+
+        for item in self.most_recently_used[idx]:
+            if(curr_val == None):
+                curr_val = item[0]
+                local_sum = item[2]
+            else:
+                if(item[0] != curr_val):
+                    count += 1
+                    total_sum += local_sum
+                    curr_val = item[0]
+                    local_sum = item[2]
+                else:
+                    local_sum += item[2]
+        
+        # Adjusting for initial state
+        total_sum += local_sum
+        count += 1
+
+        return total_sum/count
+
+    # Returns the current statistics of profiled lifetimes
     def get_details(self) -> dict:
+        # Do calculations here and send
         return {
             'mean_lifetimes': self.mean,
             'most_recent': self.most_recently_used
@@ -111,8 +129,8 @@ class Profiler:
 class GreedyRetrievalThread (threading.Thread):
     def __init__(self, thread_id, name, caller):
         threading.Thread.__init__(self)
-        self.thread_id = thread_id
-        self.caller = caller
+        self.thread_id = thread_id 
+        self.caller = caller # Pointer to the caller instance
         self.name = name
 
     def run(self):
@@ -120,7 +138,11 @@ class GreedyRetrievalThread (threading.Thread):
 
     def refresh(self):
         while True:
+            # Trigger refresh event
             post_event("need_to_refresh", self.name)
+            
+            # Get the currently inffered lifetime of the attribute
             means = getattr(self.caller,'mean')
+            # Sleep until that time is elapsed
             time.sleep(means[self.thread_id]/1000)
             
