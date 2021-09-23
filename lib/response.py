@@ -4,6 +4,7 @@ response_object = {
     'time_stamp': ''
 }
 
+# Produces the generic response from the API
 def parse_response(dictionary, session = None, meta = None):
     now = datetime.now() # current date and time
     response = response_object.copy()
