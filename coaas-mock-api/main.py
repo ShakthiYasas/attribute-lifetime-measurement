@@ -1,6 +1,3 @@
-import sys, os
-sys.path.append(os.path.abspath(os.path.join('../')))
-
 import time
 import traceback
 import configparser
@@ -8,8 +5,9 @@ from cache import Cache
 from datetime import datetime
 import matplotlib.pyplot as plt
 from flask import Flask, request
-from lib.mongoclient import MongoClient
 from flask_restful import Resource, Api
+
+from lib.mongoclient import MongoClient
 from lib.response import parse_response
 from strategies.strategyfactory import StrategyFactory
 
@@ -17,7 +15,7 @@ app = Flask(__name__)
 api = Api(app)
 
 config = configparser.ConfigParser()
-config.read('/coaas-mock-api/config.ini')
+config.read('config.ini')
 default_config = config['DEFAULT']
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 

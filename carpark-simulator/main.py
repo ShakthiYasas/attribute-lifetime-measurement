@@ -1,6 +1,3 @@
-import sys, os
-sys.path.append(os.path.abspath(os.path.join('../')))
-
 import traceback
 import configparser
 from flask import Flask
