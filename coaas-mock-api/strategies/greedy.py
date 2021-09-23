@@ -1,3 +1,5 @@
+import time
+import threading
 from math import trunc
 from dateutil import parser
 from profiler import Profiler
@@ -17,10 +19,27 @@ class Greedy(Strategy):
         self.url = url
         self.meta = None
         self.att = attributes
+        self.isProfiling = False
+        self.requests_profile = {}
         self.moving_window = window
-
+        
         self.requester = Requester()
-        self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())       
+        self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())
+
+        # Initializing background thready to clear collected responses that fall outside the window.
+        thread = threading.Thread(target=self.run, args=())
+        thread.daemon = True               
+        thread.start()        
+
+    # Sampling the requests to find the most expensive SLA attributes
+    def run(self):
+        while True:
+            self.requests_profile.clear()
+            self.isProfiling = True
+            time.sleep(5)
+            self.isProfiling = False
+            self.profiler.update_freshness_requirement(self.requests_profile)
+            time.sleep(55)
 
     # Init_cache initializes the cache memory. 
     # This includes the first retrieval.
@@ -49,6 +68,13 @@ class Greedy(Strategy):
         self.profiler.auto_cache_refresh_for_greedy(self.att) 
         subscribe("need_to_refresh", self.refresh_cache)
 
+    def update_profile(self, attribute,freshness):
+        if(attribute in self.requests_profile):
+            if(self.requests_profile[attribute] < freshness):
+                self.requests_profile[attribute] = freshness
+        else:
+            self.requests_profile[attribute] = freshness
+
     # Retrieving context data entirely from the cache
     def get_result(self, url = None, json = None, session = None):       
         time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
@@ -59,6 +85,8 @@ class Greedy(Strategy):
             for item in json:
                 cached_item  = self.cache_memory.get_value_by_key(item['attribute'])
                 if(cached_item != None):
+                    if(self.isProfiling):
+                        self.update_profile(item['attribute'],item['freshness'])
                     output[item['attribute']] = cached_item
 
         return output
@@ -81,7 +109,7 @@ class Greedy(Strategy):
         }
 
         # Push to profilers
-        self.profiler.reactive_push(fetched)
+        self.profiler.reactive_push(fetched, is_greedy=True)
 
         # Update cache entries
         self.cache_memory.save(fetched)

@@ -12,6 +12,7 @@ class Profiler:
 
     lookup = {} # Index look up for each context attribute
     mean = [] # Contains the current average inferred lifetime of each attribute
+    freshness_reqiurement = {} # Current level of freshness requirements
     
     # Static configurations for background threads 
     interval = 1.0 # 1 Second
@@ -44,6 +45,11 @@ class Profiler:
             self.clear_expired()
             time.sleep(self.interval)
 
+    # Get the freshness of the most SLA for each attribute
+    def update_freshness_requirement(self,freshnesses):
+        for key, value in freshnesses.items():
+            self.freshness_reqiurement[self.lookup[key]] = value
+
     # Function to refresh greedily based on event-trigger
     def auto_cache_refresh_for_greedy(self, attributes) -> None:
         for att in attributes:
@@ -62,7 +68,7 @@ class Profiler:
 
     # Reactive push recomputes the moving avergae lifetime of the 
     # responses recived and refreshes the cache entry.
-    def reactive_push(self, response) -> None:
+    def reactive_push(self, response, is_greedy=False) -> None:
         curr_time = datetime.datetime.now()
         
         # Updating the statistics of all the attributes that has been retrived
@@ -84,7 +90,7 @@ class Profiler:
             self.most_recently_used[idx].append((value, curr_time, duration))
             
             # Calculate the new moving average lifetime
-            mean = self.calculate_meanlife(idx)
+            mean = self.calculate_meanlife(idx, is_greedy)
             
             self.mean[idx] = mean
             self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': response['step']})    
@@ -92,7 +98,7 @@ class Profiler:
         self.last_time = curr_time
 
     # Calculates the moving average lifetime of a context attribute
-    def calculate_meanlife(self, idx) -> float:
+    def calculate_meanlife(self, idx, is_greedy) -> float:
         count = 0
         total_sum = 0
         local_sum = 0
@@ -114,6 +120,10 @@ class Profiler:
         # Adjusting for initial state
         total_sum += local_sum
         count += 1
+
+        #Adjusting greedy algorithm to manage with the most expensive SLA
+        if(is_greedy):
+            return (total_sum/count)*self.freshness_reqiurement[idx]
 
         return total_sum/count
 
