@@ -3,7 +3,11 @@ import datetime
 import threading
 from lib.event import post_event
 
+# Profiler class
+# Perform the inferencing of average lifetime by intercepting the 
+# responses from the context providers.
 class Profiler:
+    # Class variables
     db = None
     mean = []
     lookup = {}
@@ -12,6 +16,7 @@ class Profiler:
     last_time = datetime.datetime.now()
 
     def __init__(self, attributes, db, window, caller_name, session = None):
+        # Instance variables
         index = 0
         self.db = db   
         self.window = window
@@ -24,6 +29,7 @@ class Profiler:
             self.lookup[att] = index
             index+=1
         
+        # Initializing background thready to clear collected responses that fall outside the window.
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True               
         thread.start() 
@@ -33,12 +39,14 @@ class Profiler:
             self.clear_expired()
             time.sleep(self.interval)
 
+    # Function to refresh greedily based on event-trigger
     def auto_cache_refresh_for_greedy(self, attributes) -> None:
         for att in attributes:
-            th = MyThread(self.lookup[att], att, self)
+            th = GreedyRetrievalThread(self.lookup[att], att, self)
             self.threadpool.append(th)
             th.start()
-
+    
+    # Clear function that run on the background
     def clear_expired(self) -> None:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
         for row in self.most_recently_used:
@@ -46,6 +54,8 @@ class Profiler:
                 if(len(stamp) != 0 and stamp[1] < exp_time):
                     row.remove(stamp)
 
+    # Recative push recomputes the moving avergae lifetime of the 
+    # responses recived and refreshes the cache entry.
     def reactive_push(self, response) -> None:
         curr_time = datetime.datetime.now()
         current_step = response['step']
@@ -97,7 +107,8 @@ class Profiler:
             'most_recent': self.most_recently_used
             }
 
-class MyThread (threading.Thread):
+# Greedy retrival thread
+class GreedyRetrievalThread (threading.Thread):
     def __init__(self, thread_id, name, caller):
         threading.Thread.__init__(self)
         self.thread_id = thread_id

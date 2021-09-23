@@ -14,9 +14,12 @@ from strategies.strategyfactory import StrategyFactory
 app = Flask(__name__)
 api = Api(app)
 
+# Global variables
 config = configparser.ConfigParser()
 config.read('config.ini')
 default_config = config['DEFAULT']
+
+# Connecting to a monogo DB instance 
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class PlatformMock(Resource):
@@ -29,30 +32,43 @@ class PlatformMock(Resource):
     setattr(selected_algo, 'session', str(current_session))
     setattr(selected_algo, 'attributes', int(default_config['NoOfAttributes']))
 
+    # "Reactive" strategy do not need a cache memory. 
+    # Therefore, skipping cache initializing for "Reactive".
     if(strategy != 'reactive'):
         cache_size = int(default_config['CacheSize'])
         if(cache_size < selected_algo.attributes):
             cache_size = selected_algo.attributes
             print('Initializing cache with '+ str(selected_algo.attributes) + ' slots.')
         
+        #Initializing cache memory
         setattr(selected_algo, 'cache_memory', Cache(cache_size))
         selected_algo.init_cache()
 
+    # POST /contexts endpoint
+    # Retrives context data. 
     def post(self):
         try:
+            # Start to process the request
             start = time.time()
             json_obj = request.get_json()
             data = self.selected_algo.get_result(default_config['BaseURL'], json_obj, str(self.current_session))
-    
             elapsed_time = time.time() - start
             response = parse_response(data, str(self.current_session))
+            # End of processing the request
+            
             db.insert_one(self.strategy+'-responses', {'session': str(self.current_session), 'strategy': self.strategy, 'data': response, 'time': elapsed_time})
+            
+            # Return data and 200 OK code
+            return response, 200 
 
-            return response, 200  # return data and 200 OK code
         except(Exception):
             print('An error occured : ' + traceback.format_exc())
-            return parse_response({'message':'An error occured'}), 400  # return message and 400 Error code
+            
+            # Return message and 400 Error code
+            return parse_response({'message':'An error occured'}), 400  
 
+    # GET /context endpoint.
+    # Retrives the details (metadata & statistics) of the current session in progress. 
     def get(self):
         session = request.args.get('session')
         if(session == None):
@@ -69,6 +85,7 @@ class PlatformMock(Resource):
             requests.append(str(res._id))
             responsetimes.append(res.time)
 
+        # Plots the variation of response times
         plt.plot(requests, responsetimes)  
         filename = str(self.current_session)+'-responsetime.png'
         plt.savefig(filename)
