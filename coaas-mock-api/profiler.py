@@ -121,8 +121,9 @@ class Profiler:
         total_sum += local_sum
         count += 1
 
-        #Adjusting greedy algorithm to manage with the most expensive SLA
-        if(is_greedy):
+        # Adjusting greedy algorithm to manage with the most expensive SLA
+        # However, considering the lifetime until freshness = 0 if no freshness requirement is yet specificed.
+        if(is_greedy and idx in self.freshness_reqiurement):
             return (total_sum/count)*self.freshness_reqiurement[idx]
 
         return total_sum/count
