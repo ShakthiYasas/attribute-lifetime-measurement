@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('.')))
+
 import traceback
 import configparser
 from flask import Flask
@@ -16,7 +19,7 @@ api = Api(app)
 # Global Variables
 start_time = datetime.now()
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(os.getcwd()+'/carpark-simulator/config.ini')
 default_config = config['DEFAULT']
 
 # Creating a DB client

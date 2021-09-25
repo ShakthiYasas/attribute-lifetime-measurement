@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('.')))
+
 import time
 import traceback
 import configparser
@@ -16,7 +19,7 @@ api = Api(app)
 
 # Global variables
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(os.getcwd()+'/coaas-mock-api/config.ini')
 default_config = config['DEFAULT']
 
 # Connecting to a monogo DB instance 
