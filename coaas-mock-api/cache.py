@@ -41,7 +41,7 @@ class Cache:
 class LimitedSizeDict(OrderedDict):
     def __init__(self, *args, **kwds):
         # Frequency of access counter (count,[list of timestamps])
-        self.freq_table = []
+        self.freq_table = {}
 
         self.size_limit = kwds.pop("size_limit", None)
         OrderedDict.__init__(self, *args, **kwds)
