@@ -26,9 +26,11 @@ class Cache:
     # Read from cache using key
     def get_value_by_key(self,key):
         if(key in self.cache_spec):
-            stat = self.cache_spec.freq_table[key]
+            stat = list(self.cache_spec.freq_table[key])
             stat[0]=+1
             stat[1].append(datetime.now())
+            self.cache_spec.freq_table[key] = tuple(stat)
+            
             return self.cache_spec[key]
         else:
             return None
