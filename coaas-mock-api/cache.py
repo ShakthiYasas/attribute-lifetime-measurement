@@ -9,7 +9,7 @@ class Cache:
     # Insert/Update to cache by key
     def save(self, cacheitems) -> None:
         for key, value in cacheitems.items():
-            if(key not in self.freq_table):
+            if(key not in self.cache_spec.freq_table):
                 self.cache_spec.freq_table[key] = (0,[])
             self.cache_spec[key] = value
 
