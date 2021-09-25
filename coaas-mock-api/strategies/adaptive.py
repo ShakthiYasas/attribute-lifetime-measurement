@@ -13,10 +13,11 @@ from strategies.strategy import Strategy
 # Adaptive create cache misses and potentially vulanarable to data inaccuracies.
 # Therefore, a compromise between the greedy and reactive.
 
-class Adaptive(Strategy):   
+class Adaptive(Strategy):  
     def __init__(self, attributes, url, db, window):
         self.url = url
         self.meta = None
+        self.db_insatnce = db
         self.moving_window = window
 
         self.requester = Requester()
