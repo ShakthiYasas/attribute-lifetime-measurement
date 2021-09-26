@@ -17,6 +17,7 @@ class Adaptive(Strategy):
     def __init__(self, attributes, url, db, window):
         self.url = url
         self.meta = None
+        self.db_insatnce = db
         self.moving_window = window
 
         self.requester = Requester()

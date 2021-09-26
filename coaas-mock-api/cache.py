@@ -9,7 +9,7 @@ class Cache:
     # Insert/Update to cache by key
     def save(self, cacheitems) -> None:
         for key, value in cacheitems.items():
-            if(key not in self.freq_table):
+            if(key not in self.cache_spec.freq_table):
                 self.cache_spec.freq_table[key] = (0,[])
             self.cache_spec[key] = value
 
@@ -26,9 +26,10 @@ class Cache:
     # Read from cache using key
     def get_value_by_key(self,key):
         if(key in self.cache_spec):
-            stat = self.cache_spec.freq_table[key]
+            stat = list(self.cache_spec.freq_table[key])
             stat[0]=+1
             stat[1].append(datetime.now())
+            self.cache_spec[key] = tuple(stat)
             return self.cache_spec[key]
         else:
             return None
@@ -41,7 +42,7 @@ class Cache:
 class LimitedSizeDict(OrderedDict):
     def __init__(self, *args, **kwds):
         # Frequency of access counter (count,[list of timestamps])
-        self.freq_table = []
+        self.freq_table = {}
 
         self.size_limit = kwds.pop("size_limit", None)
         OrderedDict.__init__(self, *args, **kwds)
