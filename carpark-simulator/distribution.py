@@ -55,20 +55,12 @@ class NormalDistribution(Distribution):
 
     # Get the current occupnacy of the car-park
     def get_occupancy_level(self, step):
-        closest_step = min(self.time_step, key=lambda x:abs(x-step))
-        idx = self.time_step.index(closest_step)
-
+        idx = self.time_step.index(step)     
         # Mapping continuous time into discrete timesteps 
-        if(closest_step>step):
-            if(self.variation>0):
-                return self.occupancy[idx-1]
-            else:
-                return self.sample_size - self.occupancy[idx-1]
+        if(self.variation>0):
+            return self.occupancy[idx]
         else:
-            if(self.variation>0):
-                return self.occupancy[idx]
-            else:
-                return self.sample_size - self.occupancy[idx]
+            return self.sample_size - self.occupancy[idx]
 
 # RandomDistribution class 
 # Generates a standard normal distribution that is guranteed no-skew.
@@ -127,20 +119,12 @@ class RandomDistribution(Distribution):
                 self.occupancy = randomnoiser(self.occupancy, self.sample_size, configuration.noise_percentage)
 
     def get_occupancy_level(self, step):
-        closest_step = min(self.time_step, key=lambda x:abs(x-step))
-        idx = self.time_step.index(closest_step)
-        
+        idx = self.time_step.index(step)     
         # Mapping continuous time into discrete timesteps 
-        if(closest_step>step):
-            if(self.variation>0):
-                return self.occupancy[idx-1]
-            else:
-                return self.sample_size - self.occupancy[idx-1]
+        if(self.variation>0):
+            return self.occupancy[idx]
         else:
-            if(self.variation>0):
-                return self.occupancy[idx]
-            else:
-                return self.sample_size - self.occupancy[idx]
+            return self.sample_size - self.occupancy[idx]
 
 # SuperImposedDistribution class
 # Superimposes skewed normal distribution with a un-skewed normal distibution to produce
@@ -169,20 +153,12 @@ class SuperImposedDistribution(Distribution):
 
         # Get current occupnacy of the carpark
         def get_occupancy_level(self, step):
-            closest_step = min(self.time_step, key=lambda x:abs(x-step))
-            idx = self.time_step.index(closest_step)
-
+            idx = self.time_step.index(step)     
             # Mapping continuous time into discrete timesteps 
-            if(closest_step>step):
-                if(self.variation>0):
-                    return self.occupancy[idx-1]
-                else:
-                    return self.sample_size - self.occupancy[idx-1]
+            if(self.variation>0):
+                return self.occupancy[idx]
             else:
-                if(self.variation>0):
-                    return self.occupancy[idx]
-                else:
-                    return self.sample_size - self.occupancy[idx]
+                return self.sample_size - self.occupancy[idx]
 
 # StaticDistribution class
 # Generates a linear distribution where gradient = 0 (i.e. y=n where n is real number)
@@ -240,14 +216,8 @@ class LinearDistribution(Distribution):
 
     # Get current occupnacy of the carpark
     def get_occupancy_level(self, step):
-        closest_step = min(self.time_step, key=lambda x:abs(x-step))
-        idx = self.time_step.index(closest_step)
-
-        # Mapping continuous time into discrete timesteps 
-        if(closest_step>step):
-            return self.occupancy[idx-1]
-        else:
-            return self.occupancy[idx]
+        idx = self.time_step.index(step) 
+        return self.occupancy[idx]
 
 # Static Method
 # Takes 2 distributions and merges them into a single distribution.

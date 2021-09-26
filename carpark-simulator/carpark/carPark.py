@@ -1,3 +1,4 @@
+from math import trunc
 import matplotlib.pyplot as plt
 from configuration import CarParkConfiguration
 from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution, LinearDistribution, StaticDistribution
@@ -34,7 +35,7 @@ class CarPark:
 
     # Produces the current occupancy
     def get_current_status(self, milisecond_diff) -> dict:
-        current_time_step = milisecond_diff/self.configuration.sampling_rate
+        current_time_step = trunc(milisecond_diff/self.configuration.sampling_rate)
         response_obj = dict()
         for idx in range(0,len(self.distribution)):
             response_obj['area_'+str(idx+1)+'_availability'] = self.distribution[idx].get_occupancy_level(current_time_step)
@@ -57,7 +58,7 @@ class CarPark:
             plt.plot(dist.time_step, dist.occupancy)
             
             # Saving the CSV file
-            life_file = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'lifetimes.csv', "a")
+            life_file = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'-lifetimes.csv', "a")
             life_file.write('start,end,occupancy,life\n')
 
             start, end = 0, 0
@@ -66,7 +67,7 @@ class CarPark:
                 end = idx
                 if(start != end and curr_value != dist.occupancy[end]):
                     life = (dist.time_step[end] - dist.time_step[start])*self.configuration.sampling_rate
-                    life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx])+','+str(life)+'\n')
+                    life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx-1])+','+str(life)+'\n')
                     start = end
                     curr_value = dist.occupancy[end]
                 elif(idx == len(dist.time_step)-1):
