@@ -61,7 +61,7 @@ class Adaptive(Strategy):
                     l_f = self.profiler.most_recently_used[idx]
                     last_fecth = self.profiler.last_time if not l_f else l_f[-1][1]
                     mean_for_att = self.profiler.mean[idx]
-                    expire_time = mean_for_att * item['freshness']
+                    expire_time = mean_for_att * (1 - item['freshness'])
                     time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
                     
                     if(now > time_at_expire):
@@ -83,7 +83,7 @@ class Adaptive(Strategy):
                 l_f = self.profiler.most_recently_used[idx]
                 last_fecth = self.profiler.last_time if not l_f else l_f[-1][1]
                 mean_for_att = self.profiler.mean[idx]
-                expire_time = mean_for_att * item['freshness']
+                expire_time = mean_for_att * (1 - item['freshness'])
                 time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)
                 
                 if(now > time_at_expire):
