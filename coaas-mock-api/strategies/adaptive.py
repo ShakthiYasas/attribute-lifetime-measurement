@@ -1,9 +1,12 @@
+import time
 import datetime
+import threading
 from math import trunc
 from dateutil import parser
 
 from strategies.strategy import Strategy
 from lib.restapiwrapper import ServiceSelector
+from lib.fifoqueue import FIFOQueue_2
 
 from profilers.staticprofiler import StaticProfiler
 from profilers.adaptiveprofiler import AdaptiveProfiler
@@ -19,21 +22,45 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 class Adaptive(Strategy):  
     def __init__(self, db, window, isstatic=True):
         self.meta = None
-        self.db_instance = db
-        self.moving_window = window
-        self.observed = {}
+        self.__db_instance = db
+        self.__moving_window = window
+        self.__observed = {}
 
         self.service_selector = ServiceSelector(db)
         if(isstatic):
-            self.profiler = AdaptiveProfiler(db, self.moving_window, self.__class__.__name__.lower())
+            self.profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
         else:
-            self.profiler = StaticProfiler(db, self.moving_window, self.__class__.__name__.lower())
+            self.profiler = StaticProfiler(db, self.__moving_window, self.__class__.__name__.lower())
     
     # Init_cache initializes the cache memory. 
     def init_cache(self):
         # Set current session to profiler if not set
         if(self.profiler.session == None):
             self.profiler.session = self.session
+
+        # Initializing background thread clear observations.
+        thread = threading.Thread(target=self.run, args=())
+        thread.daemon = True               
+        thread.start() 
+
+    def run(self):
+        while True:
+            self.clear_expired()
+            # Observing the attributes that has not been cached within the window
+            time.sleep(self.__moving_window/1000) 
+    
+    # Clear function that run on the background
+    async def clear_expired(self) -> None:
+        exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window)
+        for key,value in self.__observed.items():
+            if(value.get_last() < exp_time):
+                del self.__observed[key]
+            else:
+                for tstamp in value:
+                    if(tstamp < exp_time):
+                        value.remove(tstamp)
+                    else:
+                        break
 
     # Retrieving context data
     def get_result(self, json = None, session = None) -> dict:               
@@ -101,7 +128,7 @@ class Adaptive(Strategy):
                     if(cached_item != None):
                         output[item['attribute']] = cached_item
 
-            self.db_instance.insert_many('cache_hits', query)
+            self.__db_instance.insert_many('cache_hits', query)
             
             return output
         else:
@@ -110,10 +137,9 @@ class Adaptive(Strategy):
             # If caching, then update all the records 
             # Else update the observed list
             if(entityid in self.observed):
-                self.observed[entityid].append(datetime.datetime.now())
+                self.__observed[entityid].push(datetime.datetime.now())
             else:
-                self.observed[entityid] = [datetime.datetime.now()]
-            # Background thread to remove stale observations
+                self.__observed[entityid] = FIFOQueue_2(100).push(datetime.datetime.now())
 
     # Returns the current statistics from the profiler
     def get_current_profile(self):

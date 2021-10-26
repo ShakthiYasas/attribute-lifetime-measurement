@@ -69,6 +69,8 @@ class AdaptiveProfiler(Profiler):
                 # If value of older than the oldest in the current window, clear it from the matrix
                 if(len(stamp) != 0 and stamp[1] < exp_time):
                     row.remove(stamp)
+                else:
+                    break
 
     # Reactive push recomputes the moving avergae lifetime of the 
     # responses recived and refreshes the cache entry.
