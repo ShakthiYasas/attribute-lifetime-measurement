@@ -4,7 +4,7 @@ from cache.cacheagent import CacheAgent
 from lib.limitedsizedict import LimitedSizeDict
 
 # Implementing a simple fixed sized in-memory cache
-class CacheCache(CacheAgent):
+class CloudCache(CacheAgent):
     def __init__(self, size):
         self.entityhash = LimitedSizeDict(size_limit = size)
 

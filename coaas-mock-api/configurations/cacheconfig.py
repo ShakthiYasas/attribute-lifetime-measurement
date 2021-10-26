@@ -8,10 +8,8 @@ class CacheConfiguration(Configuration):
     type = 'in-memory'
     
     def __init__(self, config):
-        defaults = config['DEFAULT']
-       
-        self.type = defaults['CacheType']
-        self.window_size = defaults['WindowSize']
-        self.cache_size = int(defaults['CacheBlocksPerUnit'])*int(defaults['CacheSize'])
+        self.type = config['CacheType']
+        self.window_size = config['WindowSize']
+        self.cache_size = int(config['CacheBlocksPerUnit'])*int(config['CacheSize'])
 
         
