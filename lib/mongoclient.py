@@ -7,6 +7,11 @@ class MongoClient:
     myclient = pymongo.MongoClient(connection)
     self.db = myclient[database]
   
+  # Retrieve the first record of the collection by a condition
+  def read_single(self, collection, condition, sorting_col = '_id'):
+    col = self.db[collection]
+    return col.find(condition).sort(sorting_col).limit(1)
+
   # Retrieve the last record of the collection
   def read_last(self, collection, sorting_col = '_id'):
     col = self.db[collection]

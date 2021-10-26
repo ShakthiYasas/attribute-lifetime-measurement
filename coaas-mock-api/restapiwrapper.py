@@ -25,3 +25,13 @@ class Requester:
                 time.sleep(0.5)
         
         return response
+
+# Simple Context Service Resolution
+class ServiceSelector:
+    def __init__(self, db):
+        self.db_instance = db
+        self.requester = Requester()
+
+    def get_response_for_entity(self, entityid):
+        rec = self.db_instance.read_single('service-registry',{'entity':entityid})
+        return self.requester.get_response(rec['url'])

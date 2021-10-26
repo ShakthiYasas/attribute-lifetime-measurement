@@ -114,8 +114,6 @@ class Greedy(Strategy):
         # Update cache entries
         self.cache_memory.save(fetched)
 
-        #run_in_parallel(self.cache_memory.save(fetched),self.profiler.reactive_push(fetched))
-
         
         
         
