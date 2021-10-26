@@ -11,7 +11,7 @@ from lib.event import post_event
 # Profiler class for adaptive lifetime based refreshing
 # Perform the inferencing of average lifetime by intercepting the responses from the context providers.
 class AdaptiveProfiler(Profiler):
-    # Class variables
+    # Private Class variables
     __db = None
 
     __lookup = {} # Index look up for each context attribute
@@ -139,6 +139,16 @@ class AdaptiveProfiler(Profiler):
             'mean_lifetimes': self.__mean,
             'most_recent': self.__most_recently_used
             }
+
+    # Getter methods
+    def get_lookup(self) -> dict:
+        return self.__lookup
+
+    def get_most_recently_used(self,idx) -> dict:
+        return self.__most_recently_used[idx]
+
+    def get_means(self,idx) -> dict:
+        return self.__mean[idx]
 
 # Greedy retrival thread
 class GreedyRetrievalThread (threading.Thread):

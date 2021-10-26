@@ -5,8 +5,9 @@ from lib.limitedsizedict import LimitedSizeDict
 
 # Implementing a simple fixed sized in-memory cache
 class InMemoryCache(CacheAgent):
-    def __init__(self, size):
-        self.__entityhash = LimitedSizeDict(size_limit = size)
+    def __init__(self, config):
+        self.window = config.window_size
+        self.__entityhash = LimitedSizeDict(size_limit = config.cache_size)
     
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
