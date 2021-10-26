@@ -4,38 +4,39 @@ sys.path.append(os.path.abspath(os.path.join('..')))
 import time
 import datetime
 import threading
+
+from profiler import Profiler
 from lib.event import post_event
 
-# Profiler class
-# Perform the inferencing of average lifetime by intercepting the 
-# responses from the context providers.
-class Profiler:
+# Profiler class for adaptive lifetime based refreshing
+# Perform the inferencing of average lifetime by intercepting the responses from the context providers.
+class AdaptiveProfiler(Profiler):
     # Class variables
-    db = None
+    __db = None
 
-    lookup = {} # Index look up for each context attribute
-    mean = [] # Contains the current average inferred lifetime of each attribute
-    freshness_reqiurement = {} # Current level of freshness requirements
+    __lookup = {} # Index look up for each context attribute
+    __mean = [] # Contains the current average inferred lifetime of each attribute
+    __freshness_reqiurement = {} # Current level of freshness requirements
     
     # Static configurations for background threads 
-    interval = 1.0 # 1 Second
-    threadpool = []
+    __interval = 1.0 # 1 Second
+    __threadpool = []
 
     last_time = datetime.datetime.now()
 
     def __init__(self, attributes, db, window, caller_name, session = None):
         # Instance variables
         index = 0
-        self.db = db   
+        self.__db = db   
         self.window = window
         self.session = session
         self.caller_name = caller_name # Retrieval strategy
-        self.mean = [0] * len(attributes) # Mean lifetime of all attributes initialized to 0
-        self.most_recently_used = [[]] * len(attributes) # Zero matrix initialized
+        self.__mean = [0] * len(attributes) # Mean lifetime of all attributes initialized to 0
+        self.__most_recently_used = [[]] * len(attributes) # Zero matrix initialized
         
         # Entring values to lookup table
         for att in attributes:
-            self.lookup[att] = index
+            self.__lookup[att] = index
             index+=1
         
         # Initializing background thready to clear collected responses that fall outside the window.
@@ -46,24 +47,24 @@ class Profiler:
     def run(self):
         while True:
             self.clear_expired()
-            time.sleep(self.interval)
+            time.sleep(self.__interval)
 
     # Get the freshness of the most SLA for each attribute
     def update_freshness_requirement(self,freshnesses):
         for key, value in freshnesses.items():
-            self.freshness_reqiurement[self.lookup[key]] = value
+            self.__freshness_reqiurement[self.__lookup[key]] = value
 
     # Function to refresh greedily based on event-trigger
     def auto_cache_refresh_for_greedy(self, attributes) -> None:
         for att in attributes:
-            th = GreedyRetrievalThread(self.lookup[att], att, self)
-            self.threadpool.append(th)
+            th = GreedyRetrievalThread(self.__lookup[att], att, self)
+            self.__threadpool.append(th)
             th.start()
     
     # Clear function that run on the background
     def clear_expired(self) -> None:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
-        for row in self.most_recently_used:
+        for row in self.__most_recently_used:
             for stamp in row:
                 # If value of older than the oldest in the current window, clear it from the matrix
                 if(len(stamp) != 0 and stamp[1] < exp_time):
@@ -79,8 +80,8 @@ class Profiler:
             if(key == 'step'):
                 continue
 
-            idx = self.lookup[key]
-            lst_vals = self.most_recently_used[idx]
+            idx = self.__lookup[key]
+            lst_vals = self.__most_recently_used[idx]
             
             # Calculating the time gap with last retrieval
             duration = 0 
@@ -90,13 +91,13 @@ class Profiler:
                 duration = ((curr_time - lst_vals[-1][1]).total_seconds())*1000.0
             
             # Update the most recent data matrix with the recent retrieval 
-            self.most_recently_used[idx].append((value, curr_time, duration))
+            self.__most_recently_used[idx].append((value, curr_time, duration))
             
             # Calculate the new moving average lifetime
             mean = self.calculate_meanlife(idx, is_greedy)
             
-            self.mean[idx] = mean
-            self.db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': response['step']})    
+            self.__mean[idx] = mean
+            self.__db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': response['step']})    
         
         self.last_time = curr_time
 
@@ -107,7 +108,7 @@ class Profiler:
         local_sum = 0
         curr_val = None
 
-        for item in self.most_recently_used[idx]:
+        for item in self.__most_recently_used[idx]:
             if(curr_val == None):
                 curr_val = item[0]
                 local_sum = item[2]
@@ -126,8 +127,8 @@ class Profiler:
 
         # Adjusting greedy algorithm to manage with the most expensive SLA
         # However, considering the lifetime until freshness = 0 if no freshness requirement is yet specificed.
-        if(is_greedy and idx in self.freshness_reqiurement):
-            return (total_sum/count) * (1 - self.freshness_reqiurement[idx])
+        if(is_greedy and idx in self.__freshness_reqiurement):
+            return (total_sum/count) * (1 - self.__freshness_reqiurement[idx])
 
         return total_sum/count
 
@@ -135,8 +136,8 @@ class Profiler:
     def get_details(self) -> dict:
         # Do calculations here and send
         return {
-            'mean_lifetimes': self.mean,
-            'most_recent': self.most_recently_used
+            'mean_lifetimes': self.__mean,
+            'most_recent': self.__most_recently_used
             }
 
 # Greedy retrival thread
