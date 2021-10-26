@@ -2,9 +2,11 @@ import datetime
 from math import trunc
 from dateutil import parser
 
-from profiler import Profiler
 from strategies.strategy import Strategy
-from restapiwrapper import ServiceSelector
+from lib.restapiwrapper import ServiceSelector
+
+from profilers.staticprofiler import StaticProfiler
+from profilers.adaptiveprofiler import AdaptiveProfiler
 
 # Adaptive retrieval strategy
 # This strategy would retrieve from the context provider only when the freshness can't be met.
@@ -15,14 +17,17 @@ from restapiwrapper import ServiceSelector
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
-    def __init__(self, db, window):
+    def __init__(self, db, window, isstatic=True):
         self.meta = None
         self.db_instance = db
         self.moving_window = window
         self.observed = {}
 
         self.service_selector = ServiceSelector(db)
-        self.profiler = Profiler(db, self.moving_window, self.__class__.__name__.lower())
+        if(isstatic):
+            self.profiler = AdaptiveProfiler(db, self.moving_window, self.__class__.__name__.lower())
+        else:
+            self.profiler = StaticProfiler(db, self.moving_window, self.__class__.__name__.lower())
     
     # Init_cache initializes the cache memory. 
     def init_cache(self):
@@ -48,12 +53,12 @@ class Adaptive(Strategy):
                 if(self.cache_memory.get_value_by_key(entityid, item['attribute']) != None):
                     # The context attribute is also cached for the entity
                     # Get the index of the cache slot in which the attribute is cached
-                    idx = self.profiler.lookup[str(entityid)+'.'+item['attribute']]
+                    idx = self.profiler.get_lookup[str(entityid)+'.'+item['attribute']]
                     # Retreive the recent history of retrievals of the attribute
-                    l_f = self.profiler.most_recently_used[idx]
+                    l_f = self.profiler.get_most_recently_used(idx)
                     last_fecth = self.profiler.last_time if not l_f else l_f[-1][1]
                     # Estimated lifetime of the attribute
-                    mean_for_att = self.profiler.mean[idx]
+                    mean_for_att = self.profiler.get_means(idx)
                     # Based on the estimated lifetime, calculate the expiry period until the subsequent retrieval
                     expire_time = mean_for_att * (1 - item['freshness'])
                     time_at_expire = last_fecth + datetime.timedelta(milliseconds=expire_time)

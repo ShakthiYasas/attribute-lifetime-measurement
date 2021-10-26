@@ -8,8 +8,9 @@ class CacheAgent(object):
     # Retrieve
     def get_values(self) -> dict: pass
     def get_value_by_key(self,entityid,attribute): pass
-    # Check Cache
-    def _is_cached(self,entityid,attribute): pass
+    # Check Cache (private method)
+    def __is_cached(self,entityid,attribute): pass
     # Get Statistics
     def get_statistics(self): pass
     def get_statistics(self, entityid, attribute): pass
+    def get_hitrate_trend(self): pass

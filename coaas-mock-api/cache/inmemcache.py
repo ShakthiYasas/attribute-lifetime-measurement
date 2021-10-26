@@ -1,13 +1,37 @@
+import time
+import threading
 from datetime import datetime
 
 from cache.cacheagent import CacheAgent
 from lib.limitedsizedict import LimitedSizeDict
+from lib.fifoqueue import FIFOQueue
 
 # Implementing a simple fixed sized in-memory cache
 class InMemoryCache(CacheAgent):
-    def __init__(self, config):
-        self.window = config.window_size
+    def __init__(self, config):      
+        # Data structure of the cache
         self.__entityhash = LimitedSizeDict(size_limit = config.cache_size)
+
+        # Statistical configurations
+        self.window = config.window_size
+        self.__hitrate_trend = FIFOQueue(round(self.window/5000)) 
+        self.__localstats = []
+        
+        # Initializing background thread to calculate current hit rate.
+        thread = threading.Thread(target=self.run, args=())
+        thread.daemon = True               
+        thread.start() 
+
+    def run(self):
+        while True:
+            self.calculate_hitrate()
+            # Hit rate is calculated each 5 seconds
+            time.sleep(5)
+
+    async def calculate_hitrate(self):
+        local = self.__localstats.copy()
+        self.__localstats.clear()
+        self.__hitrate_trend.push(sum(local)/len(local))
     
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
@@ -33,13 +57,18 @@ class InMemoryCache(CacheAgent):
         return self.__entityhash
 
     # Check if the entity is cached
-    def _is_cached(self,entityid,attribute):
-        return entityid in self.__entityhash and attribute in self.__entityhash[entityid]        
+    def __is_cached(self,entityid,attribute):
+        res = entityid in self.__entityhash and attribute in self.__entityhash[entityid]
+        if(res):
+            self.__localstats.append(1)
+        else:
+            self.__localstats.append(0)
+        return res
 
     # Read from cache using key
     def get_value_by_key(self,entityid,attribute):
         # Check if both the entity and the the attribute are already cached
-        if(self._is_cached(entityid,attribute)):
+        if(self.__is_cached(entityid,attribute)):
             # Updating frequency table for context attributes
             att_stat = list(self.__entityhash[entityid].freq_table[attribute])
             att_stat[0]=+1
@@ -64,4 +93,7 @@ class InMemoryCache(CacheAgent):
     def get_statistics(self, entityid, attribute):
         return self.__entityhash[entityid].freq_table[attribute]
 
+    # Returns the trend of the hit rate with in the moving window
+    def get_hitrate_trend(self):
+        return self.__hitrate_trend
 

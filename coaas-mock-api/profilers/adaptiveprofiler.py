@@ -62,7 +62,7 @@ class AdaptiveProfiler(Profiler):
             th.start()
     
     # Clear function that run on the background
-    def clear_expired(self) -> None:
+    async def clear_expired(self) -> None:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
         for row in self.__most_recently_used:
             for stamp in row:
