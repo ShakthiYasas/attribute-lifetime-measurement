@@ -12,8 +12,6 @@ from lib.event import post_event
 # Perform the inferencing of average lifetime by intercepting the responses from the context providers.
 class AdaptiveProfiler(Profiler):
     # Private Class variables
-    __db = None
-
     __lookup = {} # Index look up for each context attribute-provider pair
     __mean = {} # Contains the current average inferred lifetime of each attribute-provider pair
     __freshness_reqiurement = {} # Current level of freshness requirements
@@ -24,9 +22,8 @@ class AdaptiveProfiler(Profiler):
 
     last_time = datetime.datetime.now()
 
-    def __init__(self, db, window, caller_name, session = None):
-        # Constants of the instance
-        self.__db = db   
+    def __init__(self, window, caller_name, session = None):
+        # Constants of the instance  
         self.window = window
         self.session = session
         self.caller_name = caller_name
@@ -43,7 +40,7 @@ class AdaptiveProfiler(Profiler):
             time.sleep(self.__interval)
 
     # Clear function that run on the background
-    async def clear_expired(self) -> None:
+    def clear_expired(self) -> None:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
         for row in self.__lookup.items():
             for stamp in row:
