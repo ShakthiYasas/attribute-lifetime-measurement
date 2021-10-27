@@ -158,24 +158,20 @@ class Adaptive(Strategy):
                     list(map(lambda key,value: (key,value['url']), metadata.items())))
 
     def __refresh_cache_for_entity(self, new_context) -> None:
-        for entityid,attribute_list,metadata in new_context:
-            response = {
-                entityid : self.service_selector.get_response_for_entity(attribute_list, 
+        for entityid,attribute_list,metadata in new_context:       
+            response = self.service_selector.get_response_for_entity(attribute_list, 
                         list(map(lambda key,value: (key,value['url']), metadata.items())))
-            }
             # Push to profiler
-            self.__profiler.reactive_push(response)
+            self.__profiler.reactive_push({entityid,response})
             # Save items in cache
-            self.cache_memory.save(response)
+            self.cache_memory.save(entityid,response)
 
     # Refreshing for selected context producers
     def __refresh_cache_for_producers(self, refresh_context) -> None:
         # Retrive raw context from provider according to the provider
         for entityid,attribute_list,prodid,url in refresh_context:
-            response = {
-                entityid : self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
-            }
+            response = self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
             # Push to profiler
-            self.__profiler.reactive_push(response)
+            self.__profiler.reactive_push({entityid,response})
             # Save items in cache
-            self.cache_memory.save(response)
+            self.cache_memory.save(entityid,response)

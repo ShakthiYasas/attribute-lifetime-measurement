@@ -13,5 +13,5 @@ class CacheAgent(object):
     def __is_cached(self,entityid,attribute): pass
     # Get Statistics
     def get_statistics(self): pass
-    def get_statistics(self, entityid, attribute): pass
     def get_hitrate_trend(self): pass
+    def get_statistics(self, entityid, attribute): pass

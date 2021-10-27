@@ -36,15 +36,15 @@ class InMemoryCache(CacheAgent):
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
         if(entityid in self.__entityhash):
-            for key, value in cacheitems.items():
-                if(key not in self.__entityhash[entityid].freq_table):
-                    self.__entityhash[entityid].freq_table[key] = (0,[])
-                self.__entityhash[entityid][key] = value
+            for att_name, values in cacheitems.items():
+                if(att_name not in self.__entityhash[entityid].freq_table):
+                    self.__entityhash[entityid].freq_table[att_name] = (0,[])
+                self.__entityhash[entityid][att_name] = values
         else:
             self.__entityhash[entityid] = LimitedSizeDict()
-            for key, value in cacheitems.items():
-                self.__entityhash[entityid].freq_table[key] = (0,[])
-                self.__entityhash[entityid][key] = value
+            for att_name, values in cacheitems.items():
+                self.__entityhash[entityid].freq_table[att_name] = (0,[])
+                self.__entityhash[entityid][att_name] = values
 
     # Evicts an entity from cache
     def evict(self, entityid) -> None:
