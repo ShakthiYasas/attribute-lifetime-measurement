@@ -89,10 +89,8 @@ class Adaptive(Strategy):
                         att_in_cache = self.cache_memory.get_value_by_key(entityid, att_name)
                         if(isinstance(self.__profiler, AdaptiveProfiler)):
                             for prodid,val,lastret in att_in_cache:
-                                # Get the index of the cache slot in which the attribute is cached
-                                idx = self.__profiler.get_lookup[str(entityid)+'.'+str(prodid)+'.'+att_name]
                                 # Estimated lifetime of the attribute
-                                mean_for_att = self.__profiler.get_means(idx)  
+                                mean_for_att = self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att_name)  
                                 extime = mean_for_att * (1 - fthresh)
                                 time_at_expire = lastret + datetime.timedelta(milisseconds=extime)
                                 if(now > time_at_expire):
@@ -162,7 +160,7 @@ class Adaptive(Strategy):
             response = self.service_selector.get_response_for_entity(attribute_list, 
                         list(map(lambda key,value: (key,value['url']), metadata.items())))
             # Push to profiler
-            self.__profiler.reactive_push({entityid,response})
+            self.__profiler.reactive_push({entityid:response})
             # Save items in cache
             self.cache_memory.save(entityid,response)
 
@@ -172,6 +170,6 @@ class Adaptive(Strategy):
         for entityid,attribute_list,prodid,url in refresh_context:
             response = self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
             # Push to profiler
-            self.__profiler.reactive_push({entityid,response})
+            self.__profiler.reactive_push({entityid:response})
             # Save items in cache
             self.cache_memory.save(entityid,response)

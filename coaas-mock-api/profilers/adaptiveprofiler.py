@@ -14,8 +14,8 @@ class AdaptiveProfiler(Profiler):
     # Private Class variables
     __db = None
 
-    __lookup = {} # Index look up for each context attribute
-    __mean = [] # Contains the current average inferred lifetime of each attribute
+    __lookup = {} # Index look up for each context attribute-provider pair
+    __mean = {} # Contains the current average inferred lifetime of each attribute-provider pair
     __freshness_reqiurement = {} # Current level of freshness requirements
     
     # Static configurations for background threads 
@@ -24,20 +24,12 @@ class AdaptiveProfiler(Profiler):
 
     last_time = datetime.datetime.now()
 
-    def __init__(self, attributes, db, window, caller_name, session = None):
-        # Instance variables
-        index = 0
+    def __init__(self, db, window, caller_name, session = None):
+        # Constants of the instance
         self.__db = db   
         self.window = window
         self.session = session
-        self.caller_name = caller_name # Retrieval strategy
-        self.__mean = [0] * len(attributes) # Mean lifetime of all attributes initialized to 0
-        self.__most_recently_used = [[]] * len(attributes) # Zero matrix initialized
-        
-        # Entring values to lookup table
-        for att in attributes:
-            self.__lookup[att] = index
-            index+=1
+        self.caller_name = caller_name
         
         # Initializing background thready to clear collected responses that fall outside the window.
         thread = threading.Thread(target=self.run, args=())
@@ -46,60 +38,50 @@ class AdaptiveProfiler(Profiler):
 
     def run(self):
         while True:
-            self.clear_expired()
+            if(len(self.__lookup.items())>0):
+                self.clear_expired()
             time.sleep(self.__interval)
 
-    # Get the freshness of the most SLA for each attribute
-    def update_freshness_requirement(self,freshnesses):
-        for key, value in freshnesses.items():
-            self.__freshness_reqiurement[self.__lookup[key]] = value
-
-    # Function to refresh greedily based on event-trigger
-    def auto_cache_refresh_for_greedy(self, attributes) -> None:
-        for att in attributes:
-            th = GreedyRetrievalThread(self.__lookup[att], att, self)
-            self.__threadpool.append(th)
-            th.start()
-    
     # Clear function that run on the background
     async def clear_expired(self) -> None:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.window)
-        for row in self.__most_recently_used:
+        for row in self.__lookup.items():
             for stamp in row:
                 # If value of older than the oldest in the current window, clear it from the matrix
-                if(len(stamp) != 0 and stamp[1] < exp_time):
+                if(stamp[1] < exp_time):
                     row.remove(stamp)
                 else:
                     break
 
     # Reactive push recomputes the moving avergae lifetime of the 
     # responses recived and refreshes the cache entry.
-    def reactive_push(self, response, is_greedy=False) -> None:
+    def reactive_push(self, response:dict , is_greedy=False) -> None:
         curr_time = datetime.datetime.now()
+        entity = next(iter((response.items())) )
         
         # Updating the statistics of all the attributes that has been retrived
-        for key,value in response.items():
-            if(key == 'step'):
-                continue
-
-            idx = self.__lookup[key]
-            lst_vals = self.__most_recently_used[idx]
-            
-            # Calculating the time gap with last retrieval
-            duration = 0 
-            if not lst_vals:
-                duration = ((curr_time - self.last_time).total_seconds())*1000.0
-            else:
-                duration = ((curr_time - lst_vals[-1][1]).total_seconds())*1000.0
-            
-            # Update the most recent data matrix with the recent retrieval 
-            self.__most_recently_used[idx].append((value, curr_time, duration))
-            
-            # Calculate the new moving average lifetime
-            mean = self.calculate_meanlife(idx, is_greedy)
-            
-            self.__mean[idx] = mean
-            self.__db.insert_one(key+'-lifetime',{'session': self.session, 'strategy': self.caller_name, 'lifetime:':mean, 'time': curr_time, 'step': response['step']})    
+        for attr_name, val_list in entity[1].items():
+            for prodid,val,l_ret in val_list:
+                idx = str(entity[0])+'.'+str(prodid)+'.'+attr_name
+                if(idx in self.__lookup):
+                    # There exist a current lookup
+                    rec_history = self.__lookup[idx]
+                    # Calculating the time gap with last retrieval
+                    duration = 0 
+                    if len(rec_history):
+                        duration = ((curr_time - rec_history[-1][1]).total_seconds())*1000.0 
+                    else:
+                        duration = ((curr_time - self.last_time).total_seconds())*1000.0
+                    # Update the most recent data matrix with the recent retrieval 
+                    self.__lookup[idx].append((val, curr_time, duration)) 
+                    # Calculate the new moving average lifetime
+                    self.__mean[idx] = self.calculate_meanlife(idx, is_greedy)
+                else:
+                    # There is not look up at the moment.
+                    # So, this is an new entity or an attribute of an entity that is cached now. 
+                    # Add to lookup and add to most recently used
+                    self.__lookup[idx]=[(val, curr_time, 0)]
+                    self.__mean[idx]=0 
         
         self.last_time = curr_time
 
@@ -110,7 +92,7 @@ class AdaptiveProfiler(Profiler):
         local_sum = 0
         curr_val = None
 
-        for item in self.__most_recently_used[idx]:
+        for item in self.__lookup[idx]:
             if(curr_val == None):
                 curr_val = item[0]
                 local_sum = item[2]
@@ -139,18 +121,25 @@ class AdaptiveProfiler(Profiler):
         # Do calculations here and send
         return {
             'mean_lifetimes': self.__mean,
-            'most_recent': self.__most_recently_used
+            'most_recent': self.__lookup
             }
 
     # Getter methods
-    def get_lookup(self) -> dict:
-        return self.__lookup
+    def get_mean(self,attribute) -> dict:
+        return self.__mean[attribute]
 
-    def get_most_recently_used(self,idx) -> dict:
-        return self.__most_recently_used[idx]
-
-    def get_means(self,idx) -> dict:
-        return self.__mean[idx]
+# Methods only relevant to Greedy (Full Coverage) Retrieval 
+    # Get the freshness of the most SLA for each attribute
+    def update_freshness_requirement(self,freshnesses):
+        for key, value in freshnesses.items():
+            self.__freshness_reqiurement[key] = value
+    
+    # Function to refresh greedily based on event-trigger
+    def auto_cache_refresh_for_greedy(self, attributes) -> None:
+        for att in attributes:
+            th = GreedyRetrievalThread(self.__lookup[att], att, self)
+            self.__threadpool.append(th)
+            th.start()
 
 # Greedy retrival thread
 class GreedyRetrievalThread (threading.Thread):
