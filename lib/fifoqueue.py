@@ -9,6 +9,9 @@ class FIFOQueue():
             self.__queue.get()
         self.__queue.put_nowait(val)
 
+    def getlist(self):
+        return list(self.__queue)
+
 
 class FIFOQueue_2():
     def __init__(self,size):

@@ -23,7 +23,9 @@ class Adaptive(Strategy):
         self.__reqs_in_window = 0
         self.__isstatic = isstatic
         self.__moving_window = window
+
         self.__entity_access_trend = FIFOQueue_2(100)
+        self.__request_rate_trend = FIFOQueue_2(100)
 
         self.service_selector = ServiceSelector()
         if(not self.__isstatic):
@@ -64,6 +66,7 @@ class Adaptive(Strategy):
                         self.__entity_access_trend.push(access_freq)
                         break
         self.__evaluated.clear()
+        self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
         self.__reqs_in_window = 0
     
     # Returns the current statistics from the profiler

@@ -15,15 +15,15 @@ class DQNConfiguration(Configuration):
         self.replace_target_iter = int(defaults['ParameterSync'])
         self.dynamic_e_greedy_iter = int(defaults['ExplorationEpoch'])
 
-        self.learning_rate = float(hyper_params['alpha'])
-        self.discount_rate = float(hyper_params['gamma'])
-        self.e_greedy_init = float(hyper_params['epsilon'])
-        self.e_greedy_max = float(hyper_params['epsilon_max'])
-        self.e_greedy_increment = float(hyper_params['delta_plus'])
-        self.e_greedy_decrement = float(hyper_params['delta_minus'])
+        self.learning_rate = float(hyper_params['Alpha'])
+        self.discount_rate = float(hyper_params['Gamma'])
+        self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.e_greedy_max = float(hyper_params['Epsilon_max'])
+        self.e_greedy_increment = float(hyper_params['Delta_plus'])
+        self.e_greedy_decrement = float(hyper_params['Delta_minus'])
 
-        self.history_size = int(hyper_params['history_size'])
-        self.reward_threshold = float(hyper_params['reward_max'])
+        self.history_size = int(defaults['HistorySize'])
+        self.reward_threshold = float(defaults['MaxReward'])
 
 # Configuration for the A3C Agent
 class A3CConfiguration(Configuration):
@@ -40,12 +40,12 @@ class A3CConfiguration(Configuration):
         self.replace_target_iter = int(defaults['ParameterSync'])
         self.dynamic_e_greedy_iter = int(defaults['ExplorationEpoch'])
 
-        self.learning_rate = float(hyper_params['alpha'])
-        self.discount_rate = float(hyper_params['gamma'])
-        self.e_greedy_init = float(hyper_params['epsilon'])
-        self.e_greedy_max = float(hyper_params['epsilon_max'])
-        self.e_greedy_increment = float(hyper_params['delta_plus'])
-        self.e_greedy_decrement = float(hyper_params['delta_minus'])
+        self.learning_rate = float(hyper_params['Alpha'])
+        self.discount_rate = float(hyper_params['Gamma'])
+        self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.e_greedy_max = float(hyper_params['Epsilon_max'])
+        self.e_greedy_increment = float(hyper_params['Delta_plus'])
+        self.e_greedy_decrement = float(hyper_params['Delta_minus'])
 
-        self.history_size = int(hyper_params['history_size'])
-        self.reward_threshold = float(hyper_params['reward_max'])
+        self.history_size = int(defaults['HistorySize'])
+        self.reward_threshold = float(defaults['MaxReward'])
