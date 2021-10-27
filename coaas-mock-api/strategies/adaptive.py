@@ -145,7 +145,7 @@ class Adaptive(Strategy):
         # Evaluate if the entity can be cached
         is_caching = False
         if not entityid in self.__evaluated:
-            # Entity hasn't been evulated in this window before
+            # Entity hasn't been evaluted in this window before
             is_caching = True
         
         if(is_caching):
