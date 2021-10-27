@@ -2,9 +2,9 @@ import sys, os
 sys.path.append(os.path.abspath(os.path.join('.')))
 
 import time
+import secrets
 import traceback
 import configparser
-from cache import Cache
 from datetime import datetime
 import matplotlib.pyplot as plt
 from flask import Flask, request
@@ -12,7 +12,11 @@ from flask_restful import Resource, Api
 
 from lib.mongoclient import MongoClient
 from lib.response import parse_response
+from lib.sqlliteclient import SQLLiteClient
+
+from cache.cachefactory import CacheFactory
 from strategies.strategyfactory import StrategyFactory
+from configurations.cacheconfig import CacheConfiguration
 
 app = Flask(__name__)
 api = Api(app)
@@ -26,40 +30,62 @@ default_config = config['DEFAULT']
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class PlatformMock(Resource):
+    # Initialize this session
+    __token = secrets.token_hex(nbytes=16)
     strategy = default_config['Strategy'].lower()
-    current_session = db.insert_one(strategy+'-sessions', {'strategy': strategy, 'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
+    db.insert_one('sessions', 
+        {
+            'strategy': strategy, 
+            'token': __token,
+            'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        })
     
-    strategy_factory = StrategyFactory(strategy, default_config['Attributes'].lower().split(','), default_config['BaseURL'], db, int(default_config['MovingWindow']))
+    # Create an instance of the refreshing strategy
+    __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']))
+    __selected_algo = __strategy_factory.get_cache_memory()
 
-    selected_algo = strategy_factory.selected_algo
-    setattr(selected_algo, 'session', str(current_session))
-    setattr(selected_algo, 'attributes', int(default_config['NoOfAttributes']))
+    # Set current session token
+    setattr(__selected_algo, 'session', __token)
 
     # "Reactive" strategy do not need a cache memory. 
     # Therefore, skipping cache initializing for "Reactive".
     if(strategy != 'reactive'):
-        cache_size = int(default_config['CacheSize'])
-        if(cache_size < selected_algo.attributes):
-            cache_size = selected_algo.attributes
-            print('Initializing cache with '+ str(selected_algo.attributes) + ' slots.')
-        
         #Initializing cache memory
-        setattr(selected_algo, 'cache_memory', Cache(cache_size))
-        selected_algo.init_cache()
+        cache_fac = CacheFactory(CacheConfiguration(default_config))
+        setattr(__selected_algo, 'cache_memory', cache_fac.get_cache_memory())
+
+    # Initalize the SQLLite Instance 
+    __service_registry = SQLLiteClient(default_config['SQLDBName'])
+    __service_registry.seed_db_at_start()
+    setattr(__selected_algo, 'service_registry', __service_registry)
 
     # POST /contexts endpoint
     # Retrives context data. 
     def post(self):
         try:
-            # Start to process the request
             start = time.time()
             json_obj = request.get_json()
-            data = self.selected_algo.get_result(default_config['BaseURL'], json_obj, str(self.current_session))
-            elapsed_time = time.time() - start
-            response = parse_response(data, str(self.current_session))
+
+            # Simple Authenticator
+            consumer = json_obj['requester']
+            fthr = self.__service_registry.get_freshness_for_consumer(consumer['id'],consumer['sla'])
+            if(fthr<0):
+                # Return message and 401 Error code
+                return parse_response({'message':'Unauthorized'}), 401  
+
+            # Start to process the request
+            data = self.__selected_algo.get_result(json_obj['query'], fthr, self.__token)
+            response = parse_response(data, self.__token)
             # End of processing the request
             
-            db.insert_one(self.strategy+'-responses', {'session': str(self.current_session), 'strategy': self.strategy, 'data': response, 'time': elapsed_time})
+            # Statistics
+            elapsed_time = time.time() - start
+            db.insert_one('responses_history', 
+                {
+                    'session': self.__token, 
+                    'data': response, 
+                    'response_time': elapsed_time
+                })
             
             # Return data and 200 OK code
             return response, 200 
@@ -75,22 +101,25 @@ class PlatformMock(Resource):
     def get(self):
         session = request.args.get('session')
         if(session == None):
-            session = str(db.read_last(self.strategy+'-sessions')._id)
+            session = str(db.read_last('sessions').token)
 
         plt.xlabel('Request')
         plt.ylabel('Response Time')
         
-        responses = db.read_all(self.strategy+'-responses', {'session': str(self.current_session) if session == None else session, 'strategy': self.strategy})
+        responses = db.read_all('responses', 
+            {
+                'session': self.__token if session == None else session
+            })
 
         requests = []
         responsetimes = []
         for res in responses:
             requests.append(str(res._id))
-            responsetimes.append(res.time)
+            responsetimes.append(res.response_time)
 
         # Plots the variation of response times
         plt.plot(requests, responsetimes)  
-        filename = str(self.current_session)+'-responsetime.png'
+        filename = self.__token+'_responsetime_variation.png'
         plt.savefig(filename)
 
         return {'fileName': filename}, 200 # file saved

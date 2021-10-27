@@ -2,11 +2,12 @@ import time
 import threading
 from math import trunc
 from dateutil import parser
-from profiler import Profiler
 from datetime import datetime
+
+from profiler import Profiler
 from lib.event import subscribe
-from restapiwrapper import Requester
 from strategies.strategy import Strategy
+from restapiwrapper import ServiceSelector
 
 # Greedy retrieval strategy
 # This strategy is greedy because it attempts to minimize the number of retrievals.
@@ -15,7 +16,7 @@ from strategies.strategy import Strategy
 # Greedy is the most vulanarable to data inaccuracies but expected to be the fastest to respond.
 
 class Greedy(Strategy):
-    def __init__(self, attributes, url, db, window):
+    def __init__(self, attributes, url, db, window, isstatic=True):
         self.url = url
         self.meta = None
         self.att = attributes
@@ -23,7 +24,7 @@ class Greedy(Strategy):
         self.requests_profile = {}
         self.moving_window = window
         
-        self.requester = Requester()
+        self.service_selector = ServiceSelector(db)
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())
 
         # Initializing background thready to clear collected responses that fall outside the window.
@@ -37,6 +38,7 @@ class Greedy(Strategy):
             self.requests_profile.clear()
             self.isProfiling = True
             time.sleep(5)
+
             self.isProfiling = False
             self.profiler.update_freshness_requirement(self.requests_profile)
             time.sleep(55)
@@ -49,6 +51,7 @@ class Greedy(Strategy):
             self.profiler.session = self.session
 
         # Retrives the first response from context provider  
+        # Fix this here 
         response = self.requester.get_response(self.url)
 
         # Calculating the current time step in-relation to the context provider to test data accuracy
@@ -76,7 +79,7 @@ class Greedy(Strategy):
             self.requests_profile[attribute] = freshness
 
     # Retrieving context data entirely from the cache
-    def get_result(self, url = None, json = None, session = None):       
+    async def get_result(self, json = None, fthresh = 0, session = None):       
         time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
         output = {'step': trunc(time_diff/self.meta['sampling_rate'])}
 
@@ -97,14 +100,15 @@ class Greedy(Strategy):
 
     # Refreshing selected cached item on a period basis 
     # Parameters: attribute = cached context attributes which requires refreshing
-    def refresh_cache(self, attribute) -> None:
+    def refresh_cache(self, entityid) -> None:
         # Retrive raw context from provider
-        response = self.requester.get_response(self.url)
+        response = self.service_selector.get_response_for_entity(entityid)
         
         del response['meta']
         time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
         fetched = {
-            attribute : response[attribute],
+            'entity': entityid,
+            'attributes': response['attributes'],
             'step': trunc(time_diff/self.meta['sampling_rate'])
         }
 

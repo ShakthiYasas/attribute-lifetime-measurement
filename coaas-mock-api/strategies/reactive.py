@@ -2,8 +2,9 @@ from math import trunc
 from dateutil import parser
 from datetime import datetime
 from profiler import Profiler
-from restapiwrapper import Requester
+
 from strategies.strategy import Strategy
+from restapiwrapper import ServiceSelector
 
 # Reactive retrieval strategy
 # This strategy would retrieve from the context provider for all the requests.
@@ -12,25 +13,26 @@ from strategies.strategy import Strategy
 # However, expecting the lowest response time.
 
 class Reactive(Strategy):
-    def __init__(self, attributes, url, db, window):
+    def __init__(self, attributes, url, db, window, isstatic=True):
         self.url = url
         self.meta = None 
         self.moving_window = window
 
-        self.requester = Requester()
+        self.service_selector = ServiceSelector(db)
         self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())     
 
-    def get_result(self, url = None, json = None, session = None):   
+    async def get_result(self, json = None, fthresh = 0, session = None):   
         # Set current session to profiler if not set
         if(self.profiler.session == None):
             self.profiler.session = self.session
         
         # Retrieve context data directly from provider 
+        # Fix this here
         response = ''
         if(url == None): 
-            response = self.requester.get_response(self.url)
+            response = self.service_selector.get_response_for_entity()
         else:
-            response = self.requester.get_response(url)
+            response = self.service_selector.get_response_for_entity()
 
         # Calculating the current time step in-relation to the context provider to test data accuracy
         if(self.meta == None):

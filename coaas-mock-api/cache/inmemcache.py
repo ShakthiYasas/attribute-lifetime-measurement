@@ -65,6 +65,13 @@ class InMemoryCache(CacheAgent):
             self.__localstats.append(0)
         return res
 
+    # Check if the all the attributes requested for the entity is cached
+    def are_all_atts_cached(self,entityid,attributes):
+        for attribute in attributes:
+            if(not(entityid in self.__entityhash and attribute in self.__entityhash[entityid])):
+                return False
+        return True
+
     # Read from cache using key
     def get_value_by_key(self,entityid,attribute):
         # Check if both the entity and the the attribute are already cached
@@ -84,7 +91,14 @@ class InMemoryCache(CacheAgent):
             return self.__entityhash[entityid][attribute]
         else:
             return None
-            
+
+    # Get all attribute values for an entity
+    def get_values_for_entity(self,entityid,attr_list):
+        output = {}
+        for att in attr_list:
+            output[att] = self.get_value_by_key(entityid,att)
+        return output
+
     # Retrive frequency of access statistics for currently cached entities
     def get_statistics(self):
         return self.__entityhash.freq_table
