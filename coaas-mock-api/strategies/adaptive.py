@@ -25,6 +25,7 @@ class Adaptive(Strategy):
         self.__moving_window = window
 
         self.__entity_access_trend = FIFOQueue_2(100)
+        self.__attribute_access_trend = {}
         self.__request_rate_trend = FIFOQueue_2(100)
 
         self.service_selector = ServiceSelector()
@@ -52,26 +53,50 @@ class Adaptive(Strategy):
     async def clear_expired(self) -> None:
         exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window)
         for key,value in self.__observed.items():
-            if(value.get_last() < exp_time):
+            if(value['req_ts'][-1] < exp_time):
+                # The entire entity hasn't been accessed recently
                 del self.__observed[key]
                 del self.__entity_access_trend[key]
+                del self.__attribute_access_trend[key]
             else:
-                for tstamp in value:
+                for tstamp in value['req_ts']:
                     if(tstamp < exp_time):
-                        value.remove(tstamp)
+                        value['req_ts'].pop(0)
                     else:
                         access_freq = 0
                         if(self.__reqs_in_window>0):
-                            access_freq = len(value)/self.__reqs_in_window
+                            access_freq = len(value['req_ts'])/self.__reqs_in_window
                         self.__entity_access_trend.push(access_freq)
                         break
+                
+                for curr_attr, access_list in value['attributes'].items():
+                    for tstamp in access_list:
+                        if(tstamp < exp_time):
+                            value['attributes'][curr_attr].pop(0)
+                        else:
+                            access_freq = 0
+                            if(self.__reqs_in_window>0):
+                                access_freq = len(value['attributes'][curr_attr])/self.__reqs_in_window
+                            
+                            if(key in self.__attribute_access_trend):
+                                if(curr_attr in key in self.__attribute_access_trend[key]):
+                                    self.__attribute_access_trend[key][curr_attr].push(access_freq)
+                                else:
+                                    self.__attribute_access_trend[key][curr_attr] = FIFOQueue_2(100).push(access_freq)
+                            else:
+                                self.__attribute_access_trend[key] = {
+                                    curr_attr : FIFOQueue_2(100).push(access_freq)
+                                }
+
+                            break
+
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
         self.__reqs_in_window = 0
     
     # Returns the current statistics from the profiler
     def get_current_profile(self):
-        self.profiler.get_details()
+        self.__profiler.get_details()
 
     # Retrieving context data
     def get_result(self, json = None, fthresh = 0, session = None) -> dict: 
@@ -124,7 +149,11 @@ class Adaptive(Strategy):
                                         break
                 else:
                     # Atleast one of the attributes requested are not in cache for the entity
-                    new_context.append((entityid,ent['attributes'],lifetimes))
+                    # Should return the attributes that should be cached
+                    cachig_attrs = self.__evalute_attributes_for_caching(entityid,
+                                            self.__get_attributes_not_cached(entityid, ent['attributes']))
+                    if(cachig_attrs):
+                        new_context.append((entityid,cachig_attrs,lifetimes))
 
                 # Multithread this
                 if(len(new_context)>0):
@@ -143,29 +172,53 @@ class Adaptive(Strategy):
                 
         return output
 
+    # Get attributes not cached for the entity
+    def __get_attributes_not_cached(self, entityid, attributes):
+        return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
+
     # Evaluate for caching
+    def __evalute_attributes_for_caching(self, entityid, attributes:list) -> list:
+        # Evaluate the attributes to cache or not
+        # And return those which need to be cached
+        pass
+
     def __evaluate_for_caching(self, entityid, attributes:dict):
+        # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
         is_caching = False
+        updated_attr_dict = {}
         if not entityid in self.__evaluated:
             # Entity hasn't been evaluted in this window before
             is_caching = True
+            # if caching, updated_attr_dict with those which will be cached
         
         if(is_caching):
             # Add to cache 
-            self.cache_memory.save(entityid,attributes)
+            self.cache_memory.save(entityid,updated_attr_dict)
             # Push to profiler
             if(not self.__isstatic):
-                self.__profiler.reactive_push({entityid:attributes})
+                self.__profiler.reactive_push({entityid:updated_attr_dict})
             del self.__observed[entityid]
             del self.__entity_access_trend[entityid]
         else:
-            # Update the observed list for uncached entities
+            # Update the observed list for uncached entities and attributes 
+            now = datetime.datetime.now()
             if(entityid in self.__observed):
-                self.__observed[entityid].push(datetime.datetime.now())
+                self.__observed[entityid]['req_ts'].append(now)
+                for attr,vals in attributes:
+                    if(attr in self.__observed[entityid]['attributes']):
+                        self.__observed[entityid]['attributes'][attr].append(now)
+                    else:
+                        self.__observed[entityid]['attributes'][attr] = [now]
             else:
-                # The most recent 100 requests to the entity
-                self.__observed[entityid] = FIFOQueue_2(100).push(datetime.datetime.now())
+                attrs = {}
+                for attr,vals in attributes:
+                    attrs[attr] = [now]
+                self.__observed[entityid] = {
+                    'req_ts': [now],
+                    'attributes': attrs
+                } 
+
 
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:

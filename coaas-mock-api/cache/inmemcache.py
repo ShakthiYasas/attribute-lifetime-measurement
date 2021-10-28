@@ -99,6 +99,10 @@ class InMemoryCache(CacheAgent):
     def get_values(self) -> LimitedSizeDict:
         return self.__entityhash
 
+    # Get all attributes cached for an entity
+    def get_attributes_of_entity(self,entityid) -> LimitedSizeDict:
+        return list(self.__entityhash[entityid].keys())
+
     # Check if the entity is cached
     def __is_cached(self,entityid,attribute):
         res = entityid in self.__entityhash and attribute in self.__entityhash[entityid]
