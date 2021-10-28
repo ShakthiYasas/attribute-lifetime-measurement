@@ -14,16 +14,16 @@ class CacheFactory:
             self.__configuration = configuration
 
     # Retruns the singleton instance of a cache
-    def get_cache_memory(self) -> CacheAgent:
+    def get_cache_memory(self, db) -> CacheAgent:
         if(self.cache == None):
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration) 
                 and CacheConfiguration.type == 'in-memory'):
                 print('Initializing a local in-memory cache instance.')
-                self.__cache = InMemoryCache(self.__configuration)
+                self.__cache = InMemoryCache(self.__configuration, db)
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration)
                 and CacheConfiguration.type == 'cloud'):
                 print('Initializing a cloud based cache instance.')
-                self.__cache = CloudCache(self.__configuration)
+                self.__cache = CloudCache(self.__configuration, db)
             else:
                 raise ValueError('Invalid configuration.')
         

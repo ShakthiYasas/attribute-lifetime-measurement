@@ -9,7 +9,7 @@ from eviction.evictorfactory import EvictorFactory
 
 # Implementing a simple fixed sized in-memory cache
 class InMemoryCache(CacheAgent):
-    def __init__(self, config):      
+    def __init__(self, config, db):      
         # Data structure of the cache
         self.__entityhash = LimitedSizeDict(size_limit = config.cache_size)
 
@@ -18,8 +18,11 @@ class InMemoryCache(CacheAgent):
         self.__hitrate_trend = FIFOQueue(round(self.window/5000)) 
         self.__localstats = []
 
+        # Statistical DB
+        self.__db = db
+
         # Inialize Eviction Algorithm
-        self.__evictor = EvictorFactory(config.eviction_algo, self.__class__.__name__.lower()).getevictor()
+        self.__evictor = EvictorFactory(config.eviction_algo, self).getevictor()
         
         # Initializing background thread to calculate current hit rate.
         thread = threading.Thread(target=self.run, args=())
@@ -44,22 +47,56 @@ class InMemoryCache(CacheAgent):
         if(entityid in self.__entityhash):
             for att_name, values in cacheitems.items():
                 if(att_name not in self.__entityhash[entityid].freq_table):
-                    self.__entityhash[entityid].freq_table[att_name] = (0,[])
+                    self.__entityhash[entityid].freq_table[att_name] = (0,[],datetime.datetime.now())
                 self.__entityhash[entityid][att_name] = values
         else:
             self.__entityhash[entityid] = LimitedSizeDict()
+            self.__entityhash.freq_table[entityid] = (0,[],datetime.datetime.now())
+
             for att_name, values in cacheitems.items():
-                self.__entityhash[entityid].freq_table[att_name] = (0,[])
+                self.__entityhash[entityid].freq_table[att_name] = (0,[],datetime.datetime.now())
                 self.__entityhash[entityid][att_name] = values
 
     # Evicts an entity from cache
     def evict(self, entityid) -> None:
-        self.__entityhash.move_to_end(entityid,last=False)
-        self.__entityhash.popitem(last=False)
+        now = datetime.now()
+        attribute_lifetimes = []
+        
+        for key,value in self.__entityhash[entityid].freq_table.items():
+            attribute_lifetimes.append({
+                'entityid': entityid,
+                'attribute': key,
+                'c_lifetime': now - value[2]
+            })
+
+        # Push cached lifetime entity to Statistical DB
+        self.__db.insert_one('entity-cached-lifetime',{
+            'entityid': entityid,
+            'c_lifetime': now - self.__entityhash.freq_table[entityid][2]
+        })
+
+        # Push cached lifetimes of all the attributes to Statistical DB
+        self.__db.insert_many('attribute-cached-lifetime', attribute_lifetimes)
+
+        del self.__entityhash[entityid]
         del self.__entityhash.freq_table[entityid]
+
+    # Evicts an attribute of an entity from cache
+    def evict_attribute(self, entityid, attribute) -> None:
+        now = datetime.now()
+        # Push cached lifetime of attribute to Statistical DB
+        att_meta = self.__entityhash[entityid].freq_table[attribute]
+        self.__db.insert_one('attribute-cached-lifetime',{
+                'entityid': entityid,
+                'attribute': attribute,
+                'c_lifetime': now - att_meta[2]
+            })
+
+        del self.__entityhash[entityid][attribute]
+        del self.__entityhash[entityid].freq_table[attribute]
     
     # Read the entire cache
-    def get_values(self) -> dict:
+    def get_values(self) -> LimitedSizeDict:
         return self.__entityhash
 
     # Check if the entity is cached

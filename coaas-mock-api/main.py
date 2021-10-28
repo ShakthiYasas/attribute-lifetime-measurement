@@ -52,7 +52,7 @@ class PlatformMock(Resource):
     if(strategy != 'reactive'):
         #Initializing cache memory
         cache_fac = CacheFactory(CacheConfiguration(default_config))
-        setattr(__selected_algo, 'cache_memory', cache_fac.get_cache_memory())
+        setattr(__selected_algo, 'cache_memory', cache_fac.get_cache_memory(db))
 
     # Initalize the SQLLite Instance 
     __service_registry = SQLLiteClient(default_config['SQLDBName'])

@@ -5,9 +5,8 @@ from lib.limitedsizedict import LimitedSizeDict
 
 # Implementing a simple fixed sized in-memory cache
 class CloudCache(CacheAgent):
-    def __init__(self, config):
+    def __init__(self, config, db):
         self.window = config.window_size
-        self.__entityhash = LimitedSizeDict(size_limit = config.cache_size)
 
     # Evicts an entity from cache
     def evict(self, entityid) -> None: pass
