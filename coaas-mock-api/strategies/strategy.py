@@ -2,6 +2,7 @@
 class Strategy(object):
     """Base class of all the strategies"""
     
+    selective_cache_agent = None
     service_registry = None
     cache_memory = None
     attributes = 0

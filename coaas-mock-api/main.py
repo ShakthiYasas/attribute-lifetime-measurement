@@ -18,6 +18,8 @@ from cache.cachefactory import CacheFactory
 from strategies.strategyfactory import StrategyFactory
 from configurations.cacheconfig import CacheConfiguration
 
+from agents.agentfactory import AgentFactory
+
 app = Flask(__name__)
 api = Api(app)
 
@@ -59,6 +61,10 @@ class PlatformMock(Resource):
     __service_registry.seed_db_at_start()
     setattr(__selected_algo, 'service_registry', __service_registry)
 
+    # Initialize the Selective Caching Agent
+    agent_fac = AgentFactory(config)
+    setattr(__selected_algo, 'selective_cache_agent', agent_fac.get_agent())
+    
     # POST /contexts endpoint
     # Retrives context data. 
     def post(self):
