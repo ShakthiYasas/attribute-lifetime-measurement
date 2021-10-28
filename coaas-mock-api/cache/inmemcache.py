@@ -19,7 +19,7 @@ class InMemoryCache(CacheAgent):
         self.__localstats = []
 
         # Inialize Eviction Algorithm
-        self.__evictor = EvictorFactory(config.eviction_algo).getevictor()
+        self.__evictor = EvictorFactory(config.eviction_algo, self.__class__.__name__.lower()).getevictor()
         
         # Initializing background thread to calculate current hit rate.
         thread = threading.Thread(target=self.run, args=())
@@ -34,7 +34,7 @@ class InMemoryCache(CacheAgent):
             self.__evictor.evict()
             time.sleep(5)
 
-    async def calculate_hitrate(self):
+    def calculate_hitrate(self):
         local = self.__localstats.copy()
         self.__localstats.clear()
         self.__hitrate_trend.push(sum(local)/len(local))
