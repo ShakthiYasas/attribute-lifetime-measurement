@@ -10,6 +10,7 @@ class CacheConfiguration(Configuration):
     def __init__(self, config):
         self.type = config['CacheType']
         self.window_size = int(config['WindowSize'])
+        self.eviction_algo = config['EvictionAlgo']
         self.cache_size = int(config['CacheBlocksPerUnit'])*int(config['CacheSize'])
 
         

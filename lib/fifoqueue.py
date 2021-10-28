@@ -28,3 +28,6 @@ class FIFOQueue_2():
     
     def remove(self,val):
         self.__queue.remove(val)
+
+    def getlist(self):
+        return self.__queue

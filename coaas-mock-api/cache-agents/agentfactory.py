@@ -18,10 +18,12 @@ class AgentFactory:
     def get_agent(self, actions, features) -> Agent:
         if(self.__agent == None):
             if(self.__configuration != None and isinstance(self.__configuration,DQNConfiguration)):
-                return DQNAgent(actions, features, self.__configuration)
+                print('Initializing a DQN based RL agent for selective context caching.')
+                self.__agent = DQNAgent(actions, features, self.__configuration)
             if(self.__configuration != None and isinstance(self.__configuration,A3CConfiguration)):
-                return A3CAgent(actions, features, self.__configuration)
+                print('Initializing a Asynchronous-Advantage-Actor-Critic based RL agent for selective context caching.')
+                self.__agent = A3CAgent(actions, features, self.__configuration)
             else:
                 raise ValueError('Invalid configuration.')
-        else:
-            return self.__agent
+        
+        return self.__agent

@@ -18,9 +18,11 @@ class CacheFactory:
         if(self.cache == None):
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration) 
                 and CacheConfiguration.type == 'in-memory'):
+                print('Initializing a local in-memory cache instance.')
                 self.__cache = InMemoryCache(self.__configuration)
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration)
                 and CacheConfiguration.type == 'cloud'):
+                print('Initializing a cloud based cache instance.')
                 self.__cache = CloudCache(self.__configuration)
             else:
                 raise ValueError('Invalid configuration.')

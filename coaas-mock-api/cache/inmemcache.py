@@ -5,6 +5,7 @@ from datetime import datetime
 from cache.cacheagent import CacheAgent
 from lib.limitedsizedict import LimitedSizeDict
 from lib.fifoqueue import FIFOQueue
+from eviction.evictorfactory import EvictorFactory
 
 # Implementing a simple fixed sized in-memory cache
 class InMemoryCache(CacheAgent):
@@ -16,6 +17,9 @@ class InMemoryCache(CacheAgent):
         self.window = config.window_size
         self.__hitrate_trend = FIFOQueue(round(self.window/5000)) 
         self.__localstats = []
+
+        # Inialize Eviction Algorithm
+        self.__evictor = EvictorFactory(config.eviction_algo).getevictor()
         
         # Initializing background thread to calculate current hit rate.
         thread = threading.Thread(target=self.run, args=())
@@ -24,8 +28,10 @@ class InMemoryCache(CacheAgent):
 
     def run(self):
         while True:
-            self.calculate_hitrate()
             # Hit rate is calculated each 5 seconds
+            self.calculate_hitrate()
+            # Items are evicted every 5 seconds as well 
+            self.__evictor.evict()
             time.sleep(5)
 
     async def calculate_hitrate(self):
