@@ -2,6 +2,7 @@ import random
 
 from agent import ExplorationAgent
 
+# Takes __observed (in adaptive) as input 
 class RandomAgent(ExplorationAgent):
     # Random agent looks at the observed (un-cached) context list 
     # and decide to cache one of the items randomly.
@@ -20,6 +21,7 @@ class RandomAgent(ExplorationAgent):
         # Returns (entityid, attribute)
         return (rand_ent[0], rand_att[0])
 
+# Takes __observed (in adaptive) as input 
 class MRUAgent(ExplorationAgent):
     # Most Recently Used agent looks at the observed (un-cached) context list 
     # and decide to cache one of the items that is the 
@@ -37,6 +39,7 @@ class MRUAgent(ExplorationAgent):
         # Returns (entityid, attribute)
         return MRUAgent._choose_action(observation)
 
+# Takes __attribute_access_trend (in adaptive) as input 
 class MFUAgent(ExplorationAgent):
     # Most Frequently Used agent looks at the observed (un-cached) context list 
     # and decide to cache one of the items that is the 

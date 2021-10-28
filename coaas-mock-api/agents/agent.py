@@ -1,7 +1,7 @@
 # Abstract class
 class Agent(object):
     action_space = [0,1]
-    def __init__(self): pass
+    def __init__(self, config): pass
     def choose_action(self, observation): pass
     def store_transition(self, state, action, reward, new_state): pass
 
