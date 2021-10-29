@@ -18,14 +18,17 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 
 class Adaptive(Strategy):  
     def __init__(self, db, window, isstatic=True): 
+        self.__cached = {}
         self.__observed = {}
         self.__evaluated = []
         self.__reqs_in_window = 0
         self.__isstatic = isstatic
         self.__moving_window = window
+        self.__most_expensive_sla = None
 
         self.__entity_access_trend = FIFOQueue_2(100)
         self.__attribute_access_trend = {}
+        self.__cached_attribute_access_trend = {}
         self.__request_rate_trend = FIFOQueue_2(1000)
 
         self.service_selector = ServiceSelector()
@@ -50,23 +53,33 @@ class Adaptive(Strategy):
             time.sleep(self.__moving_window/1000) 
     
     # Clear function that run on the background
-    async def clear_expired(self) -> None:
-        exp_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window)
-        for key,value in self.__observed.items():
+    def clear_expired(self) -> None:
+        # Multithread the following 2
+        Adaptive.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
+        Adaptive.__clear_cached()
+        
+        self.__evaluated.clear()
+        self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
+        self.__reqs_in_window = 0
+        self.__most_expensive_sla = (0,1.0,1.0)
+    
+    @staticmethod
+    def __clear_observed(exp_time):
+        for key,value in Adaptive.__observed.items():
             if(value['req_ts'][-1] < exp_time):
                 # The entire entity hasn't been accessed recently
-                del self.__observed[key]
-                del self.__entity_access_trend[key]
-                del self.__attribute_access_trend[key]
+                del Adaptive.__observed[key]
+                del Adaptive.__entity_access_trend[key]
+                del Adaptive.__attribute_access_trend[key]
             else:
                 for tstamp in value['req_ts']:
                     if(tstamp < exp_time):
                         value['req_ts'].pop(0)
                     else:
                         access_freq = 0
-                        if(self.__reqs_in_window>0):
-                            access_freq = len(value['req_ts'])/self.__reqs_in_window
-                        self.__entity_access_trend.push(access_freq)
+                        if(Adaptive.__reqs_in_window>0):
+                            access_freq = len(value['req_ts'])/Adaptive.__reqs_in_window
+                        Adaptive.__entity_access_trend.push(access_freq)
                         break
                 
                 for curr_attr, access_list in value['attributes'].items():
@@ -75,32 +88,58 @@ class Adaptive(Strategy):
                             value['attributes'][curr_attr].pop(0)
                         else:
                             access_freq = 0
-                            if(self.__reqs_in_window>0):
-                                access_freq = len(value['attributes'][curr_attr])/self.__reqs_in_window
-                            
-                            if(key in self.__attribute_access_trend):
-                                if(curr_attr in key in self.__attribute_access_trend[key]):
-                                    self.__attribute_access_trend[key][curr_attr].push(access_freq)
+                            if(Adaptive.__reqs_in_window>0):
+                                access_freq = len(value['attributes'][curr_attr])/Adaptive.__reqs_in_window 
+                            if(key in Adaptive.__attribute_access_trend):
+                                if(curr_attr in key in Adaptive.__attribute_access_trend[key]):
+                                    Adaptive.__attribute_access_trend[key][curr_attr].push(access_freq)
                                 else:
-                                    self.__attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_freq)
+                                    Adaptive.__attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_freq)
                             else:
-                                self.__attribute_access_trend[key] = {
+                                Adaptive.__attribute_access_trend[key] = {
                                     curr_attr : FIFOQueue_2(1000).push(access_freq)
                                 }
-
+                                
                             break
-
-        self.__evaluated.clear()
-        self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
-        self.__reqs_in_window = 0
     
+    @staticmethod
+    def __clear_cached():
+        for key,attributes in Adaptive.__cached.items():                
+            for curr_attr, access_list in attributes.items():
+                access_freq = 0
+                if(len(access_list)>0):
+                    access_freq = sum(access_list)/len(access_list)  
+
+                if(key in Adaptive.__cached_attribute_access_trend):
+                    if(curr_attr in key in Adaptive.__cached_attribute_access_trend[key]):
+                        Adaptive.__cached_attribute_access_trend[key][curr_attr].push(access_freq)
+                    else:
+                        Adaptive.__cached_attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_freq)
+                else:
+                    Adaptive.__cached_attribute_access_trend[key] = {
+                        curr_attr : FIFOQueue_2(1000).push(access_freq)
+                    }
+                Adaptive.__cached[key][curr_attr].clear()
+
     # Returns the current statistics from the profiler
     def get_current_profile(self):
         self.__profiler.get_details()
 
     # Retrieving context data
-    def get_result(self, json = None, fthresh = 0, session = None) -> dict: 
-        self.__reqs_in_window+=1              
+    def get_result(self, json = None, fthresh = (0,1.0,1.0), session = None) -> dict: 
+        self.__reqs_in_window+=1
+        if(self.__most_expensive_sla == None):
+            self.__most_expensive_sla = fthresh
+        else:
+            if(fthresh != self.__most_expensive_sla):
+                if(fthresh[0]>self.__most_expensive_sla[0]):
+                    self.__most_expensive_sla = fthresh
+                else:
+                    if(fthresh[2]>self.__most_expensive_sla[2]):
+                        self.__most_expensive_sla[2] = fthresh[2]
+                    if(fthresh[1]<self.__most_expensive_sla[1]):
+                        self.__most_expensive_sla[1] = fthresh[1]
+
         refetching = [] # Freshness not met for the value generated by a producer [(entityid, prodid)]
         new_context = [] # Need to fetch the entity with all attributes [(entityid, [attributes])]
         now = datetime.datetime.now()
@@ -116,21 +155,26 @@ class Adaptive(Strategy):
                 if(self.__isstatic):
                     lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'])
                 
+                if(not (entityid in self.__cached)):
+                    self.__cached[entityid] = {}
+
                 # Refetch from the producer if atleast 1 of it's attributes are not available or not fresh
                 if(self.cache_memory.are_all_atts_cached(entityid, ent['attributes'])):
                     # All of the attributes requested are in cache for the entity
                     for att_name in ent['attributes']:
                         # Get all values from the context producers for the attribute in cache
                         att_in_cache = self.cache_memory.get_value_by_key(entityid, att_name)
+                        ishit = 1
                         if(not self.__isstatic):
                             for prodid,val,lastret in att_in_cache:
                                 # Estimated lifetime of the attribute
                                 mean_for_att = self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att_name)  
-                                extime = mean_for_att * (1 - fthresh)
+                                extime = mean_for_att * (1 - fthresh[0])
                                 time_at_expire = lastret + datetime.timedelta(milisseconds=extime)
                                 if(now > time_at_expire):
                                     # If the attribute doesn't meet the freshness level (Cache miss) from the producer
                                     # add the entity and producer to the need to refresh list.
+                                    ishit = 0
                                     refetching.append((entityid,prodid,lifetimes[prodid]['url']))
                                     break
                         else:
@@ -145,8 +189,14 @@ class Adaptive(Strategy):
                                     if(now > time_at_expire):
                                         # If the attribute doesn't meet the freshness level (Cache miss) from the producer
                                         # add the entity and producer to the need to refresh list.
+                                        ishit = 0
                                         refetching.append((entityid,ent['attributes'],prodid,lifetimes[prodid]['url']))
                                         break
+                        
+                        if(not (att_name in self.__cached[entityid])):
+                            self.__cached[entityid][att_name] = [ishit]
+                        else:
+                            self.__cached[entityid][att_name].append(ishit)
                 else:
                     # Atleast one of the attributes requested are not in cache for the entity
                     # Should return the attributes that should be cached

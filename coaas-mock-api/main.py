@@ -75,7 +75,7 @@ class PlatformMock(Resource):
             # Simple Authenticator
             consumer = json_obj['requester']
             fthr = self.__service_registry.get_freshness_for_consumer(consumer['id'],consumer['sla'])
-            if(fthr<0):
+            if(fthr == None):
                 # Return message and 401 Error code
                 return parse_response({'message':'Unauthorized'}), 401  
 

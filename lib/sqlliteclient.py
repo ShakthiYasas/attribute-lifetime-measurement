@@ -12,17 +12,19 @@ class SQLLiteClient:
             WHERE isActive=1 AND id="+consumerid)
         if(len(res) != 0):
             freshness = self.__conn.execute(
-                "SELECT freshness \
+                "SELECT freshness, price, penalty \
                 FROM SLA \
-                WHERE isActive=1 AND id="+slaid)
+                WHERE isActive=1 AND id="+slaid +"\
+                LIMIT 1")
             if(len(freshness)==0):
                 # No SLA set at the moment. So, assuming no freshness requirement. 
-                return 0
+                return (0,1.0,1.0)
             else:
-                return freshness[0]
+                # (fthr, price, penalty)
+                return (freshness[0],freshness[1],freshness[2])
         else:
             # No Consumer Found.
-            return -1
+            return None
 
     # Retrieve the URLs of the matching providers and lifetimes of the attributes
     def get_context_producers(self, entityid, attributes) -> dict:
@@ -69,8 +71,8 @@ class SQLLiteClient:
             (1,'Car'),(2,'Bike'),(3,'CarPark')")
        
         self.__conn.execute(
-            "INSERT INTO SLA (id,freshness,isActive) VALUES\
-            (1,0.9,1),(2,0.8,1),(3,0.7,1),(4,0.6,0)")
+            "INSERT INTO SLA (id,freshness,price,penalty,isActive) VALUES\
+            (1,0.9,1.2,2.0,1),(2,0.8,1.0,2.0,1),(3,0.7,0.8,1.8,1),(4,0.6,0.75,1.25,0)")
        
         self.__conn.execute(
             "INSERT INTO ContextConsumer (id,name,isActive) VALUES\
