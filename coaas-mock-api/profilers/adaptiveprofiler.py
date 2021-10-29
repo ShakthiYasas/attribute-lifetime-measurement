@@ -12,7 +12,7 @@ from lib.event import post_event
 # Perform the inferencing of average lifetime by intercepting the responses from the context providers.
 class AdaptiveProfiler(Profiler):
     # Private Class variables
-    __lookup = {} # Index look up for each context attribute-provider pair
+    __lookup = {} # Statistics of each context attribute-provider pair
     __mean = {} # Contains the current average inferred lifetime of each attribute-provider pair
     __freshness_reqiurement = {} # Current level of freshness requirements
     

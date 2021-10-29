@@ -26,7 +26,7 @@ class Adaptive(Strategy):
 
         self.__entity_access_trend = FIFOQueue_2(100)
         self.__attribute_access_trend = {}
-        self.__request_rate_trend = FIFOQueue_2(100)
+        self.__request_rate_trend = FIFOQueue_2(1000)
 
         self.service_selector = ServiceSelector()
         if(not self.__isstatic):
@@ -82,10 +82,10 @@ class Adaptive(Strategy):
                                 if(curr_attr in key in self.__attribute_access_trend[key]):
                                     self.__attribute_access_trend[key][curr_attr].push(access_freq)
                                 else:
-                                    self.__attribute_access_trend[key][curr_attr] = FIFOQueue_2(100).push(access_freq)
+                                    self.__attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_freq)
                             else:
                                 self.__attribute_access_trend[key] = {
-                                    curr_attr : FIFOQueue_2(100).push(access_freq)
+                                    curr_attr : FIFOQueue_2(1000).push(access_freq)
                                 }
 
                             break
