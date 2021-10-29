@@ -17,6 +17,12 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
+    __attribute_access_trend = {}
+    __cached_hit_access_trend = {}
+    __cached_attribute_access_trend = {}
+    __entity_access_trend = FIFOQueue_2(100)
+    __request_rate_trend = FIFOQueue_2(1000)
+
     def __init__(self, db, window, isstatic=True): 
         self.__cached = {}
         self.__observed = {}
@@ -25,11 +31,6 @@ class Adaptive(Strategy):
         self.__isstatic = isstatic
         self.__moving_window = window
         self.__most_expensive_sla = None
-
-        self.__entity_access_trend = FIFOQueue_2(100)
-        self.__attribute_access_trend = {}
-        self.__cached_attribute_access_trend = {}
-        self.__request_rate_trend = FIFOQueue_2(1000)
 
         self.service_selector = ServiceSelector()
         if(not self.__isstatic):
@@ -106,19 +107,27 @@ class Adaptive(Strategy):
     def __clear_cached():
         for key,attributes in Adaptive.__cached.items():                
             for curr_attr, access_list in attributes.items():
-                access_freq = 0
+                hit_rate = 0
                 if(len(access_list)>0):
-                    access_freq = sum(access_list)/len(access_list)  
+                    hit_rate = sum(access_list)/len(access_list)  
+                
+                access_ratio = len(access_list)/Adaptive.__reqs_in_window 
 
-                if(key in Adaptive.__cached_attribute_access_trend):
-                    if(curr_attr in key in Adaptive.__cached_attribute_access_trend[key]):
-                        Adaptive.__cached_attribute_access_trend[key][curr_attr].push(access_freq)
+                if(key in Adaptive.__cached_hit_access_trend):
+                    if(curr_attr in key in Adaptive.__cached_hit_access_trend[key]):
+                        Adaptive.__cached_hit_access_trend[key][curr_attr].push(hit_rate)
+                        Adaptive.__cached_attribute_access_trend[key][curr_attr].push(access_ratio)
                     else:
-                        Adaptive.__cached_attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_freq)
+                        Adaptive.__cached_hit_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(hit_rate)
+                        Adaptive.__cached_attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_ratio)
                 else:
-                    Adaptive.__cached_attribute_access_trend[key] = {
-                        curr_attr : FIFOQueue_2(1000).push(access_freq)
+                    Adaptive.__cached_hit_access_trend[key] = {
+                        curr_attr : FIFOQueue_2(1000).push(hit_rate)
                     }
+                    Adaptive.__cached_attribute_access_trend[key] = {
+                        curr_attr : FIFOQueue_2(1000).push(access_ratio)
+                    }
+
                 Adaptive.__cached[key][curr_attr].clear()
 
     # Returns the current statistics from the profiler
