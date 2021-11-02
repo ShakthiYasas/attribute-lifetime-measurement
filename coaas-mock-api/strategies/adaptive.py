@@ -305,9 +305,29 @@ class Adaptive(Strategy):
 
     # Translating an observation to a state
     def __translate_to_state(self, entityid, att, lifetimes):
-        fea_vec = []
         isobserved = self.__isobserved(entityid, att)
+        # Access Rates 
+        fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
+        # Hit Rates and Expectations
+        fea_vec = fea_vec + self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
+        # Average Cached Lifetime 
+        cached_lt_res = self.__db.read_all_with_limit('cachedlifetime',{
+                    'entity': entityid,
+                    'attribute': att
+                },10)
+        if(cached_lt_res):
+            avg_lts = list(map(lambda x: x['lifetime'], cached_lt_res))
+            fea_vec.append(statistics.mean(avg_lts))
+        else:
+            fea_vec.append(0)
+        # Expected Marginal Utility
 
+
+
+        return np.array(fea_vec)
+
+    def __calculate_access_rates(self, isobserved, entityid, att):
+        fea_vec = []
         if(isobserved):
             # Actual and Expected Access Rates 
             attribute_trend = self.__cached_attribute_access_trend[entityid][att]
@@ -326,16 +346,9 @@ class Adaptive(Strategy):
             # No actual or expected access rates becasue the item is already cached
             fea_vec = [0,0,0,0,0,0]
 
-        # Average Cached Lifetime 
+        return fea_vec
 
-        # Expected Marginal Utility
-
-        # Hit Rates and Expectations
-        fea_vec = fea_vec + self.calculate_hitrate_features(isobserved, entityid, att, lifetimes)
-
-        return np.array(fea_vec)
-
-    def calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
+    def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
         fea_vec = []
         if(isobserved):
             # No current hit rates to report 

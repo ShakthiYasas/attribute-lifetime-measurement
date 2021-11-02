@@ -52,7 +52,7 @@ class ServiceSelector:
             if(rt is None):
                 res = self.__db.read_all_with_limit('responsetimes',{
                     'context_producer': cp
-                })
+                },10)
                 if(res):
                     local_rt = list(map(lambda x: x['avg_response_time'], res))
                     rtlist.append(statistics.mean(local_rt))

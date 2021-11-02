@@ -43,14 +43,13 @@ class DQNAgent(Agent):
         self.__feature_vector = [
             'short_term_access', 'expected_short_term_access', 
             'mid_term_access', 'expected_mid_term_access',
-            'long_term_access', 'expected_long_term_access',            
-            'average_cached_lifetime', 'expected_marginal_utility'
+            'long_term_access', 'expected_long_term_access',   
             'short_term_hitrate', 'expected_short_term_hitrate',
             'mid_term_hitrate', 'expected_mid_term_hitrate',
-            'long_term_hitrate', 'expected_long_term_hitrate'
+            'long_term_hitrate', 'expected_long_term_hitrate',         
+            'average_cached_lifetime', 'expected_marginal_utility'
             ]
         self.__n_features = len(self.__feature_vector)*self.__init_state_space_size
-
         
         # e-Greedy Exploration
         self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
