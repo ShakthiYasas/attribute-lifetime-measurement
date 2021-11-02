@@ -1,7 +1,7 @@
 from lib.limitedsizedict import LimitedSizeDict
 # Abstract class
 class CacheAgent(object):
-    def __init__(self, config, db): pass
+    def __init__(self, config, db, registry=None): pass
     # Eviction
     def evict(self, entityid) -> None: pass
     # Store 

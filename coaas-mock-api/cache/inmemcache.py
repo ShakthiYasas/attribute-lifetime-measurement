@@ -9,13 +9,16 @@ from eviction.evictorfactory import EvictorFactory
 
 # Implementing a simple fixed sized in-memory cache
 class InMemoryCache(CacheAgent):
-    def __init__(self, config, db):      
+    def __init__(self, config, db, registry):      
         # Data structure of the cache
         self.__entityhash = LimitedSizeDict(size_limit = config.cache_size)
 
+        # Access to SQLite instance
+        self.__registry = registry
+
         # Statistical configurations
         self.window = config.window_size
-        self.__hitrate_trend = FIFOQueue(round(self.window/5000)) 
+        self.__hitrate_trend = FIFOQueue(100) 
         self.__localstats = []
 
         # Statistical DB
@@ -31,18 +34,25 @@ class InMemoryCache(CacheAgent):
 
     def run(self):
         while True:
-            # Hit rate is calculated each 5 seconds
+            # Hit rate is calculated in each window
             self.calculate_hitrate()
-            # Items are evicted every 5 seconds as well 
-            for ent,att in self.__evictor.select_for_evict():
-                self.evict_attribute(ent, att)
-            time.sleep(5)
+            # Items are evicted every each window
+            items_to_evict = self.__evictor.select_for_evict()
+            if(isinstance(items_to_evict,list)):
+                for ent,att in items_to_evict:
+                    self.evict_attribute(ent, att)
+            else:
+                self.evict(items_to_evict)
+            time.sleep(self.window/1000)
 
     def calculate_hitrate(self):
         local = self.__localstats.copy()
         self.__localstats.clear()
-        self.__hitrate_trend.push(sum(local)/len(local))
+        self.__hitrate_trend.push((sum(local)/len(local),len(local)))
     
+    def getdb(self):
+        return self.__db
+
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
         now = datetime.datetime.now()
@@ -158,3 +168,5 @@ class InMemoryCache(CacheAgent):
     def get_hitrate_trend(self):
         return self.__hitrate_trend
 
+    def get_providers_for_entity(self, entityid):
+        return self.__registry.get_providers_for_entity(entityid)

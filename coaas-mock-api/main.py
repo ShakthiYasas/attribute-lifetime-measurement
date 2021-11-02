@@ -50,17 +50,17 @@ class PlatformMock(Resource):
     # Set current session token
     setattr(__selected_algo, 'session', __token)
 
+      # Initalize the SQLLite Instance 
+    __service_registry = SQLLiteClient(default_config['SQLDBName'])
+    __service_registry.seed_db_at_start()
+    setattr(__selected_algo, 'service_registry', __service_registry)
+
     # "Reactive" strategy do not need a cache memory. 
     # Therefore, skipping cache initializing for "Reactive".
     if(strategy != 'reactive'):
         #Initializing cache memory
-        cache_fac = CacheFactory(CacheConfiguration(default_config))
+        cache_fac = CacheFactory(CacheConfiguration(default_config), __service_registry)
         setattr(__selected_algo, 'cache_memory', cache_fac.get_cache_memory(db))
-
-    # Initalize the SQLLite Instance 
-    __service_registry = SQLLiteClient(default_config['SQLDBName'])
-    __service_registry.seed_db_at_start()
-    setattr(__selected_algo, 'service_registry', __service_registry)
 
     # Initialize the Selective Caching Agent
     agent_fac = AgentFactory(config, __selected_algo)

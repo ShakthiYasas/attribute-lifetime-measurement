@@ -26,6 +26,14 @@ class SQLLiteClient:
             # No Consumer Found.
             return None
 
+    # Retrieve context producers for an entity
+    def get_providers_for_entity(self,entityid):
+        producers = self.__conn.execute(
+                "SELECT id \
+                FROM ContextProducer \
+                WHERE entityId="+entityid+" AND isActive=1")
+        return list(map(lambda x: x[0], producers))
+
     # Retrieve the URLs of the matching providers and lifetimes of the attributes
     def get_context_producers(self, entityid, attributes) -> dict:
         output = {}

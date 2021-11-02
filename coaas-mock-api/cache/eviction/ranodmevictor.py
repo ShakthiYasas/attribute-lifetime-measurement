@@ -16,4 +16,4 @@ class RandomEvictor(Evictor):
         attributes = self.__cache.get_statistics_entity(selected_entity).keys()
         selected_att = attributes[np.random.randint(0,len(attributes)+1)]
 
-        return (selected_entity, selected_att)
+        return [(selected_entity, selected_att)]

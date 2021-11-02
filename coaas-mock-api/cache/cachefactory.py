@@ -9,9 +9,9 @@ class CacheFactory:
     # Class varaible
     __cache = None
 
-    def __init__(self, configuration = None):
-        if(configuration != None):
-            self.__configuration = configuration
+    def __init__(self, configuration, registry=None):
+        self.__configuration = configuration
+        self.__registry = registry
 
     # Retruns the singleton instance of a cache
     def get_cache_memory(self, db) -> CacheAgent:
@@ -19,7 +19,7 @@ class CacheFactory:
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration) 
                 and CacheConfiguration.type == 'in-memory'):
                 print('Initializing a local in-memory cache instance.')
-                self.__cache = InMemoryCache(self.__configuration, db)
+                self.__cache = InMemoryCache(self.__configuration, db, self.__registry )
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration)
                 and CacheConfiguration.type == 'cloud'):
                 print('Initializing a cloud based cache instance.')

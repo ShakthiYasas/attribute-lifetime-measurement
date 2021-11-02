@@ -309,7 +309,8 @@ class Adaptive(Strategy):
         # Access Rates 
         fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
         # Hit Rates and Expectations
-        fea_vec = fea_vec + self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
+        new_feas, avg_latency = self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
+        fea_vec = fea_vec + new_feas
         # Average Cached Lifetime 
         cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
                     'entity': entityid,
@@ -323,6 +324,8 @@ class Adaptive(Strategy):
         # Expected Marginal Utility
 
 
+        # Latency
+        fea_vec.append(avg_latency)
 
         return np.array(fea_vec)
 
@@ -350,11 +353,12 @@ class Adaptive(Strategy):
 
     def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
         fea_vec = []
+
+        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x,y: x, lifetimes.items())))
+
         if(isobserved):
             # No current hit rates to report 
             # Expected Hit Rate (If Not Cached)
-            avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x,y: x, lifetimes.items())))
-            
             local_avg_lt = []
             if(not self.__isstatic):
                 for prodid,lts in lifetimes.items():
@@ -408,7 +412,7 @@ class Adaptive(Strategy):
                 fea_vec.append(hit_trend.get_last_position(ran))
                 fea_vec.append(extrapolation[trend_size-1+ran])
 
-        return fea_vec
+        return fea_vec, avg_rt
 
     def __isobserved(self, entityid, attribute):
         if(entityid in self.__observed and attribute in self.__observed[entityid]['attributes']):

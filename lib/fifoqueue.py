@@ -11,6 +11,9 @@ class FIFOQueue():
 
     def getlist(self):
         return list(self.__queue)
+    
+    def getsize(self):
+        return self.__queue.qsize()
 
 
 class FIFOQueue_2():

@@ -47,7 +47,8 @@ class DQNAgent(Agent):
             'short_term_hitrate', 'expected_short_term_hitrate',
             'mid_term_hitrate', 'expected_mid_term_hitrate',
             'long_term_hitrate', 'expected_long_term_hitrate',         
-            'average_cached_lifetime', 'expected_marginal_utility'
+            'average_cached_lifetime', 'expected_marginal_utility', 
+            'average_latency'
             ]
         self.__n_features = len(self.__feature_vector)*self.__init_state_space_size
         
