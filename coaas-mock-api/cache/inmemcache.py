@@ -143,11 +143,11 @@ class InMemoryCache(CacheAgent):
         return output
 
     # Retrive frequency of access statistics for currently cached entities
-    def get_statistics(self):
+    def get_statistics_all(self)->dict:
         return self.__entityhash.freq_table
 
     # Retrive frequency of access of all attribute of an entity
-    def get_statistics(self, entityid):
+    def get_statistics_entity(self, entityid)->dict:
         return self.__entityhash[entityid].freq_table
 
     # Retrive frequency of access statistics for a context attribute
