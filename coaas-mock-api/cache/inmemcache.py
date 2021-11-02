@@ -37,12 +37,13 @@ class InMemoryCache(CacheAgent):
             # Hit rate is calculated in each window
             self.calculate_hitrate()
             # Items are evicted every each window
-            items_to_evict = self.__evictor.select_for_evict()
-            if(isinstance(items_to_evict,list)):
-                for ent,att in items_to_evict:
-                    self.evict_attribute(ent, att)
-            else:
-                self.evict(items_to_evict)
+            if(self.__evictor):
+                items_to_evict = self.__evictor.select_for_evict()
+                if(isinstance(items_to_evict,list)):
+                    for ent,att in items_to_evict:
+                        self.evict_attribute(ent, att)
+                else:
+                    self.evict(items_to_evict)
             time.sleep(self.window/1000)
 
     def calculate_hitrate(self):

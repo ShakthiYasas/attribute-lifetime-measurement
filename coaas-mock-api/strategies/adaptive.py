@@ -322,8 +322,7 @@ class Adaptive(Strategy):
         else:
             fea_vec.append(0)
         # Expected Marginal Utility
-
-
+        
         # Latency
         fea_vec.append(avg_latency)
 
