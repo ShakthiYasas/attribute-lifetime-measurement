@@ -311,12 +311,12 @@ class Adaptive(Strategy):
         # Hit Rates and Expectations
         fea_vec = fea_vec + self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
         # Average Cached Lifetime 
-        cached_lt_res = self.__db.read_all_with_limit('cachedlifetime',{
+        cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
                     'entity': entityid,
                     'attribute': att
                 },10)
         if(cached_lt_res):
-            avg_lts = list(map(lambda x: x['lifetime'], cached_lt_res))
+            avg_lts = list(map(lambda x: x['c_lifetime'], cached_lt_res))
             fea_vec.append(statistics.mean(avg_lts))
         else:
             fea_vec.append(0)
