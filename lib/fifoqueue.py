@@ -25,6 +25,9 @@ class FIFOQueue_2():
 
     def get_last(self):
         return self.__queue[-1]
+    
+    def get_head(self):
+        return self.__queue[0]
 
     def get_last_range(self, length):
         return self.__queue[len(self.__queue)-length : len(self.__queue)]

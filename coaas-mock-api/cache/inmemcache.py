@@ -4,7 +4,7 @@ from datetime import datetime
 
 from cache.cacheagent import CacheAgent
 from lib.limitedsizedict import LimitedSizeDict
-from lib.fifoqueue import FIFOQueue
+from lib.fifoqueue import FIFOQueue, FIFOQueue_2
 from eviction.evictorfactory import EvictorFactory
 
 # Implementing a simple fixed sized in-memory cache
@@ -45,17 +45,18 @@ class InMemoryCache(CacheAgent):
     
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
+        now = datetime.datetime.now()
         if(entityid in self.__entityhash):
             for att_name, values in cacheitems.items():
                 if(att_name not in self.__entityhash[entityid].freq_table):
-                    self.__entityhash[entityid].freq_table[att_name] = (0,[],datetime.datetime.now())
+                    self.__entityhash[entityid].freq_table[att_name] = (FIFOQueue_2(100).push(now),now)
                 self.__entityhash[entityid][att_name] = values
         else:
             self.__entityhash[entityid] = LimitedSizeDict()
-            self.__entityhash.freq_table[entityid] = (0,[],datetime.datetime.now())
+            self.__entityhash.freq_table[entityid] = (FIFOQueue_2(100).push(now),now)
 
             for att_name, values in cacheitems.items():
-                self.__entityhash[entityid].freq_table[att_name] = (0,[],datetime.datetime.now())
+                self.__entityhash[entityid].freq_table[att_name] = (FIFOQueue_2().push(now),now)
                 self.__entityhash[entityid][att_name] = values
 
     # Evicts an entity from cache
@@ -95,10 +96,6 @@ class InMemoryCache(CacheAgent):
 
         del self.__entityhash[entityid][attribute]
         del self.__entityhash[entityid].freq_table[attribute]
-    
-    # Read the entire cache
-    def get_values(self) -> LimitedSizeDict:
-        return self.__entityhash
 
     # Get all attributes cached for an entity
     def get_attributes_of_entity(self,entityid) -> LimitedSizeDict:
@@ -126,14 +123,12 @@ class InMemoryCache(CacheAgent):
         if(self.__is_cached(entityid,attribute)):
             # Updating frequency table for context attributes
             att_stat = list(self.__entityhash[entityid].freq_table[attribute])
-            att_stat[0]=+1
-            att_stat[1].append(datetime.now())
+            att_stat[0].push(datetime.now())
             self.__entityhash[entityid].freq_table[attribute] = tuple(att_stat)
             
             # Updating frequency table for entities
             ent_stat = list(self.__entityhash.freq_table[entityid])
-            ent_stat[0]=+1
-            ent_stat[1].append(datetime.now())
+            ent_stat[0].push(datetime.now())
             self.__entityhash.freq_table[entityid] = tuple(ent_stat)
 
             return self.__entityhash[entityid][attribute]
