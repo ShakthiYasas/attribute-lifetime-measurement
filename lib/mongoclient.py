@@ -21,6 +21,11 @@ class MongoClient:
   def read_all(self, collection, condition, sorting_col = '_id'):
     col = self.__db[collection]
     return col.find(condition).sort(sorting_col,-1)
+
+  # Retrieve all the items in the collection
+  def read_all_with_limit(self, collection, condition, limit, sorting_col = '_id'):
+    col = self.__db[collection]
+    return col.find(condition).sort(sorting_col,-1).limit(limit)
     
   # Insert a single new item to the collection
   # Returns: _id of the inserted item

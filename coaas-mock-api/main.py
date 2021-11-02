@@ -44,7 +44,8 @@ class PlatformMock(Resource):
     
     # Create an instance of the refreshing strategy
     __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']))
-    __selected_algo = __strategy_factory.get_cache_memory()
+    __selected_algo = __strategy_factory.get_retrieval_strategy()
+    setattr(__selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
 
     # Set current session token
     setattr(__selected_algo, 'session', __token)
@@ -62,7 +63,7 @@ class PlatformMock(Resource):
     setattr(__selected_algo, 'service_registry', __service_registry)
 
     # Initialize the Selective Caching Agent
-    agent_fac = AgentFactory(config)
+    agent_fac = AgentFactory(config, __selected_algo)
     setattr(__selected_algo, 'selective_cache_agent', agent_fac.get_agent())
     
     # POST /contexts endpoint

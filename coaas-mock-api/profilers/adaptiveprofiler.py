@@ -122,7 +122,7 @@ class AdaptiveProfiler(Profiler):
             }
 
     # Getter methods
-    def get_mean(self,attribute) -> dict:
+    def get_mean(self,attribute):
         return self.__mean[attribute]
 
 # Methods only relevant to Greedy (Full Coverage) Retrieval 

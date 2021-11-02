@@ -1,10 +1,15 @@
 import time
 import datetime
 import threading
+import statistics
 
 from lib.fifoqueue import FIFOQueue_2
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 from profilers.adaptiveprofiler import AdaptiveProfiler
 
@@ -32,7 +37,7 @@ class Adaptive(Strategy):
         self.__moving_window = window
         self.__most_expensive_sla = None
 
-        self.service_selector = ServiceSelector()
+        self.service_selector = ServiceSelector(db)
         if(not self.__isstatic):
             self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
     
@@ -157,13 +162,13 @@ class Adaptive(Strategy):
         for ent in json:
             # Check freshness of requested attributes
             entityid = ent['entityId']
+            lifetimes = None
+            if(self.__isstatic):
+                lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'])
+
             if(entityid in self.cache_memory.entityhash):
                 # Entity is cached
                 # Atleast one of the attributes of the entity is already cached 
-                lifetimes = None
-                if(self.__isstatic):
-                    lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'])
-                
                 if(not (entityid in self.__cached)):
                     self.__cached[entityid] = {}
 
@@ -209,10 +214,11 @@ class Adaptive(Strategy):
                 else:
                     # Atleast one of the attributes requested are not in cache for the entity
                     # Should return the attributes that should be cached
-                    cachig_attrs = self.__evalute_attributes_for_caching(entityid,
-                                            self.__get_attributes_not_cached(entityid, ent['attributes']))
-                    if(cachig_attrs):
-                        new_context.append((entityid,cachig_attrs,lifetimes))
+                    caching_attrs = self.__evalute_attributes_for_caching(entityid,
+                                            self.__get_attributes_not_cached(entityid, ent['attributes']),
+                                            lifetimes)
+                    if(caching_attrs):
+                        new_context.append((entityid,caching_attrs,lifetimes))
 
                 # Multithread this
                 if(len(new_context)>0):
@@ -225,9 +231,10 @@ class Adaptive(Strategy):
                 output[entityid] = self.__retrieve_entity(ent['attributes'],lifetimes)
                 # Evaluate whether to cache
                 # Run this in the background
-                self.__evaluate_for_caching(entityid, output[entityid])
+                self.__evaluate_for_caching(entityid, output[entityid], lifetimes)
 
             output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
+            self.__evaluated.append(entityid)
                 
         return output
 
@@ -236,48 +243,177 @@ class Adaptive(Strategy):
         return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
 
     # Evaluate for caching
-    def __evalute_attributes_for_caching(self, entityid, attributes:list) -> list:
+    def __evalute_attributes_for_caching(self, entityid, attributes:list, lifetimes) -> list:
         # Evaluate the attributes to cache or not
-        # And return those which need to be cached
-        pass
+        actions = []
+        for att in attributes:
+            # Translate the entity,attribute pair to a state
+            observation = self.__translate_to_state(entityid,att,lifetimes)
+            # Select the action for the state using the RL Agent
+            action = self.selective_cache_agent.choose_action(observation)
+            if(action != (0,0)):
+                actions.append(action)
 
-    def __evaluate_for_caching(self, entityid, attributes:dict):
+    def __evaluate_for_caching(self, entityid, attributes:dict, lifetimes):
         # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
         is_caching = False
-        updated_attr_dict = {}
+        updated_attr_dict = []
         if not entityid in self.__evaluated:
             # Entity hasn't been evaluted in this window before
-            is_caching = True
-            # if caching, updated_attr_dict with those which will be cached
+            for att in attributes:
+                observation = self.__translate_to_state(entityid,att,lifetimes)
+                action = self.selective_cache_agent.choose_action(observation)
+                if(action != (0,0)):
+                    updated_attr_dict.append(action[1])
+                    is_caching = True
         
         if(is_caching):
             # Add to cache 
             self.cache_memory.save(entityid,updated_attr_dict)
             # Push to profiler
             if(not self.__isstatic):
-                self.__profiler.reactive_push({entityid:updated_attr_dict})
+                self.__profiler.reactive_push({entityid:updated_attr_dict})     
             del self.__observed[entityid]
             del self.__entity_access_trend[entityid]
+            # Update the observed list for uncached entities and attributes 
+            self.__update_observed(entityid, list(set(updated_attr_dict) - set(attributes)))
         else:
             # Update the observed list for uncached entities and attributes 
-            now = datetime.datetime.now()
-            if(entityid in self.__observed):
-                self.__observed[entityid]['req_ts'].append(now)
-                for attr,vals in attributes:
-                    if(attr in self.__observed[entityid]['attributes']):
-                        self.__observed[entityid]['attributes'][attr].append(now)
-                    else:
-                        self.__observed[entityid]['attributes'][attr] = [now]
-            else:
-                attrs = {}
-                for attr,vals in attributes:
-                    attrs[attr] = [now]
-                self.__observed[entityid] = {
-                    'req_ts': [now],
-                    'attributes': attrs
-                } 
+            self.__update_observed(entityid, attributes)
+        
+        # Push to Queue to calculate reward in next epoch
+        self.__calculate_reward(list(map(lambda x: (entityid, x), updated_attr_dict)))
+    
+    def __update_observed(self, entityid, attributes):
+        now = datetime.datetime.now()
+        if(entityid in self.__observed):
+            self.__observed[entityid]['req_ts'].append(now)
+            for attr,vals in attributes:
+                if(attr in self.__observed[entityid]['attributes']):
+                    self.__observed[entityid]['attributes'][attr].append(now)
+                else:
+                    self.__observed[entityid]['attributes'][attr] = [now]
+        else:
+            attrs = {}
+            for attr,vals in attributes:
+                attrs[attr] = [now]
+            self.__observed[entityid] = {
+                'req_ts': [now],
+                'attributes': attrs
+            } 
 
+    # Translating an observation to a state
+    def __translate_to_state(self, entityid, att, lifetimes):
+        fea_vec = []
+        isobserved = self.__isobserved(entityid, att)
+
+        if(isobserved):
+            # Actual and Expected Access Rates 
+            attribute_trend = self.__cached_attribute_access_trend[entityid][att]
+            trend_size = attribute_trend.get_queue_size()
+
+            xi = np.array(range(0,trend_size))
+            s = InterpolatedUnivariateSpline(xi, attribute_trend, k=2)
+            total_size = trend_size + self.trend_ranges[2]
+            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            for ran in self.trend_ranges:
+                fea_vec.append(attribute_trend.get_last_position(ran))
+                fea_vec.append(extrapolation[trend_size-1+ran])
+        else:
+            # Actual and Expected Access Rates 
+            # No actual or expected access rates becasue the item is already cached
+            fea_vec = [0,0,0,0,0,0]
+
+        # Average Cached Lifetime 
+
+        # Expected Marginal Utility
+
+        # Hit Rates and Expectations
+        fea_vec = fea_vec + self.calculate_hitrate_features(isobserved, entityid, att, lifetimes)
+
+        return np.array(fea_vec)
+
+    def calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
+        fea_vec = []
+        if(isobserved):
+            # No current hit rates to report 
+            # Expected Hit Rate (If Not Cached)
+            avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x,y: x, lifetimes.items())))
+            
+            local_avg_lt = []
+            if(not self.__isstatic):
+                for prodid,lts in lifetimes.items():
+                    local_avg_lt.append(self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att))
+            else:
+                for prodid,lts in lifetimes.items():
+                    if(att in lts['lifetimes']):
+                        local_avg_lt.append(lts['lifetimes'][att])
+
+            avg_life = statistics.mean(local_avg_lt) if(local_avg_lt) else 1
+
+            frt = 1-(avg_rt/avg_life)
+            fthr = self.__most_expensive_sla[0]
+
+            req_rate_trend = self.__request_rate_trend
+            trend_size = req_rate_trend.get_queue_size()
+
+            xi = np.array(range(0,trend_size))
+            s = InterpolatedUnivariateSpline(xi, req_rate_trend, k=2)
+            total_size = trend_size + self.trend_ranges[2]
+            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            for ran in self.trend_ranges:
+                fea_vec.append(0)
+                req_at_point = extrapolation[trend_size-1+ran]
+                if(fthr>frt):
+                    delta = avg_life*(fthr-frt)
+                    if(delta >= req_at_point):
+                        # It is effective to cache
+                        # because multiple requests can be served
+                        fea_vec.append(1/(delta*req_at_point))
+                    else:
+                        # It is not effective to cache
+                        # because no more that 1 request could be served
+                        fea_vec.append(0)
+                else:
+                    # It is not effective to cache
+                    # because the item is already expired by the time it arrives
+                    fea_vec.append(0)
+        else:
+            # Current Hit Rate (If Cached)
+            hit_trend = self.__cached_hit_access_trend[entityid][att]
+            trend_size = hit_trend.get_queue_size()
+
+            xi = np.array(range(0,trend_size))
+            s = InterpolatedUnivariateSpline(xi, hit_trend, k=2)
+            total_size = trend_size + self.trend_ranges[2]
+            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            for ran in self.trend_ranges:
+                fea_vec.append(hit_trend.get_last_position(ran))
+                fea_vec.append(extrapolation[trend_size-1+ran])
+
+        return fea_vec
+
+    def __isobserved(self, entityid, attribute):
+        if(entityid in self.__observed and attribute in self.__observed[entityid]['attributes']):
+            return True
+        return False
+
+    def __calculate_reward(self, actions):
+        # new_state, reward = self.selective_cache_agent.step(action)
+        # self.selective_cache_agent.store_transition(self.state, action, reward, new_state)
+        pass
+
+    # Get Observed Data
+    def get_observed(self):
+        return self.__observed
+
+    # Get attribute access trend
+    def get_attribute_access_trend(self):
+        return self.__attribute_access_trend
 
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:

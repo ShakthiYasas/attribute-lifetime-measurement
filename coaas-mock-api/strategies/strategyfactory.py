@@ -23,5 +23,5 @@ class StrategyFactory:
             self.__selected_algo =  Reactive(db, window, isstatic)
 
     # Retruns the singleton instance of a strategy
-    def get_cache_memory(self) -> Strategy:
+    def get_retrieval_strategy(self):
         return self.__selected_algo
