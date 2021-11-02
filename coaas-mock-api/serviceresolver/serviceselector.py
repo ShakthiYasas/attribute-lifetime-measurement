@@ -19,11 +19,11 @@ class ServiceSelector:
             if(prodid in self.__statistics):
                 self.__statistics[prodid] = {
                     'count': 1,
-                    'queue': FIFOQueue().push(aft_time-now)
+                    'queue': FIFOQueue().push((aft_time-now).total_seconds())
                 }
             else:
                 self.__statistics[prodid]['count']+=1
-                self.__statistics[prodid]['queue'].push(aft_time-now)
+                self.__statistics[prodid]['queue'].push((aft_time-now).total_seconds())
 
             if(self.__statistics[prodid]['count'] % 5):
                 self.__db.insert_one('responsetimes',{

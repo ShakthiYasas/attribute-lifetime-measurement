@@ -34,7 +34,8 @@ class InMemoryCache(CacheAgent):
             # Hit rate is calculated each 5 seconds
             self.calculate_hitrate()
             # Items are evicted every 5 seconds as well 
-            self.__evictor.evict()
+            for ent,att in self.__evictor.select_for_evict():
+                self.evict_attribute(ent, att)
             time.sleep(5)
 
     def calculate_hitrate(self):
@@ -149,6 +150,10 @@ class InMemoryCache(CacheAgent):
     # Retrive frequency of access statistics for currently cached entities
     def get_statistics(self):
         return self.__entityhash.freq_table
+
+    # Retrive frequency of access of all attribute of an entity
+    def get_statistics(self, entityid):
+        return self.__entityhash[entityid].freq_table
 
     # Retrive frequency of access statistics for a context attribute
     def get_statistics(self, entityid, attribute):
