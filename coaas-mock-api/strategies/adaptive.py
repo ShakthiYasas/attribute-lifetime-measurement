@@ -291,8 +291,7 @@ class Adaptive(Strategy):
         
         if(is_caching):
             # Add to cache 
-            self.__last_actions += updated_attr_dict # This is wrong
-
+            self.__last_actions = [(entityid, x) for x in updated_attr_dict]
             self.cache_memory.save(entityid,updated_attr_dict)
             # Push to profiler
             if(not self.__isstatic):
