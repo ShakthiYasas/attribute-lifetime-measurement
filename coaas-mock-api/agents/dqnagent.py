@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow.compat.v1 as tf
 
+from lib.event import subscribe
 from exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 # Random seeding
@@ -47,8 +48,7 @@ class DQNAgent(Agent):
             'short_term_hitrate', 'expected_short_term_hitrate',
             'mid_term_hitrate', 'expected_mid_term_hitrate',
             'long_term_hitrate', 'expected_long_term_hitrate',         
-            'average_cached_lifetime', 'expected_marginal_utility', 
-            'average_latency'
+            'average_cached_lifetime', 'average_latency'
             ]
         self.__n_features = len(self.__feature_vector)*self.__init_state_space_size
         
@@ -85,6 +85,8 @@ class DQNAgent(Agent):
         self.__sess = tf.Session()
         tf.summary.FileWriter("logs/", self.__sess.graph)
         self.__sess.run(tf.global_variables_initializer())
+
+        subscribe("need_to_learn", self.learn)
         
     def __build_network(self, optimizer:str):
         # Cleaning the DQ Network (Reset to initial state)
@@ -195,7 +197,7 @@ class DQNAgent(Agent):
     # Learn the network
     def learn(self):
         # Checking to replace target parameters
-        if self.__learn_step_counter % self.__replace_target_iter == 0:
+        if (self.__learn_step_counter % self.__replace_target_iter == 0):
             self.__sess.run(self.__replace_target_op)
 
         # Sampling batch memory from all memory instances
@@ -254,7 +256,7 @@ class DQNAgent(Agent):
             truncate = lambda x, lower, upper: min(max(x, lower), upper)
             self.__epsilons = truncate(self.__epsilons, self.epsilons_min, self.__epsilons_max)
 
-        self.__learn_step_counter += 1
+        self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
 
     def get_feature_vector(self):
         return self.__feature_vector

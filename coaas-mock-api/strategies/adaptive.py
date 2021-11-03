@@ -3,6 +3,7 @@ import datetime
 import threading
 import statistics
 
+from lib.event import post_event
 from lib.fifoqueue import FIFOQueue_2
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
@@ -22,13 +23,14 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
+    __learning_counter = 0
     __attribute_access_trend = {}
     __cached_hit_access_trend = {}
     __cached_attribute_access_trend = {}
     __entity_access_trend = FIFOQueue_2(100)
     __request_rate_trend = FIFOQueue_2(1000)
 
-    def __init__(self, db, window, isstatic=True): 
+    def __init__(self, db, window, isstatic=True, learncycle = 20): 
         self.__cached = {}
         self.__observed = {}
         self.__evaluated = []
@@ -36,6 +38,7 @@ class Adaptive(Strategy):
         self.__isstatic = isstatic
         self.__moving_window = window
         self.__most_expensive_sla = None
+        self.__learning_cycle = learncycle
 
         self.service_selector = ServiceSelector(db)
         if(not self.__isstatic):
@@ -214,6 +217,7 @@ class Adaptive(Strategy):
                 else:
                     # Atleast one of the attributes requested are not in cache for the entity
                     # Should return the attributes that should be cached
+                    self.__learning_counter += 1
                     caching_attrs = self.__evalute_attributes_for_caching(entityid,
                                             self.__get_attributes_not_cached(entityid, ent['attributes']),
                                             lifetimes)
@@ -231,11 +235,16 @@ class Adaptive(Strategy):
                 output[entityid] = self.__retrieve_entity(ent['attributes'],lifetimes)
                 # Evaluate whether to cache
                 # Run this in the background
+                self.__learning_counter += 1
                 self.__evaluate_for_caching(entityid, output[entityid], lifetimes)
 
             output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
             self.__evaluated.append(entityid)
-                
+
+        if(self.__learning_counter % self.__learning_cycle == 0):
+            # Trigger learning 
+            self.trigger_agent_learning()
+
         return output
 
     # Get attributes not cached for the entity
@@ -457,4 +466,17 @@ class Adaptive(Strategy):
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:response})
+            
+    def trigger_agent_learning(self) -> None:
+        th = LearningThread(self)
+        th.start()
+        th.join()
+
+class LearningThread (threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        post_event("need_to_learn")
+
             

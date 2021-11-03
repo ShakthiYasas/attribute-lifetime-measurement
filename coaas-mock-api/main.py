@@ -43,7 +43,7 @@ class PlatformMock(Resource):
         })
     
     # Create an instance of the refreshing strategy
-    __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']))
+    __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']), int(default_config['LearningCycle']))
     __selected_algo = __strategy_factory.get_retrieval_strategy()
     setattr(__selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
 

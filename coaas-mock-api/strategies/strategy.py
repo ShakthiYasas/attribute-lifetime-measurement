@@ -9,7 +9,7 @@ class Strategy(object):
     attributes = 0
     session = ''
 
-    def __init__(self, db, window, isstatic=True): pass
+    def __init__(self, db, window, isstatic=True, learncycle = 20): pass
     def init_cache(self): pass
     def get_result(self, json = None, fthr = (0,1.0,1.0), session = None) -> dict: pass
     def get_current_profile(self): pass
