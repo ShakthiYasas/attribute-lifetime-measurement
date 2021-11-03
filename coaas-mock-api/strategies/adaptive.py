@@ -4,6 +4,7 @@ import threading
 import statistics
 
 from lib.event import post_event
+from agents.dqnagent import DQNAgent
 from lib.fifoqueue import FIFOQueue_2
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
@@ -34,6 +35,7 @@ class Adaptive(Strategy):
         self.__cached = {}
         self.__observed = {}
         self.__evaluated = []
+        self.__last_actions = []
         self.__reqs_in_window = 0
         self.__isstatic = isstatic
         self.__moving_window = window
@@ -241,8 +243,8 @@ class Adaptive(Strategy):
             output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
             self.__evaluated.append(entityid)
 
-        if(self.__learning_counter % self.__learning_cycle == 0):
-            # Trigger learning 
+        if(isinstance(self.selective_cache_agent, DQNAgent) and self.__learning_counter % self.__learning_cycle == 0):
+            # Trigger learning for the DQN Agent
             self.trigger_agent_learning()
 
         return output
@@ -261,24 +263,36 @@ class Adaptive(Strategy):
             # Select the action for the state using the RL Agent
             action = self.selective_cache_agent.choose_action(observation)
             if(action != (0,0)):
-                actions.append(action)
+                self.__last_actions.append(action)
+                actions.append(action[1])
+        
+        # Push to Queue to calculate reward in next epoch
+        self.__calculate_reward(list(map(lambda x: (entityid, x), actions)))
+
+        return actions
 
     def __evaluate_for_caching(self, entityid, attributes:dict, lifetimes):
         # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
         is_caching = False
         updated_attr_dict = []
+        random_one = []
         if not entityid in self.__evaluated:
             # Entity hasn't been evaluted in this window before
             for att in attributes:
                 observation = self.__translate_to_state(entityid,att,lifetimes)
                 action = self.selective_cache_agent.choose_action(observation)
-                if(action != (0,0)):
+                if(action != (0,0) and action[0] == entityid):
                     updated_attr_dict.append(action[1])
                     is_caching = True
+                else:
+                    if(action != (0,0)):
+                        random_one.append(action)
         
         if(is_caching):
             # Add to cache 
+            self.__last_actions += updated_attr_dict # This is wrong
+
             self.cache_memory.save(entityid,updated_attr_dict)
             # Push to profiler
             if(not self.__isstatic):
@@ -293,7 +307,22 @@ class Adaptive(Strategy):
         
         # Push to Queue to calculate reward in next epoch
         self.__calculate_reward(list(map(lambda x: (entityid, x), updated_attr_dict)))
-    
+
+        if(random_one):
+            self.__cache_entity_attribute_pairs(random_one)
+            self.__calculate_reward(random_one)
+        
+    def __cache_entity_attribute_pairs(self, entityttpairs):
+        for entityid, att in entityttpairs:
+            self.cache_memory.save(entityid,[att])
+            # Push to profiler
+            if(not self.__isstatic):
+                self.__profiler.reactive_push({entityid:[att]})     
+            del self.__observed[entityid]
+            del self.__entity_access_trend[entityid]
+            # Update the observed list for uncached entities and attributes 
+            self.__update_observed(entityid, [att])
+
     def __update_observed(self, entityid, attributes):
         now = datetime.datetime.now()
         if(entityid in self.__observed):
@@ -330,8 +359,7 @@ class Adaptive(Strategy):
             fea_vec.append(statistics.mean(avg_lts))
         else:
             fea_vec.append(0)
-        # Expected Marginal Utility
-        
+
         # Latency
         fea_vec.append(avg_latency)
 

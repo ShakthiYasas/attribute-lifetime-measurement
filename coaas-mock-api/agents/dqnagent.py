@@ -258,6 +258,7 @@ class DQNAgent(Agent):
 
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
 
+    # Getter method for feature vetcor labels
     def get_feature_vector(self):
         return self.__feature_vector
 
