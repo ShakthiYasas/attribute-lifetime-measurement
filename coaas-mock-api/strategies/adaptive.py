@@ -42,6 +42,8 @@ class Adaptive(Strategy):
         self.__most_expensive_sla = None
         self.__learning_cycle = learncycle
 
+        self.req_rate_extrapolation = None
+
         self.service_selector = ServiceSelector(db)
         if(not self.__isstatic):
             self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
@@ -65,9 +67,10 @@ class Adaptive(Strategy):
     
     # Clear function that run on the background
     def clear_expired(self) -> None:
-        # Multithread the following 2
+        # Multithread the following 3
         Adaptive.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
         Adaptive.__clear_cached()
+        self.__extrapolate_request_rate()
         
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
@@ -145,7 +148,7 @@ class Adaptive(Strategy):
         self.__profiler.get_details()
 
     # Retrieving context data
-    def get_result(self, json = None, fthresh = (0,1.0,1.0), session = None) -> dict: 
+    def get_result(self, json = None, fthresh = (0.5,1.0,1.0), session = None) -> dict: 
         self.__reqs_in_window+=1
         if(self.__most_expensive_sla == None):
             self.__most_expensive_sla = fthresh
@@ -221,8 +224,7 @@ class Adaptive(Strategy):
                     # Should return the attributes that should be cached
                     self.__learning_counter += 1
                     caching_attrs = self.__evalute_attributes_for_caching(entityid,
-                                            self.__get_attributes_not_cached(entityid, ent['attributes']),
-                                            lifetimes)
+                                            self.__get_attributes_not_cached(entityid, ent['attributes']))
                     if(caching_attrs):
                         new_context.append((entityid,caching_attrs,lifetimes))
 
@@ -238,7 +240,7 @@ class Adaptive(Strategy):
                 # Evaluate whether to cache
                 # Run this in the background
                 self.__learning_counter += 1
-                self.__evaluate_for_caching(entityid, output[entityid], lifetimes)
+                self.__evaluate_for_caching(entityid, output[entityid])
 
             output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
             self.__evaluated.append(entityid)
@@ -254,12 +256,12 @@ class Adaptive(Strategy):
         return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
 
     # Evaluate for caching
-    def __evalute_attributes_for_caching(self, entityid, attributes:list, lifetimes) -> list:
+    def __evalute_attributes_for_caching(self, entityid, attributes:list) -> list:
         # Evaluate the attributes to cache or not
         actions = []
         for att in attributes:
             # Translate the entity,attribute pair to a state
-            observation = self.__translate_to_state(entityid,att,lifetimes)
+            observation = self.__translate_to_state(entityid,att)
             # Select the action for the state using the RL Agent
             action = self.selective_cache_agent.choose_action(observation)
             if(action != (0,0)):
@@ -271,7 +273,7 @@ class Adaptive(Strategy):
 
         return actions
 
-    def __evaluate_for_caching(self, entityid, attributes:dict, lifetimes):
+    def __evaluate_for_caching(self, entityid, attributes:dict):
         # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
         is_caching = False
@@ -280,7 +282,7 @@ class Adaptive(Strategy):
         if not entityid in self.__evaluated:
             # Entity hasn't been evaluted in this window before
             for att in attributes:
-                observation = self.__translate_to_state(entityid,att,lifetimes)
+                observation = self.__translate_to_state(entityid,att)
                 action = self.selective_cache_agent.choose_action(observation)
                 if(action != (0,0) and action[0] == entityid):
                     updated_attr_dict.append(action[1])
@@ -341,11 +343,12 @@ class Adaptive(Strategy):
             } 
 
     # Translating an observation to a state
-    def __translate_to_state(self, entityid, att, lifetimes):
+    def __translate_to_state(self, entityid, att):
         isobserved = self.__isobserved(entityid, att)
         # Access Rates 
         fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
         # Hit Rates and Expectations
+        lifetimes = self.service_registry.get_context_producers(entityid,[att])
         new_feas, avg_latency = self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
         fea_vec = fea_vec + new_feas
         # Average Cached Lifetime 
@@ -362,7 +365,15 @@ class Adaptive(Strategy):
         # Latency
         fea_vec.append(avg_latency)
 
-        return np.array(fea_vec)
+        # Average Retriveal Cost
+        avg_ret_cost = statistics.mean([values['cost'] for prodid, values in lifetimes.items()])
+        fea_vec.append(avg_ret_cost)
+
+        return {
+            'entityid': entityid,
+            'attribute': att,
+            'features': fea_vec
+        }
 
     def __calculate_access_rates(self, isobserved, entityid, att):
         fea_vec = []
@@ -385,6 +396,16 @@ class Adaptive(Strategy):
             fea_vec = [0,0,0,0,0,0]
 
         return fea_vec
+    
+    def __extrapolate_request_rate(self):
+        req_rate_trend = self.__request_rate_trend
+        trend_size = req_rate_trend.get_queue_size()
+        self.rr_trend_size = trend_size
+
+        xi = np.array(range(0,trend_size))
+        s = InterpolatedUnivariateSpline(xi, req_rate_trend, k=2)
+        total_size = trend_size + self.trend_ranges[2]
+        self.req_rate_extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
     def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
         fea_vec = []
@@ -408,17 +429,9 @@ class Adaptive(Strategy):
             frt = 1-(avg_rt/avg_life)
             fthr = self.__most_expensive_sla[0]
 
-            req_rate_trend = self.__request_rate_trend
-            trend_size = req_rate_trend.get_queue_size()
-
-            xi = np.array(range(0,trend_size))
-            s = InterpolatedUnivariateSpline(xi, req_rate_trend, k=2)
-            total_size = trend_size + self.trend_ranges[2]
-            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
-
             for ran in self.trend_ranges:
                 fea_vec.append(0)
-                req_at_point = extrapolation[trend_size-1+ran]
+                req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-1+ran]
                 if(fthr>frt):
                     delta = avg_life*(fthr-frt)
                     if(delta >= req_at_point):
@@ -454,9 +467,11 @@ class Adaptive(Strategy):
             return True
         return False
 
-    def __calculate_reward(self, actions):
+    def __calculate_reward(self, actions):   
         # new_state, reward = self.selective_cache_agent.step(action)
         # self.selective_cache_agent.store_transition(self.state, action, reward, new_state)
+        # Do the next if agent is not DQN
+        # self.selective_cache_agent.reward_history.append(reward)
         pass
 
     # Get Observed Data
@@ -493,7 +508,11 @@ class Adaptive(Strategy):
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:response})
-            
+
+    # Retrive the current configuration of the most expensive SLA  
+    def get_most_expensive_sla(self):
+        return self.__most_expensive_sla
+
     def trigger_agent_learning(self) -> None:
         th = LearningThread(self)
         th.start()

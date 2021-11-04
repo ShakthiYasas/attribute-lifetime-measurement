@@ -79,13 +79,13 @@ class InMemoryCache(CacheAgent):
             attribute_lifetimes.append({
                 'entityid': entityid,
                 'attribute': key,
-                'c_lifetime': now - value[2]
+                'c_lifetime': (now - value[2]).total_seconds()
             })
 
         # Push cached lifetime entity to Statistical DB
         self.__db.insert_one('entity-cached-lifetime',{
             'entityid': entityid,
-            'c_lifetime': now - self.__entityhash.freq_table[entityid][2]
+            'c_lifetime': (now - self.__entityhash.freq_table[entityid][2]).total_seconds()
         })
 
         # Push cached lifetimes of all the attributes to Statistical DB
@@ -102,7 +102,7 @@ class InMemoryCache(CacheAgent):
         self.__db.insert_one('attribute-cached-lifetime',{
                 'entityid': entityid,
                 'attribute': attribute,
-                'c_lifetime': now - att_meta[2]
+                'c_lifetime': (now - att_meta[2]).total_seconds()
             })
 
         del self.__entityhash[entityid][attribute]

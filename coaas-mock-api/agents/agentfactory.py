@@ -2,8 +2,9 @@ from agent import Agent
 from acagent import ACAgent
 from dqnagent import DQNAgent
 from a3cagent import A3CAgent
+from simpleagent import SimpleAgent
 
-from configurations.agentconfig import DQNConfiguration, A3CConfiguration, ACConfiguration
+from configurations.agentconfig import DQNConfiguration, A3CConfiguration, ACConfiguration, SimpleConfiguration
 
 # Instantiate a singleton agent instance according to configuration
 class AgentFactory:
@@ -14,7 +15,9 @@ class AgentFactory:
     def __init__(self, type, configuration = None, caller = None):
         self.__caller = caller
         if(configuration != None):
-            if(type == 'ac'):
+            if(type == 'simple'):
+                self.__configuration = SimpleConfiguration(configuration)
+            elif(type == 'ac'):
                 self.__configuration = ACConfiguration(configuration)
             elif(type == 'a3c'):
                 self.__configuration = A3CConfiguration(configuration)
@@ -26,7 +29,10 @@ class AgentFactory:
     # Retruns the singleton instance of an RL agent
     def get_agent(self) -> Agent:
         if(self.__agent == None):
-            if(self.__configuration != None and isinstance(self.__configuration,ACConfiguration)):
+            if(self.__configuration != None and isinstance(self.__configuration,SimpleConfiguration)):
+                print('Initializing a Simple NPV based selective context caching.')
+                self.__agent = SimpleAgent(self.__configuration, self.__caller)
+            elif(self.__configuration != None and isinstance(self.__configuration,ACConfiguration)):
                 print('Initializing a Actor-Critic based RL agent for selective context caching.')
                 self.__agent = ACAgent(self.__configuration, self.__caller)
             elif(self.__configuration != None and isinstance(self.__configuration,DQNConfiguration)):

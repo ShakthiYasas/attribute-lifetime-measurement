@@ -1,5 +1,17 @@
 from configurations.configuration import Configuration
 
+# Configuration for the A3C Agent
+class SimpleConfiguration(Configuration):
+    def __init__(self, config):
+        defaults = config['DEFAULT']
+        hyper_params = config['HYPER']
+
+        self.window = int(defaults['MovingWindow'])
+        self.discount_rate = float(hyper_params['Gamma'])
+        self.short = int(defaults['ShortWindow'])
+        self.mid = int(defaults['MidWindow'])
+        self.long = int(defaults['LongWindow'])
+
 # Configuration for the DQN Agent
 class DQNConfiguration(Configuration):
     explore_mentor = 'Random'

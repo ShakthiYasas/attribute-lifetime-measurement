@@ -42,13 +42,15 @@ class DQNAgent(Agent):
 
         # Setting the features
         self.__feature_vector = [
-            'short_term_access', 'expected_short_term_access', 
-            'mid_term_access', 'expected_mid_term_access',
-            'long_term_access', 'expected_long_term_access',   
-            'short_term_hitrate', 'expected_short_term_hitrate',
-            'mid_term_hitrate', 'expected_mid_term_hitrate',
-            'long_term_hitrate', 'expected_long_term_hitrate',         
-            'average_cached_lifetime', 'average_latency'
+            'short_term_access (0)', 'expected_short_term_access (1)', 
+            'mid_term_access (2)', 'expected_mid_term_access (3)',
+            'long_term_access (4)', 'expected_long_term_access (5)',   
+            'short_term_hitrate (6)', 'expected_short_term_hitrate (7)',
+            'mid_term_hitrate (8)', 'expected_mid_term_hitrate (9)',
+            'long_term_hitrate (10)', 'expected_long_term_hitrate (11)',         
+            'average_cached_lifetime (12)', 
+            'average_latency (13)',
+            'average_retrieval_cost (14)'
             ]
         self.__n_features = len(self.__feature_vector)*self.__init_state_space_size
         
@@ -71,7 +73,7 @@ class DQNAgent(Agent):
         # Initializing Zero Memory Status [state, action, reward, new_state]
         self.__cost_his = []
         self.__memory_counter = 0
-        self.__reward_history = []    
+        self.reward_history = []    
         self.__memory = np.zeros((self.__memory_size, self.__n_features * 2 + 2))
         
         # Accumalated count of learning epochs 
@@ -169,9 +171,9 @@ class DQNAgent(Agent):
         self.__memory_counter += 1
         
         # Record reward
-        if(len(self.__reward_history) == self.__history_size):
-            self.__reward_history.pop(0)
-        self.__reward_history.append(reward)
+        if(len(self.reward_history) == self.__history_size):
+            self.reward_history.pop(0)
+        self.reward_history.append(reward)
 
     # Select the most suitable action given a state
     # The biggest challenge here is the change of state with changes in the environment. 
@@ -181,18 +183,16 @@ class DQNAgent(Agent):
         random_value = np.random.uniform()
         if(random_value < self.__epsilons):
             if(isinstance(self.__explore_mentor,MFUAgent)):
-                action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+                return self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
             else:
-                action = self.__explore_mentor.choose_action(self.__caller.get_observed())
+                return self.__explore_mentor.choose_action(self.__caller.get_observed())
                 # Here the action is a (entityid,attribute) to cache
         else:
-            observation = observation[np.newaxis, :]
+            obs = np.array(observation['features'])[np.newaxis, :]
             # Feed forwarding the observations to retrieve Q value for every actions
-            actions_value = self.__sess.run(self.q_eval, feed_dict={self.state: observation})
+            actions_value = self.__sess.run(self.q_eval, feed_dict={self.state: obs})
             action = np.argmax(actions_value)
-            # Translate this index to the (entityid,attribute) pair
-            
-        return action
+            return (observation['entityid'], observation['attribute']) if action > 0.7 else (0,0)
 
     # Learn the network
     def learn(self):
@@ -242,7 +242,7 @@ class DQNAgent(Agent):
                 # current performance of the system. i.e., if MR is high, the increase epsilon (more exploration)
                 # and on the contrary, decrease epsilon if MR is less (more exploitation). 
                 if self.__epsilons_increment is not None:
-                    rho = np.median(np.array(self.__reward_history))
+                    rho = np.median(np.array(self.reward_history))
                     if rho >= self.__reward_threshold:
                         self.__epsilons -= self.__epsilons_decrement
                     else:

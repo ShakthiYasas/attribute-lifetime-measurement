@@ -18,7 +18,7 @@ class SQLLiteClient:
                 LIMIT 1")
             if(len(freshness)==0):
                 # No SLA set at the moment. So, assuming no freshness requirement. 
-                return (0,1.0,1.0)
+                return (0.5,1.0,1.0)
             else:
                 # (fthr, price, penalty)
                 return (freshness[0],freshness[1],freshness[2])
@@ -39,7 +39,7 @@ class SQLLiteClient:
         output = {}
         if(len(attributes)>0):
             producers = self.__conn.execute(
-                "SELECT id, url \
+                "SELECT id, url, price \
                 FROM ContextProducer \
                 WHERE entityId="+entityid+" AND isActive=1")
             
@@ -60,7 +60,8 @@ class SQLLiteClient:
                             lts[att[0]] = att[1]
                         output[prod[0]] = {
                             'url': prod[1],
-                            'lifetimes': lts
+                            'lifetimes': lts,
+                            'cost': prod[2]
                         }
         return output
     
@@ -79,8 +80,8 @@ class SQLLiteClient:
             (1,'Car'),(2,'Bike'),(3,'CarPark')")
        
         self.__conn.execute(
-            "INSERT INTO SLA (id,freshness,price,penalty,isActive) VALUES\
-            (1,0.9,1.2,2.0,1),(2,0.8,1.0,2.0,1),(3,0.7,0.8,1.8,1),(4,0.6,0.75,1.25,0)")
+            "INSERT INTO SLA (id,freshness,price,penalty,rtmax,isActive) VALUES\
+            (1,0.9,1.2,2.0,0.5,1),(2,0.8,1.0,2.0,0.6,1),(3,0.7,0.8,1.8,0.8,1),(4,0.6,0.75,1.25,1.0,0)")
        
         self.__conn.execute(
             "INSERT INTO ContextConsumer (id,name,isActive) VALUES\
@@ -96,11 +97,11 @@ class SQLLiteClient:
         
         self.__conn.execute(
             "INSERT INTO ContextProducer VALUES\
-                (1,2,1,'http://localhost:5000/bike'),\
-                (3,1,1,'http://localhost:5000/car?id=1'),\
-                (4,1,1,'http://localhost:5000/car?id=10'),\
-                (6,3,1,'http://localhost:5000/carpark?id=5'),\
-                (7,3,1,'http://localhost:5000/carpark?id=12')")
+                (1,2,1,'http://localhost:5000/bike',0.6),\
+                (3,1,1,'http://localhost:5000/car?id=1',0.25),\
+                (4,1,1,'http://localhost:5000/car?id=10',0.25),\
+                (6,3,1,'http://localhost:5000/carpark?id=5',0.4),\
+                (7,3,1,'http://localhost:5000/carpark?id=12',0.3)")
         
         self.__conn.execute(
             "INSERT INTO ContextAttribute VALUES\
@@ -140,6 +141,7 @@ class SQLLiteClient:
                 entityId INT NOT NULL,
                 isActive BOOLEAN NOT NULL,
                 url TEXT NOT NULL,
+                price REAL NOT NULL,
                 FOREIGN KEY (entityId) REFERENCES Entity(id)
             );''')
 
@@ -178,6 +180,9 @@ class SQLLiteClient:
             (
                 id INT PRIMARY KEY NOT NULL,
                 freshness REAL NOT NULL,
+                price REAL NOT NULL,
+                penalty REAL NOT NULL,
+                maxrt REAL NOT NULL,
                 isActive BOOLEAN NOT NULL
             );''')
 
