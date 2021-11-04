@@ -6,6 +6,8 @@ import statistics
 from lib.event import post_event
 from agents.dqnagent import DQNAgent
 from lib.fifoqueue import FIFOQueue_2
+from agents.simpleagent import SimpleAgent
+
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
 
@@ -230,6 +232,7 @@ class Adaptive(Strategy):
                         caching_attrs = self.__evalute_attributes_for_caching(entityid,
                                                 self.__get_attributes_not_cached(entityid, ent['attributes']))
                         if(caching_attrs):
+                            # Remove CPs that are not suitable
                             new_context.append((entityid,caching_attrs,lifetimes))
 
                 # Multithread this
@@ -241,11 +244,11 @@ class Adaptive(Strategy):
                 # Even the entity is not cached previously
                 # So, first retrieving the entity
                 output[entityid] = self.__retrieve_entity(ent['attributes'],lifetimes)
-                # Evaluate whether to cache
-                # Run this in the background
                 self.__learning_counter += 1
+                # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
                 if(self.__window_counter > 10):
+                    # Run this in the background
                     self.__evaluate_for_caching(entityid, output[entityid])
 
             output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
@@ -275,7 +278,8 @@ class Adaptive(Strategy):
                 actions.append(action[1])
         
         # Push to Queue to calculate reward in next epoch
-        self.__calculate_reward(list(map(lambda x: (entityid, x), actions)))
+        if(not isinstance(self.selective_cache_agent, SimpleAgent)):
+            self.__calculate_reward(list(map(lambda x: (entityid, x), actions)))
 
         return actions
 
@@ -300,7 +304,10 @@ class Adaptive(Strategy):
         if(is_caching):
             # Add to cache 
             self.__last_actions = [(entityid, x) for x in updated_attr_dict]
-            self.cache_memory.save(entityid,updated_attr_dict)
+            updated_att_dict = {}
+            for att in updated_attr_dict:
+                updated_att_dict[att] = attributes[att]
+            self.cache_memory.save(entityid,updated_att_dict)
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:updated_attr_dict})     
@@ -313,15 +320,31 @@ class Adaptive(Strategy):
             self.__update_observed(entityid, attributes)
         
         # Push to Queue to calculate reward in next epoch
-        self.__calculate_reward(list(map(lambda x: (entityid, x), updated_attr_dict)))
+        if(not isinstance(self.selective_cache_agent, SimpleAgent)):
+            self.__calculate_reward(list(map(lambda x: (entityid, x), updated_attr_dict)))
 
         if(random_one):
             self.__cache_entity_attribute_pairs(random_one)
-            self.__calculate_reward(random_one)
+            if(not isinstance(self.selective_cache_agent, SimpleAgent)):
+                self.__calculate_reward(random_one)
         
     def __cache_entity_attribute_pairs(self, entityttpairs):
-        for entityid, att in entityttpairs:
-            self.cache_memory.save(entityid,[att])
+        ent_att = {}
+        for entity,att in entityttpairs:
+            if(entity in ent_att):
+                if(att in ent_att[entity]):
+                    ent_att[entity].append(att)
+                else:
+                    ent_att[entity] = [att]
+            else:
+                ent_att[entity] = [att]
+
+        for entityid, attlist in ent_att:
+            lifetimes = self.service_registry.get_context_producers(entityid,attlist)
+            li = [(prodid,value['url']) for prodid, value in lifetimes.items()]
+            response = self.service_selector.get_response_for_entity(attlist,li)
+
+            self.cache_memory.save(entityid, response)
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:[att]})     
@@ -355,6 +378,7 @@ class Adaptive(Strategy):
         fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
         # Hit Rates and Expectations
         lifetimes = self.service_registry.get_context_producers(entityid,[att])
+        # The above step could be optimzed by using a view (in SQL that updates by a trigger)
         new_feas, avg_latency = self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
         fea_vec = fea_vec + new_feas
         # Average Cached Lifetime 

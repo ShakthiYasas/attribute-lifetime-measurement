@@ -55,7 +55,7 @@ class SimpleAgent(Agent):
 
             expected_access = cur_rr_exp[cur_rr_size-1+self.__short]*observation[1]
             earning = observation[7]*cur_sla[1]
-            del_pen = observation[7]*cur_sla[2]
+            del_pen = (1-observation[7])*cur_sla[2]
             ret_cost = (1-observation[7])*observation[14]
             
             total_earning = expected_access*(earning - del_pen - ret_cost)
@@ -70,7 +70,7 @@ class SimpleAgent(Agent):
 
             expected_access = cur_rr_exp[cur_rr_size-1+self.__mid]*observation[3]
             earning = observation[9]*cur_sla[1]
-            del_pen = observation[9]*cur_sla[2]
+            del_pen = (1-observation[9])*cur_sla[2]
             ret_cost = (1-observation[9])*observation[14]
             
             total_earning = expected_access*(earning - del_pen - ret_cost)
