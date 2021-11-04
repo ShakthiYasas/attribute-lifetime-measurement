@@ -24,6 +24,7 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
+    __window_counter = 0
     __learning_counter = 0
     __attribute_access_trend = {}
     __cached_hit_access_trend = {}
@@ -63,6 +64,7 @@ class Adaptive(Strategy):
         while True:
             self.clear_expired()
             # Observing the attributes that has not been cached within the window
+            self.__window_counter+=1
             time.sleep(self.__moving_window/1000) 
     
     # Clear function that run on the background
@@ -223,10 +225,12 @@ class Adaptive(Strategy):
                     # Atleast one of the attributes requested are not in cache for the entity
                     # Should return the attributes that should be cached
                     self.__learning_counter += 1
-                    caching_attrs = self.__evalute_attributes_for_caching(entityid,
-                                            self.__get_attributes_not_cached(entityid, ent['attributes']))
-                    if(caching_attrs):
-                        new_context.append((entityid,caching_attrs,lifetimes))
+                    # Doesn't cache any item until atleast the mid range is reached
+                    if(self.__window_counter > self.trend_ranges[1]):
+                        caching_attrs = self.__evalute_attributes_for_caching(entityid,
+                                                self.__get_attributes_not_cached(entityid, ent['attributes']))
+                        if(caching_attrs):
+                            new_context.append((entityid,caching_attrs,lifetimes))
 
                 # Multithread this
                 if(len(new_context)>0):
@@ -240,7 +244,9 @@ class Adaptive(Strategy):
                 # Evaluate whether to cache
                 # Run this in the background
                 self.__learning_counter += 1
-                self.__evaluate_for_caching(entityid, output[entityid])
+                # Doesn't cache any item until atleast the mid range is reached
+                if(self.__window_counter > 10):
+                    self.__evaluate_for_caching(entityid, output[entityid])
 
             output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
             self.__evaluated.append(entityid)
