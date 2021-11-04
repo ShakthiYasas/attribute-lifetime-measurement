@@ -12,6 +12,12 @@ class SimpleConfiguration(Configuration):
         self.mid = int(defaults['MidWindow'])
         self.long = int(defaults['LongWindow'])
 
+        self.explore_mentor = defaults['ExplorationAlgorithm']
+        self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.e_greedy_max = float(hyper_params['Epsilon_max'])
+        self.e_greedy_increment = float(hyper_params['Delta_plus'])
+        self.e_greedy_decrement = float(hyper_params['Delta_minus'])
+
 # Configuration for the DQN Agent
 class DQNConfiguration(Configuration):
     explore_mentor = 'Random'
@@ -30,6 +36,7 @@ class DQNConfiguration(Configuration):
         self.learning_rate = float(hyper_params['Alpha'])
         self.discount_rate = float(hyper_params['Gamma'])
         self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.explore_mentor = defaults['ExplorationAlgorithm']
         self.e_greedy_max = float(hyper_params['Epsilon_max'])
         self.e_greedy_increment = float(hyper_params['Delta_plus'])
         self.e_greedy_decrement = float(hyper_params['Delta_minus'])
@@ -55,6 +62,7 @@ class ACConfiguration(Configuration):
         self.learning_rate = float(hyper_params['Alpha'])
         self.discount_rate = float(hyper_params['Gamma'])
         self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.explore_mentor = defaults['ExplorationAlgorithm']
         self.e_greedy_max = float(hyper_params['Epsilon_max'])
         self.e_greedy_increment = float(hyper_params['Delta_plus'])
         self.e_greedy_decrement = float(hyper_params['Delta_minus'])
@@ -80,6 +88,7 @@ class A3CConfiguration(Configuration):
         self.learning_rate = float(hyper_params['Alpha'])
         self.discount_rate = float(hyper_params['Gamma'])
         self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.explore_mentor = defaults['ExplorationAlgorithm']
         self.e_greedy_max = float(hyper_params['Epsilon_max'])
         self.e_greedy_increment = float(hyper_params['Delta_plus'])
         self.e_greedy_decrement = float(hyper_params['Delta_minus'])

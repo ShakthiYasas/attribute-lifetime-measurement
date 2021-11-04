@@ -232,7 +232,6 @@ class Adaptive(Strategy):
                         caching_attrs = self.__evalute_attributes_for_caching(entityid,
                                                 self.__get_attributes_not_cached(entityid, ent['attributes']))
                         if(caching_attrs):
-                            # Remove CPs that are not suitable
                             new_context.append((entityid,caching_attrs,lifetimes))
 
                 # Multithread this
@@ -455,27 +454,31 @@ class Adaptive(Strategy):
                         local_avg_lt.append(lts['lifetimes'][att])
 
             avg_life = statistics.mean(local_avg_lt) if(local_avg_lt) else 1
-
-            frt = 1-(avg_rt/avg_life)
-            fthr = self.__most_expensive_sla[0]
-
-            for ran in self.trend_ranges:
+            
+            if(avg_life < 0):
                 fea_vec.append(0)
-                req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-1+ran]
-                if(fthr>frt):
-                    delta = avg_life*(fthr-frt)
-                    if(delta >= req_at_point):
-                        # It is effective to cache
-                        # because multiple requests can be served
-                        fea_vec.append(1/(delta*req_at_point))
+                fea_vec.append(1)
+            else:
+                frt = 1-(avg_rt/avg_life)
+                fthr = self.__most_expensive_sla[0]
+
+                for ran in self.trend_ranges:
+                    fea_vec.append(0)
+                    req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-1+ran]
+                    if(fthr>frt):
+                        delta = avg_life*(fthr-frt)
+                        if(delta >= req_at_point):
+                            # It is effective to cache
+                            # because multiple requests can be served
+                            fea_vec.append(1/(delta*req_at_point))
+                        else:
+                            # It is not effective to cache
+                            # because no more that 1 request could be served
+                            fea_vec.append(0)
                     else:
                         # It is not effective to cache
-                        # because no more that 1 request could be served
+                        # because the item is already expired by the time it arrives
                         fea_vec.append(0)
-                else:
-                    # It is not effective to cache
-                    # because the item is already expired by the time it arrives
-                    fea_vec.append(0)
         else:
             # Current Hit Rate (If Cached)
             hit_trend = self.__cached_hit_access_trend[entityid][att]
@@ -519,7 +522,7 @@ class Adaptive(Strategy):
                     list(map(lambda key,value: (key,value['url']), metadata.items())))
 
     def __refresh_cache_for_entity(self, new_context) -> None:
-        for entityid,attribute_list,metadata in new_context:       
+        for entityid,attribute_list,metadata in new_context:
             response = self.service_selector.get_response_for_entity(attribute_list, 
                         list(map(lambda key,value: (key,value['url']), metadata.items())))
             # Save items in cache

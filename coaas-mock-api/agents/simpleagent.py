@@ -1,4 +1,7 @@
+import numpy as np
+
 from agent import Agent
+from exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 class SimpleAgent(Agent):
     def __init__(self, config, caller):
@@ -11,6 +14,26 @@ class SimpleAgent(Agent):
         self.__short = config.short
         self.__mid = config.mid
         self.__long = config.long
+
+        # Exploration
+        self.__epsilons_max = config.e_greedy_max
+        self.__epsilons_increment = config.e_greedy_increment
+        self.__epsilons_decrement = config.e_greedy_decrement
+
+        # e-Greedy Exploration
+        self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
+        self.__epsilons = list(config.e_greedy_init)
+        if (config.e_greedy_init is None) or (config.e_greedy_decrement is None):
+            self.__epsilons = list(self.epsilons_min)
+
+        # Selecting the algorithem to execute during the exploration phase
+        self.__explore_mentor = None
+        if config.explore_mentor.lower() == 'mru':
+            self.__explore_mentor = MRUAgent()
+        elif config.explore_mentor.lower() == 'mfu':
+            self.__explore_mentor = MFUAgent()
+        else:
+            self.__explore_mentor = RandomAgent()
 
     # Decide whether to cache or not cache
     def choose_action(self, observation): 
@@ -45,8 +68,15 @@ class SimpleAgent(Agent):
         npv -= cost_of_caching
 
         if(npv<=0):
+            random_value = np.random.uniform()
+            if(random_value < self.__epsilons):
+                if(isinstance(self.__explore_mentor,MFUAgent)):
+                    return self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+                else:
+                    return self.__explore_mentor.choose_action(self.__caller.get_observed())          
             return (0,0)
         else:
+            # Here the action is a (entityid,attribute) to cache
             return (entityid, attribute)
 
     def caclulcate_for_range(self, range, observation, cur_sla, cur_rr_exp, cur_rr_size):

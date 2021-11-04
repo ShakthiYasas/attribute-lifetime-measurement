@@ -39,7 +39,7 @@ class SQLLiteClient:
         output = {}
         if(len(attributes)>0):
             producers = self.__conn.execute(
-                "SELECT id, url, price \
+                "SELECT id, url, price, samplingrate \
                 FROM ContextProducer \
                 WHERE entityId="+entityid+" AND isActive=1")
             
@@ -50,6 +50,7 @@ class SQLLiteClient:
                         att_string = att_string+'OR name='+attributes[idx]
 
                 for prod in  producers:
+                    sampling_interval = 1/prod[3]
                     att_res = self.__conn.execute(
                         "SELECT name, lifetime \
                         FROM ContextAttribute \
@@ -57,7 +58,7 @@ class SQLLiteClient:
                     if(len(att_res)==len(attributes)):
                         lts = {}
                         for att in att_res:
-                            lts[att[0]] = att[1]
+                            lts[att[0]] = -1 if att[1] == -1 else max(sampling_interval,att[1])
                         output[prod[0]] = {
                             'url': prod[1],
                             'lifetimes': lts,
@@ -97,11 +98,11 @@ class SQLLiteClient:
         
         self.__conn.execute(
             "INSERT INTO ContextProducer VALUES\
-                (1,2,1,'http://localhost:5000/bike',0.6),\
-                (3,1,1,'http://localhost:5000/car?id=1',0.25),\
-                (4,1,1,'http://localhost:5000/car?id=10',0.25),\
-                (6,3,1,'http://localhost:5000/carpark?id=5',0.4),\
-                (7,3,1,'http://localhost:5000/carpark?id=12',0.3)")
+                (1,2,1,'http://localhost:5000/bike',0.6, 1),\
+                (3,1,1,'http://localhost:5000/car?id=1',0.25, 0.5),\
+                (4,1,1,'http://localhost:5000/car?id=10',0.25, 1),\
+                (6,3,1,'http://localhost:5000/carpark?id=5',0.4, 0.017),\
+                (7,3,1,'http://localhost:5000/carpark?id=12',0.3, 0.017)")
         
         self.__conn.execute(
             "INSERT INTO ContextAttribute VALUES\
@@ -142,6 +143,7 @@ class SQLLiteClient:
                 isActive BOOLEAN NOT NULL,
                 url TEXT NOT NULL,
                 price REAL NOT NULL,
+                samplingrate REAL NOT NULL,
                 FOREIGN KEY (entityId) REFERENCES Entity(id)
             );''')
 
