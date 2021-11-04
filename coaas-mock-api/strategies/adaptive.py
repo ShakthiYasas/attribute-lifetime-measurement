@@ -271,7 +271,8 @@ class Adaptive(Strategy):
             # Translate the entity,attribute pair to a state
             observation = self.__translate_to_state(entityid,att)
             # Select the action for the state using the RL Agent
-            action = self.selective_cache_agent.choose_action(observation)
+            action, est_c_lifetime = self.selective_cache_agent.choose_action(observation)
+            self.cache_memory.addcachedlifetime(action, est_c_lifetime)
             if(action != (0,0)):
                 self.__last_actions.append(action)
                 actions.append(action[1])
@@ -292,7 +293,8 @@ class Adaptive(Strategy):
             # Entity hasn't been evaluted in this window before
             for att in attributes:
                 observation = self.__translate_to_state(entityid,att)
-                action = self.selective_cache_agent.choose_action(observation)
+                action, est_c_lifetime = self.selective_cache_agent.choose_action(observation)
+                self.cache_memory.addcachedlifetime(action, est_c_lifetime)
                 if(action != (0,0) and action[0] == entityid):
                     updated_attr_dict.append(action[1])
                     is_caching = True
@@ -461,13 +463,12 @@ class Adaptive(Strategy):
             else:
                 frt = 1-(avg_rt/avg_life)
                 fthr = self.__most_expensive_sla[0]
-
+                delta = avg_life*(fthr-frt)
                 for ran in self.trend_ranges:
                     fea_vec.append(0)
                     req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-1+ran]
-                    if(fthr>frt):
-                        delta = avg_life*(fthr-frt)
-                        if(delta >= req_at_point):
+                    if(fthr>frt): 
+                        if(delta >= (1/req_at_point)):
                             # It is effective to cache
                             # because multiple requests can be served
                             fea_vec.append(1/(delta*req_at_point))

@@ -70,6 +70,10 @@ class InMemoryCache(CacheAgent):
                 self.__entityhash[entityid].freq_table[att_name] = (FIFOQueue_2().push(now),now)
                 self.__entityhash[entityid][att_name] = values
 
+    # Add to cached lifetime
+    def addcachedlifetime(self, action, cachedlife):
+        self.__registry.add_cached_life(action[0], action[1], cachedlife)
+
     # Evicts an entity from cache
     def evict(self, entityid) -> None:
         now = datetime.now()
@@ -81,6 +85,7 @@ class InMemoryCache(CacheAgent):
                 'attribute': key,
                 'c_lifetime': (now - value[2]).total_seconds()
             })
+            self.__registry.remove_cached_life(entityid, key)
 
         # Push cached lifetime entity to Statistical DB
         self.__db.insert_one('entity-cached-lifetime',{
@@ -105,6 +110,7 @@ class InMemoryCache(CacheAgent):
                 'c_lifetime': (now - att_meta[2]).total_seconds()
             })
 
+        self.__registry.remove_cached_life(entityid, attribute)
         del self.__entityhash[entityid][attribute]
         del self.__entityhash[entityid].freq_table[attribute]
 

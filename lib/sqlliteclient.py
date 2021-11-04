@@ -66,6 +66,25 @@ class SQLLiteClient:
                         }
         return output
     
+    def add_cached_life(self, entityid, attribute, lifetime):
+        cursor=self.__conn.cursor()
+        self.__conn.execute(
+            "INSERT INTO CachedLifetime (entityid, attribute, lifetime) VALUES\
+            ("+str(entityid)+",'"+attribute+"',"+str(lifetime)+")")
+        return cursor.lastrowid
+
+    def remove_cached_life(self, entityid, attribute):
+        self.__conn.execute(
+            "DELETE FROM CachedLifetime WHERE\
+            entityid="+str(entityid)+" AND attribute='"+attribute+"')")
+    
+    def get_cached_life(self, entityid, attribute):
+        self.__conn.execute(
+            "SELECT FROM CachedLifetime\
+            WHERE entityid="+str(entityid)+" AND attribute='"+attribute+"'\
+            ORDER BY Id DESC\
+            LIMIT 1)")
+
     # Initialize the SQLite instance 
     def seed_db_at_start(self):
         self.__create_tables()
@@ -98,14 +117,14 @@ class SQLLiteClient:
         
         self.__conn.execute(
             "INSERT INTO ContextProducer VALUES\
-                (1,2,1,'http://localhost:8090/bike',0.6, 1),\
-                (3,1,1,'http://localhost:8090/car1',0.25, 0.5),\
-                (4,1,1,'http://localhost:8090/car10',0.4, 1),\
-                (5,1,1,'http://localhost:8090/car12',0.3, 0.2),\
-                (6,1,1,'http://localhost:8090/car30',0.2, 1),\
-                (8,3,1,'http://localhost:8090/carpark5',0.4, 0.017),\
-                (9,3,1,'http://localhost:8090/carpark8',0.75, 0.033),\
-                (10,3,1,'http://localhost:8090/carpark12',0.3, 0.017)")
+                (1,2,1,'http://localhost:5000/bikes',0.6, 1),\
+                (3,1,1,'http://localhost:5000/cars?id=3',0.25, 0.5),\
+                (4,1,1,'http://localhost:5000/cars?id=4',0.4, 1),\
+                (5,1,1,'http://localhost:5000/cars?id=5',0.3, 0.2),\
+                (6,1,1,'http://localhost:5000/cars?id=6',0.2, 1),\
+                (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017),\
+                (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033),\
+                (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017)")
         
         self.__conn.execute(
             "INSERT INTO ContextAttribute VALUES\
@@ -227,4 +246,14 @@ class SQLLiteClient:
                 PRIMARY KEY (consumerId, slaId),
                 FOREIGN KEY (consumerId) REFERENCES ContextConsumer(id)
                 FOREIGN KEY (slaId) REFERENCES SLA(id)
+            );''')
+        
+        self.__conn.execute(
+            '''CREATE TABLE CachedLifetime
+            (
+                Id INT NOT NULL AUTO INCREMENT,
+                entityid INT NOT NULL,
+                attribute TEXT NOT NULL,
+                lifetime REAL NOT NULL,
+                PRIMARY KEY (Id)
             );''')

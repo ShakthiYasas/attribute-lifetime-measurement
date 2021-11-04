@@ -58,14 +58,34 @@ class SimpleAgent(Agent):
         cur_rr_exp = self.__caller.req_rate_extrapolation  
 
         npv = 0
+        sequence = [0,0,0]
         if(t_for_discounting >= self.__short):
-            npv += self.caclulcate_for_range('short', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            dv = self.caclulcate_for_range('short', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            sequence[0] = 1 if dv > 0 else 0
+            npv += dv
         if(t_for_discounting >= self.__mid):
-            npv += self.caclulcate_for_range('mid', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            dv = self.caclulcate_for_range('mid', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            sequence[1] = 1 if dv > 0 else 0
+            npv += dv
         if(t_for_discounting == self.__long):
-            npv += self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            dv = self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            sequence[2] = 1 if dv > 0 else 0
+            npv += dv
 
         npv -= cost_of_caching
+        sequence = tuple(sequence)
+
+        estimated_lifetime = 0
+        if(npv>0): 
+            if(sequence == (1,0,0)):
+                estimated_lifetime = (self.__short*self.__window)/1000
+            elif(sequence == (1,1,0)):
+                estimated_lifetime = (self.__mid*self.__window)/1000
+            elif(any(seq == sequence for seq in [(0,1,1),(1,0,1),(1,1,1)])):
+                estimated_lifetime = max((self.__long*self.__window)/1000, 
+                        observation[12] if observation[12] > 0 else (self.__mid*self.__window)/1000)
+            else:
+                estimated_lifetime = observation[12] if observation[12] > 0 else (self.__mid*self.__window)/1000
 
         if(npv<=0):
             random_value = np.random.uniform()
@@ -77,13 +97,13 @@ class SimpleAgent(Agent):
             return (0,0)
         else:
             # Here the action is a (entityid,attribute) to cache
-            return (entityid, attribute)
+            return ((entityid, attribute), estimated_lifetime)
 
     def caclulcate_for_range(self, range, observation, cur_sla, cur_rr_exp, cur_rr_size):
         if(range == 'short'):
             count = self.__short
 
-            expected_access = cur_rr_exp[cur_rr_size-1+self.__short]*observation[1]
+            expected_access = (cur_rr_exp[cur_rr_size-1+self.__short]*observation[1]*self.__window)/1000
             earning = observation[7]*cur_sla[1]
             del_pen = (1-observation[7])*cur_sla[2]
             ret_cost = (1-observation[7])*observation[14]
@@ -98,7 +118,7 @@ class SimpleAgent(Agent):
         elif(range == 'mid'):
             count = self.__mid - self.__short
 
-            expected_access = cur_rr_exp[cur_rr_size-1+self.__mid]*observation[3]
+            expected_access = (cur_rr_exp[cur_rr_size-1+self.__mid]*observation[3]*self.__window)/1000
             earning = observation[9]*cur_sla[1]
             del_pen = (1-observation[9])*cur_sla[2]
             ret_cost = (1-observation[9])*observation[14]
@@ -113,7 +133,7 @@ class SimpleAgent(Agent):
         else:
             count = self.__long - self.__mid
 
-            expected_access = cur_rr_exp[cur_rr_size-1+self.__long]*observation[3]
+            expected_access = (cur_rr_exp[cur_rr_size-1+self.__long]*observation[3]*self.__window)/1000
             earning = observation[11]*cur_sla[1]
             del_pen = observation[11]*cur_sla[2]
             ret_cost = (1-observation[11])*observation[14]
