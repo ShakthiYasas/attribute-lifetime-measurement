@@ -14,7 +14,8 @@ class ServiceSelector:
         output = {}
         for prodid, url in urllist:
             now = datetime.now()
-            res = self.requester.get_response(url)
+            # res = self.requester.get_response(url)
+            res = self.requester.post_response(url)
             aft_time = datetime.now()
             if(prodid in self.__statistics):
                 self.__statistics[prodid] = {

@@ -98,22 +98,53 @@ class SQLLiteClient:
         
         self.__conn.execute(
             "INSERT INTO ContextProducer VALUES\
-                (1,2,1,'http://localhost:5000/bike',0.6, 1),\
-                (3,1,1,'http://localhost:5000/car?id=1',0.25, 0.5),\
-                (4,1,1,'http://localhost:5000/car?id=10',0.25, 1),\
-                (6,3,1,'http://localhost:5000/carpark?id=5',0.4, 0.017),\
-                (7,3,1,'http://localhost:5000/carpark?id=12',0.3, 0.017)")
+                (1,2,1,'http://localhost:8090/bike',0.6, 1),\
+                (3,1,1,'http://localhost:8090/car1',0.25, 0.5),\
+                (4,1,1,'http://localhost:8090/car10',0.4, 1),\
+                (5,1,1,'http://localhost:8090/car12',0.3, 0.2),\
+                (6,1,1,'http://localhost:8090/car30',0.2, 1),\
+                (8,3,1,'http://localhost:8090/carpark5',0.4, 0.017),\
+                (9,3,1,'http://localhost:8090/carpark8',0.75, 0.033),\
+                (10,3,1,'http://localhost:8090/carpark12',0.3, 0.017)")
         
         self.__conn.execute(
             "INSERT INTO ContextAttribute VALUES\
                 (1,'speed',1,0,'kmph'),\
-                (3,'speed',2,0,'kmph'),\
-                (4,'speed',3,0,'kmph'),\
-                (5,'hieght',3,-1,'m'),\
-                (6,'hieght',4,-1,'m'),\
-                (7,'availability',6,10,'s'),\
-                (8,'availability',7,20,'s'),\
-                (9,'maxheight',6,8,'m')")
+                (2,'location',1,0,'cordinate'),\
+                (3,'regno',1,-1,'text'),"+             
+                "(4,'speed',3,0,'kmph'),\
+                (5,'location',3,0,'cordinate'),\
+                (6,'height',3,-1,'m'),\
+                (7,'capacity',3,-1,'number'),\
+                (8,'model',3,-1,'text'),\
+                (9,'regno',3,-1,'text'),\
+                (10,'speed',4,0,'kmph'),\
+                (11,'location',4,0,'cordinate'),\
+                (12,'height',4,-1,'m'),\
+                (13,'capacity',4,-1,'number'),\
+                (14,'regno',4,-1,'text'),\
+                (16,'speed',5,0,'kmph'),\
+                (17,'location',5,0,'cordinate'),\
+                (18,'height',5,-1,'m'),\
+                (19,'capacity',5,-1,'number'),\
+                (20,'model',5,-1,'text'),\
+                (21,'regno',5,-1,'text'),\
+                (23,'speed',6,0,'kmph'),\
+                (24,'location',6,0,'cordinate'),\
+                (25,'height',6,-1,'m'),\
+                (26,'regno',6,-1,'text'),"+              
+                "(28,'maxheight',8,-1,'m'),\
+                (29,'location',8,-1,'cordinate'),\
+                (30,'availability',8,30,'s'),\
+                (31,'price',8,-1,'/hr'),\
+                (33,'totalslots',8,-1,'number'),\
+                (35,'location',9,-1,'cordinate'),\
+                (36,'availability',9,60,'s'),\
+                (37,'price',9,-1,'/hr'),\
+                (39,'maxheight',10,-1,'m'),\
+                (40,'location',10,-1,'cordinate'),\
+                (41,'availability',10,150,'s'),\
+                (42,'price',10,-1,'/hr')")
         
         self.__conn.execute(
             "INSERT INTO ContextServiceProducer VALUES\
