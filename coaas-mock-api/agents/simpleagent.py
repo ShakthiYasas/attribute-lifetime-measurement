@@ -34,17 +34,17 @@ class SimpleAgent(Agent):
         cur_sla = self.__caller.get_most_expensive_sla()
         cur_rr_exp = self.__caller.req_rate_extrapolation  
 
-        total_discounted_earning = 0
+        npv = 0
         if(t_for_discounting >= self.__short):
-            total_discounted_earning += self.caclulcate_for_range('short', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            npv += self.caclulcate_for_range('short', observation, cur_sla, cur_rr_exp, cur_rr_size)
         if(t_for_discounting >= self.__mid):
-            total_discounted_earning += self.caclulcate_for_range('mid', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            npv += self.caclulcate_for_range('mid', observation, cur_sla, cur_rr_exp, cur_rr_size)
         if(t_for_discounting == self.__long):
-            total_discounted_earning += self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
+            npv += self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
 
-        total_discounted_earning -= cost_of_caching
+        npv -= cost_of_caching
 
-        if(total_discounted_earning<=0):
+        if(npv<=0):
             return (0,0)
         else:
             return (entityid, attribute)
