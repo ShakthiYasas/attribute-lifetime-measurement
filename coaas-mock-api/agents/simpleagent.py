@@ -43,6 +43,7 @@ class SimpleAgent(Agent):
         # When the cached lifetime is not available, currently the mid is used as default. 
         # But this should be imporved to use the collaboraive filter to find the most similar.
         t_for_discounting = self.__mid
+
         if(observation[12]>0):
             cached_life_units = (observation[12]*1000)/self.__window
             t_for_discounting = self.__closest_point(cached_life_units)
@@ -86,17 +87,17 @@ class SimpleAgent(Agent):
             if(random_value < self.__epsilons):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     # Should the cached lifetime of these random items be calculated
-                    return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),0)
+                    return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),(self.__mid*self.__window)/1000)
                 else:
-                    return (self.__explore_mentor.choose_action(self.__caller.get_observed()),0)         
+                    return (self.__explore_mentor.choose_action(self.__caller.get_observed()),(self.__mid*self.__window)/1000)        
             return ((0,0),0)
         else:
             # Here the action is a (entityid,attribute) to cache
             return ((entityid, attribute), estimated_lifetime)
 
-    def caclulcate_for_range(self, range, observation, cur_sla, cur_rr_exp, cur_rr_size):
-        if(range == 'short'):
-            count = self.__short
+    def caclulcate_for_range(self, rang, observation, cur_sla, cur_rr_exp, cur_rr_size):
+        if(rang == 'short'):
+            count = int(self.__short)
 
             expected_access = (cur_rr_exp[cur_rr_size-1+self.__short]*observation[1]*self.__window)/1000
             earning = observation[7]*cur_sla[1]
@@ -106,11 +107,11 @@ class SimpleAgent(Agent):
             total_earning = expected_access*(earning - del_pen - ret_cost)
             total_dis_earning = 0
             for i in range(1,count+1):
-                total_dis_earning += total_earning/((1+self.__gamma)^i)
+                total_dis_earning += total_earning/((1+self.__gamma)**i)
 
             return total_dis_earning
 
-        elif(range == 'mid'):
+        elif(rang == 'mid'):
             count = self.__mid - self.__short
 
             expected_access = (cur_rr_exp[cur_rr_size-1+self.__mid]*observation[3]*self.__window)/1000

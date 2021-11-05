@@ -2,9 +2,9 @@ import time
 import threading
 from datetime import datetime
 
+from lib.fifoqueue import FIFOQueue_2
 from cache.cacheagent import CacheAgent
 from lib.limitedsizedict import LimitedSizeDict
-from lib.fifoqueue import FIFOQueue, FIFOQueue_2
 from cache.eviction.evictorfactory import EvictorFactory
 
 # Implementing a simple fixed sized in-memory cache
@@ -60,18 +60,24 @@ class InMemoryCache(CacheAgent):
 
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
-        now = datetime.datetime.now()
+        now = datetime.now()
         if(entityid in self.__entityhash):
             for att_name, values in cacheitems.items():
                 if(att_name not in self.__entityhash[entityid].freq_table):
-                    self.__entityhash[entityid].freq_table[att_name] = (FIFOQueue_2(100).push(now),now)
+                    que = FIFOQueue_2(100)
+                    que.push(now)
+                    self.__entityhash[entityid].freq_table[att_name] = (que,now)
                 self.__entityhash[entityid][att_name] = values
         else:
             self.__entityhash[entityid] = LimitedSizeDict()
-            self.__entityhash.freq_table[entityid] = (FIFOQueue_2(100).push(now),now)
+            que = FIFOQueue_2(100)
+            que.push(now)
+            self.__entityhash.freq_table[entityid] = (que,now)
 
             for att_name, values in cacheitems.items():
-                self.__entityhash[entityid].freq_table[att_name] = (FIFOQueue_2().push(now),now)
+                que_1 = FIFOQueue_2(100)
+                que_1.push(now)
+                self.__entityhash[entityid].freq_table[att_name] = (que_1,now)
                 self.__entityhash[entityid][att_name] = values
 
     # Add to cached lifetime
@@ -124,7 +130,7 @@ class InMemoryCache(CacheAgent):
 
     # Check if the entity is cached
     def __is_cached(self,entityid,attribute):
-        res = entityid in self.__entityhash and attribute in self.__entityhash[entityid]
+        res = entityid in self.__entityhash.freq_table and attribute in self.__entityhash[entityid].freq_table
         if(res):
             self.__localstats.append(1)
         else:

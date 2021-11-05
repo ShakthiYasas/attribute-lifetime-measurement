@@ -12,14 +12,17 @@ class RandomAgent(ExplorationAgent):
         return random.randint(0, obs_list_len - 1)
 
     def choose_action(self, observation:dict):
-        rand_ent_idx = RandomAgent.__choose_action(len(observation))
-        rand_ent = list(observation.items())[rand_ent_idx]
+        if(bool(observation)):
+            rand_ent_idx = RandomAgent.__choose_action(len(observation))
+            rand_ent = list(observation.items())[rand_ent_idx]
 
-        rand_att_idx = RandomAgent.__choose_action(len(rand_ent['attributes']))
-        rand_att = list(rand_ent['attributes'].items())[rand_att_idx]
+            rand_att_idx = RandomAgent.__choose_action(len(rand_ent['attributes']))
+            rand_att = list(rand_ent['attributes'].items())[rand_att_idx]
 
-        # Returns (entityid, attribute)
-        return (rand_ent[0], rand_att[0])
+            # Returns (entityid, attribute)
+            return (rand_ent[0], rand_att[0])
+        else:
+            (0,0)
 
 # Takes __observed (in adaptive) as input 
 class MRUAgent(ExplorationAgent):
@@ -29,11 +32,14 @@ class MRUAgent(ExplorationAgent):
 
     @staticmethod
     def __choose_action(observation:dict):
-        ent_obs = sorted(list(map(lambda x,y: (x,y['req_ts'][-1]), 
-                        observation.items())), key=lambda tup: tup[1])
-        att_obs = sorted(list(map(lambda x,y: (x,y[-1]), 
-                        observation[ent_obs[-1][0]]['attributes'].items())), key=lambda tup: tup[1])
-        return (ent_obs[-1][0], att_obs[-1][0])
+        if(bool(observation)):
+            ent_obs = sorted(list(map(lambda x: (x[0],x[1]['req_ts'][-1]), 
+                            observation.items())), key=lambda tup: tup[1])
+            att_obs = sorted(list(map(lambda x: (x[0],x[1][-1]), 
+                            observation[ent_obs[-1][0]]['attributes'].items())), key=lambda tup: tup[1])
+            return (ent_obs[-1][0], att_obs[-1][0])
+        else:
+            return (0,0)
 
     def choose_action(self, observation):
         # Returns (entityid, attribute)
@@ -48,13 +54,15 @@ class MFUAgent(ExplorationAgent):
 
     @staticmethod
     def __choose_action(observation:dict):
-        glo= []
-        for entity,attrs in observation.items():
-            local = sorted(list(map(lambda x,y: (x,y[-1]), attrs)), key=lambda tup: tup[1])
-            glo.append((entity,local[-1][0],local[-1][1]))
+        if(bool(observation)):
+            glo= []
+            for entity,attrs in observation.items():
+                local = sorted(list(map(lambda x: (x[0],x[1][-1]), attrs)), key=lambda tup: tup[1])
+                glo.append((entity,local[-1][0],local[-1][1]))
 
-        sorted_glo = sorted(glo, key=lambda tup: tup[2])
-        return (sorted_glo[-1][0], sorted_glo[-1][1])
+            sorted_glo = sorted(glo, key=lambda tup: tup[2])
+            return (sorted_glo[-1][0], sorted_glo[-1][1])
+        return (0,0)
 
     def choose_action(self, observation:dict):
         # Returns (entityid, attribute)

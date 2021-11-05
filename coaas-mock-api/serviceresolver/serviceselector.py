@@ -1,7 +1,7 @@
 import statistics
 from datetime import datetime
 from lib.restapiwrapper import Requester
-from lib.fifoqueue import FIFOQueue
+from lib.fifoqueue import FIFOQueue_2
 
 # Simple Context Service Resolution
 class ServiceSelector:
@@ -19,10 +19,10 @@ class ServiceSelector:
             aft_time = datetime.now()
 
             if(not (prodid in self.__statistics)):
-                self.__statistics[prodid] = {
-                    'count': 1,
-                    'queue': FIFOQueue(100).push((aft_time-now).total_seconds())
-                }
+                queue = FIFOQueue_2(100)
+                self.__statistics[prodid] = {'count': 1}
+                queue.push((aft_time-now).total_seconds())
+                self.__statistics[prodid]['queue'] = queue
             else:
                 self.__statistics[prodid]['count'] += 1
                 self.__statistics[prodid]['queue'].push((aft_time-now).total_seconds())
@@ -39,6 +39,7 @@ class ServiceSelector:
                     output[att] = [(prodid,res[att],now)]
                 else:
                     output[att].append((prodid,res[att],now))
+        
         return output
 
     def get_average_responsetime_for_provider(self, prodid):
@@ -56,8 +57,8 @@ class ServiceSelector:
                     'context_producer': cp
                 },10)
                 if(res):
-                    local_rt = list(map(lambda x: x['avg_response_time'], res))
-                    rtlist.append(statistics.mean(local_rt))
+                    for values in res.values():
+                        rtlist.append(statistics.mean([x for x in values['lifetimes'].values()]))
             else:
                 rtlist.append(rt)
 

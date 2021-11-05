@@ -48,8 +48,7 @@ class PlatformMock(Resource):
             True if default_config['IsStaticLife'] == 'True' else False, int(default_config['LearningCycle']))
     __selected_algo = __strategy_factory.get_retrieval_strategy()
     setattr(__selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
-    if(default_config['IsStaticLife'] != 'True'):
-        __selected_algo.init_cache()
+    __selected_algo.init_cache()
         
     # Set current session token
     setattr(__selected_algo, 'session', __token)
@@ -77,7 +76,7 @@ class PlatformMock(Resource):
     # Retrives context data. 
     def post(self):
         try:
-            start = time.time()
+            start = datetime.now()
             json_obj = request.get_json()
 
             # Simple Authenticator
@@ -93,13 +92,14 @@ class PlatformMock(Resource):
             # End of processing the request
             
             # Statistics
-            elapsed_time = time.time() - start
-            db.insert_one('responses_history', 
+            db.insert_one('responses-history', 
                 {
                     'session': self.__token, 
-                    'data': response, 
-                    'response_time': elapsed_time
+                    'data': str(response), 
+                    'response_time': (datetime.now() - start).total_seconds()
                 })
+
+            print(response)
             
             # Return data and 200 OK code
             return response, 200 

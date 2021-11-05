@@ -10,22 +10,22 @@ class MongoClient:
   # Retrieve the first record of the collection by a condition
   def read_single(self, collection, condition, sorting_col = '_id'):
     col = self.__db[collection]
-    return col.find(condition).sort(sorting_col).limit(1)
+    return list(col.find(condition).sort(sorting_col).limit(1))[0]
 
   # Retrieve the last record of the collection
   def read_last(self, collection, sorting_col = '_id'):
     col = self.__db[collection]
-    return col.find().sort(sorting_col,-1).limit(1)
+    return list(col.find().sort(sorting_col,-1).limit(1))[0]
 
   # Retrieve all the items in the collection
   def read_all(self, collection, condition, sorting_col = '_id'):
     col = self.__db[collection]
-    return col.find(condition).sort(sorting_col,-1)
+    return list(col.find(condition).sort(sorting_col,-1))
 
   # Retrieve all the items in the collection
   def read_all_with_limit(self, collection, condition, limit, sorting_col = '_id'):
     col = self.__db[collection]
-    return col.find(condition).sort(sorting_col,-1).limit(limit)
+    return list(col.find(condition).sort(sorting_col,-1).limit(limit))
     
   # Insert a single new item to the collection
   # Returns: _id of the inserted item
@@ -34,7 +34,7 @@ class MongoClient:
     try:
       x = col.insert_one(data)
       return x.inserted_id
-    except(Exception):
+    except Exception as e:
       print('Insertion into mongo db failed!')
       return -1
 

@@ -26,6 +26,7 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
+    rr_trend_size = 0
     __window_counter = 0
     __learning_counter = 0
     __sla_trend = FIFOQueue_2(10)
@@ -36,6 +37,7 @@ class Adaptive(Strategy):
     __request_rate_trend = FIFOQueue_2(1000)
 
     def __init__(self, db, window, isstatic=True, learncycle = 20): 
+        self.__db = db
         self.__cached = {}
         self.__observed = {}
         self.__evaluated = []
@@ -43,7 +45,7 @@ class Adaptive(Strategy):
         self.__reqs_in_window = 0
         self.__isstatic = isstatic
         self.__moving_window = window
-        self.__most_expensive_sla = None
+        self.__most_expensive_sla = (0.5,1.0,1.0)
         self.__learning_cycle = learncycle
 
         self.req_rate_extrapolation = None
@@ -55,7 +57,7 @@ class Adaptive(Strategy):
     # Init_cache initializes the cache memory. 
     def init_cache(self):
         # Set current session to profiler if not set
-        if(self.__profiler.session == None):
+        if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
             self.__profiler.session = self.session
 
         # Initializing background thread clear observations.
@@ -73,38 +75,42 @@ class Adaptive(Strategy):
     # Clear function that run on the background
     def clear_expired(self) -> None:
         # Multithread the following 3
-        Adaptive.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
-        Adaptive.__clear_cached()
-        self.__extrapolate_request_rate()
+        if(self.__window_counter > self.trend_ranges[1]): 
+            self.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
+            self.__clear_cached()
+            self.__extrapolate_request_rate()
         
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
         self.__reqs_in_window = 0
         
         curr_his = self.__sla_trend.getlist()
-        avg_freshness = statistics.mean([x[0] for x in curr_his])
-        avg_price = statistics.mean([x[1] for x in curr_his])
-        avg_pen = statistics.mean([x[2] for x in curr_his])
+        new_most_exp_sla = (0.5,1.0,1.0)
+        if(len(curr_his)>0):
+            avg_freshness = statistics.mean([x[0] for x in curr_his])
+            avg_price = statistics.mean([x[1] for x in curr_his])
+            avg_pen = statistics.mean([x[2] for x in curr_his])
+            new_most_exp_sla = (avg_freshness,avg_price,avg_pen)
+
         self.__sla_trend.push(self.__most_expensive_sla)
-        self.__most_expensive_sla = (avg_freshness,avg_price,avg_pen)
+        self.__most_expensive_sla = new_most_exp_sla
     
-    @staticmethod
-    def __clear_observed(exp_time):
-        for key,value in Adaptive.__observed.items():
+    def __clear_observed(self,exp_time):
+        dup_obs = self.__observed.copy()
+        for key,value in dup_obs.items():
             if(value['req_ts'][-1] < exp_time):
                 # The entire entity hasn't been accessed recently
-                del Adaptive.__observed[key]
-                del Adaptive.__entity_access_trend[key]
-                del Adaptive.__attribute_access_trend[key]
+                del self.__observed[key]
+                del self.__attribute_access_trend[key]
             else:
                 for tstamp in value['req_ts']:
                     if(tstamp < exp_time):
                         value['req_ts'].pop(0)
                     else:
                         access_freq = 0
-                        if(Adaptive.__reqs_in_window>0):
-                            access_freq = len(value['req_ts'])/Adaptive.__reqs_in_window
-                        Adaptive.__entity_access_trend.push(access_freq)
+                        if(self.__reqs_in_window>0):
+                            access_freq = len(value['req_ts'])/self.__reqs_in_window
+                        self.__entity_access_trend.push(access_freq)
                         break
                 
                 for curr_attr, access_list in value['attributes'].items():
@@ -113,46 +119,57 @@ class Adaptive(Strategy):
                             value['attributes'][curr_attr].pop(0)
                         else:
                             access_freq = 0
-                            if(Adaptive.__reqs_in_window>0):
-                                access_freq = len(value['attributes'][curr_attr])/Adaptive.__reqs_in_window 
-                            if(key in Adaptive.__attribute_access_trend):
-                                if(curr_attr in key in Adaptive.__attribute_access_trend[key]):
-                                    Adaptive.__attribute_access_trend[key][curr_attr].push(access_freq)
+                            if(self.__reqs_in_window>0):
+                                access_freq = len(value['attributes'][curr_attr])/self.__reqs_in_window 
+                            if(key in self.__attribute_access_trend):
+                                if(curr_attr in self.__attribute_access_trend[key]):
+                                    self.__attribute_access_trend[key][curr_attr].push(access_freq)
                                 else:
-                                    Adaptive.__attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_freq)
+                                    que = FIFOQueue_2(1000)
+                                    que.push(access_freq)
+                                    self.__attribute_access_trend[key][curr_attr] = que
                             else:
-                                Adaptive.__attribute_access_trend[key] = {
-                                    curr_attr : FIFOQueue_2(1000).push(access_freq)
+                                que = FIFOQueue_2(1000)
+                                que.push(access_freq)
+                                self.__attribute_access_trend[key] = {
+                                    curr_attr : que
                                 }
                                 
                             break
-    
-    @staticmethod
-    def __clear_cached():
-        for key,attributes in Adaptive.__cached.items():                
+
+    def __clear_cached(self):
+        for key,attributes in self.__cached.items():                
             for curr_attr, access_list in attributes.items():
                 hit_rate = 0
                 if(len(access_list)>0):
                     hit_rate = sum(access_list)/len(access_list)  
                 
-                access_ratio = len(access_list)/Adaptive.__reqs_in_window 
+                access_ratio = 0 if(self.__reqs_in_window == 0) else len(access_list)/self.__reqs_in_window 
 
-                if(key in Adaptive.__cached_hit_access_trend):
-                    if(curr_attr in key in Adaptive.__cached_hit_access_trend[key]):
-                        Adaptive.__cached_hit_access_trend[key][curr_attr].push(hit_rate)
-                        Adaptive.__cached_attribute_access_trend[key][curr_attr].push(access_ratio)
+                if(key in self.__cached_hit_access_trend):
+                    if(curr_attr in self.__cached_hit_access_trend[key]):
+                        self.__cached_hit_access_trend[key][curr_attr].push(hit_rate)
+                        self.__cached_attribute_access_trend[key][curr_attr].push(access_ratio)
                     else:
-                        Adaptive.__cached_hit_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(hit_rate)
-                        Adaptive.__cached_attribute_access_trend[key][curr_attr] = FIFOQueue_2(1000).push(access_ratio)
+                        que = FIFOQueue_2(1000)
+                        que.push(hit_rate)
+                        self.__cached_hit_access_trend[key][curr_attr] = que
+                        que_1 = FIFOQueue_2(1000)
+                        que_1.push(access_ratio)
+                        self.__cached_attribute_access_trend[key][curr_attr] = que_1
                 else:
-                    Adaptive.__cached_hit_access_trend[key] = {
-                        curr_attr : FIFOQueue_2(1000).push(hit_rate)
+                    que = FIFOQueue_2(1000)
+                    que.push(hit_rate)
+                    self.__cached_hit_access_trend[key] = {
+                        curr_attr : que
                     }
-                    Adaptive.__cached_attribute_access_trend[key] = {
-                        curr_attr : FIFOQueue_2(1000).push(access_ratio)
+                    que_1 = FIFOQueue_2(1000)
+                    que_1.push(access_ratio)
+                    self.__cached_attribute_access_trend[key] = {
+                        curr_attr : que_1
                     }
 
-                Adaptive.__cached[key][curr_attr].clear()
+                self.__cached[key][curr_attr].clear()
 
     # Returns the current statistics from the profiler
     def get_current_profile(self):
@@ -240,25 +257,41 @@ class Adaptive(Strategy):
                                                 self.__get_attributes_not_cached(entityid, ent['attributes']))
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
+                        self.__evaluated.append(entityid)
 
                 # Multithread this
                 if(len(new_context)>0):
                     self.__refresh_cache_for_entity(new_context)
                 if(len(refetching)>0):
                     self.__refresh_cache_for_producers(refetching)
+                
+                val = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
+                output[entityid] = {}
+                for att_name,prod_values in val.items():
+                    if(prod_values != None):
+                        output[entityid][att_name] = [res_v for prod, res_v, dt in prod_values]
+                    else:
+                        # This is when the entity is not even evaluated to be cached
+                        res = self.service_selector.get_response_for_entity([att_name], 
+                            list(map(lambda k: (k[0],k[1]['url']), lifetimes.items())))   
+                        output[entityid][att_name] = [x[1] for x in res[att_name]]
+                        # Update observed
+                        self.__update_observed(entityid, att_name)
             else:
                 # Even the entity is not cached previously
                 # So, first retrieving the entity
-                output[entityid] = self.__retrieve_entity(ent['attributes'],lifetimes)
+                out = self.__retrieve_entity(ent['attributes'],lifetimes)
+                output[entityid] = {}
+                for att_name,prod_values in out.items():
+                    output[entityid][att_name] = [res_v for prod, res_v, dt in prod_values]
+                    
                 self.__learning_counter += 1
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
-                if(self.__window_counter > 10):
+                if(self.__window_counter > self.trend_ranges[1]):
                     # Run this in the background
-                    self.__evaluate_for_caching(entityid, output[entityid])
-
-            output[entityid] = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
-            self.__evaluated.append(entityid)
+                    self.__evaluate_for_caching(entityid, out)
+                    self.__evaluated.append(entityid)
 
         if(isinstance(self.selective_cache_agent, DQNAgent) and self.__learning_counter % self.__learning_cycle == 0):
             # Trigger learning for the DQN Agent
@@ -296,31 +329,30 @@ class Adaptive(Strategy):
         is_caching = False
         updated_attr_dict = []
         random_one = []
-        if not entityid in self.__evaluated:
+        if(not (entityid in self.__evaluated)):
             # Entity hasn't been evaluted in this window before
-            for att in attributes:
+            for att in attributes.keys():
                 observation = self.__translate_to_state(entityid,att)
                 action, est_c_lifetime = self.selective_cache_agent.choose_action(observation)
-                self.cache_memory.addcachedlifetime(action, est_c_lifetime)
                 if(action != (0,0) and action[0] == entityid):
                     updated_attr_dict.append(action[1])
+                    self.cache_memory.addcachedlifetime(action, est_c_lifetime)
                     is_caching = True
                 else:
                     if(action != (0,0)):
                         random_one.append(action)
-        
+                        
         if(is_caching):
             # Add to cache 
             self.__last_actions = [(entityid, x) for x in updated_attr_dict]
-            updated_att_dict = {}
+            updated_dict = {}
             for att in updated_attr_dict:
-                updated_att_dict[att] = attributes[att]
-            self.cache_memory.save(entityid,updated_att_dict)
+                updated_dict[att] = attributes[att]
+            self.cache_memory.save(entityid,updated_dict)
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:updated_attr_dict})     
             del self.__observed[entityid]
-            del self.__entity_access_trend[entityid]
             # Update the observed list for uncached entities and attributes 
             self.__update_observed(entityid, list(set(updated_attr_dict) - set(attributes)))
         else:
@@ -365,14 +397,14 @@ class Adaptive(Strategy):
         now = datetime.datetime.now()
         if(entityid in self.__observed):
             self.__observed[entityid]['req_ts'].append(now)
-            for attr,vals in attributes:
+            for attr in attributes:
                 if(attr in self.__observed[entityid]['attributes']):
                     self.__observed[entityid]['attributes'][attr].append(now)
                 else:
                     self.__observed[entityid]['attributes'][attr] = [now]
         else:
             attrs = {}
-            for attr,vals in attributes:
+            for attr in attributes:
                 attrs[attr] = [now]
             self.__observed[entityid] = {
                 'req_ts': [now],
@@ -417,17 +449,24 @@ class Adaptive(Strategy):
         fea_vec = []
         if(isobserved):
             # Actual and Expected Access Rates 
-            attribute_trend = self.__cached_attribute_access_trend[entityid][att]
+            attribute_trend = self.__attribute_access_trend[entityid][att]
             trend_size = attribute_trend.get_queue_size()
 
-            xi = np.array(range(0,trend_size))
-            s = InterpolatedUnivariateSpline(xi, attribute_trend, k=2)
+            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            yi = attribute_trend.getlist()
+            if(trend_size<3):
+                diff = 3 - len(yi)
+                last_val = yi[-1]
+                for i in range(0,diff):
+                    yi.append(last_val)
+
+            s = InterpolatedUnivariateSpline(xi, yi, k=2)
             total_size = trend_size + self.trend_ranges[2]
             extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
             for ran in self.trend_ranges:
                 fea_vec.append(attribute_trend.get_last_position(ran))
-                fea_vec.append(extrapolation[trend_size-1+ran])
+                fea_vec.append(extrapolation[trend_size-2+ran])
         else:
             # Actual and Expected Access Rates 
             # No actual or expected access rates becasue the item is already cached
@@ -440,67 +479,89 @@ class Adaptive(Strategy):
         trend_size = req_rate_trend.get_queue_size()
         self.rr_trend_size = trend_size
 
-        xi = np.array(range(0,trend_size))
-        s = InterpolatedUnivariateSpline(xi, req_rate_trend, k=2)
+        xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+        yi = req_rate_trend.getlist()
+        if(trend_size<3):
+            diff = 3 - len(yi)
+            last_val = yi[-1]
+            for i in range(0,diff):
+                yi.append(last_val)
+
+        s = InterpolatedUnivariateSpline(xi, yi, k=2)
         total_size = trend_size + self.trend_ranges[2]
         self.req_rate_extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
+    def get_projected_hit_rate(self, entityid, att, avg_rt, lifetimes):
+        fea_vec = []
+        local_avg_lt = []
+        if(not self.__isstatic):
+            for prodid,lts in lifetimes.items():
+                local_avg_lt.append(self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att))
+        else:
+            for prodid,lts in lifetimes.items():
+                if(att in lts['lifetimes']):
+                    local_avg_lt.append(lts['lifetimes'][att])
+
+        avg_life = statistics.mean(local_avg_lt) if(local_avg_lt) else 1
+            
+        if(avg_life < 0):
+            fea_vec = [0,1,0,1,0,1]
+        else:
+            frt = 1-(avg_rt/avg_life)
+            fthr = self.__most_expensive_sla[0]
+            delta = avg_life*(fthr-frt)
+            for ran in self.trend_ranges:
+                fea_vec.append(0)
+                req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-2+ran]
+                if(fthr>frt): 
+                    if(delta >= (1/req_at_point)):
+                        # It is effective to cache
+                        # because multiple requests can be served
+                        fea_vec.append(1/(delta*req_at_point))
+                    else:
+                        # It is not effective to cache
+                        # because no more that 1 request could be served
+                        fea_vec.append(0)
+                else:
+                    # It is not effective to cache
+                    # because the item is already expired by the time it arrives
+                    fea_vec.append(0)
+        
+        return fea_vec
+
     def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
         fea_vec = []
-
-        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x,y: x, lifetimes.items())))
-
+        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items())))
         if(isobserved):
             # No current hit rates to report 
             # Expected Hit Rate (If Not Cached)
-            local_avg_lt = []
-            if(not self.__isstatic):
-                for prodid,lts in lifetimes.items():
-                    local_avg_lt.append(self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att))
-            else:
-                for prodid,lts in lifetimes.items():
-                    if(att in lts['lifetimes']):
-                        local_avg_lt.append(lts['lifetimes'][att])
-
-            avg_life = statistics.mean(local_avg_lt) if(local_avg_lt) else 1
-            
-            if(avg_life < 0):
-                fea_vec.append(0)
-                fea_vec.append(1)
-            else:
-                frt = 1-(avg_rt/avg_life)
-                fthr = self.__most_expensive_sla[0]
-                delta = avg_life*(fthr-frt)
-                for ran in self.trend_ranges:
-                    fea_vec.append(0)
-                    req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-1+ran]
-                    if(fthr>frt): 
-                        if(delta >= (1/req_at_point)):
-                            # It is effective to cache
-                            # because multiple requests can be served
-                            fea_vec.append(1/(delta*req_at_point))
-                        else:
-                            # It is not effective to cache
-                            # because no more that 1 request could be served
-                            fea_vec.append(0)
-                    else:
-                        # It is not effective to cache
-                        # because the item is already expired by the time it arrives
-                        fea_vec.append(0)
+            fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)
         else:
             # Current Hit Rate (If Cached)
-            hit_trend = self.__cached_hit_access_trend[entityid][att]
-            trend_size = hit_trend.get_queue_size()
+            if(entityid in self.__cached_hit_access_trend and att in self.__cached_hit_access_trend[entityid]):
+                hit_trend = self.__cached_hit_access_trend[entityid][att]
+                trend_size = hit_trend.get_queue_size()
 
-            xi = np.array(range(0,trend_size))
-            s = InterpolatedUnivariateSpline(xi, hit_trend, k=2)
-            total_size = trend_size + self.trend_ranges[2]
-            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+                xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+                yi = hit_trend.getlist()
+                if(trend_size<3):
+                    diff = 3 - len(yi)
+                    last_val = yi[-1]
+                    for i in range(0,diff):
+                        yi.append(last_val)
 
-            for ran in self.trend_ranges:
-                fea_vec.append(hit_trend.get_last_position(ran))
-                fea_vec.append(extrapolation[trend_size-1+ran])
+                s = InterpolatedUnivariateSpline(xi, yi, k=2)
+                total_size = trend_size + self.trend_ranges[2]
+                extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
+                for ran in self.trend_ranges:
+                    fea_vec.append(hit_trend.get_last_position(ran))
+                    fea_vec.append(extrapolation[trend_size-2+ran])
+            else:
+                # No current hit rates to report 
+                # Expected Hit Rate (If Not Cached)
+                fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)
+                
         return fea_vec, avg_rt
 
     def __isobserved(self, entityid, attribute):
