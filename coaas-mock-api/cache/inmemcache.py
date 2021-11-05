@@ -18,7 +18,7 @@ class InMemoryCache(CacheAgent):
 
         # Statistical configurations
         self.window = config.window_size
-        self.__hitrate_trend = FIFOQueue(100) 
+        self.__hitrate_trend = FIFOQueue_2(100) 
         self.__localstats = []
 
         # Statistical DB
@@ -36,6 +36,7 @@ class InMemoryCache(CacheAgent):
         while True:
             # Hit rate is calculated in each window
             self.calculate_hitrate()
+
             # Items are evicted every each window
             if(self.__evictor):
                 items_to_evict = self.__evictor.select_for_evict()
@@ -53,6 +54,9 @@ class InMemoryCache(CacheAgent):
     
     def getdb(self):
         return self.__db
+    
+    def get_cachedlifetime(self, entityid, attribute):
+        return self.__registry.get_cached_life(entityid, attribute)
 
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:

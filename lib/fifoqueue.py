@@ -36,7 +36,7 @@ class FIFOQueue_2():
         return self.__queue[len(self.__queue)-length : len(self.__queue)]
     
     def get_last_position(self, length):
-        idx = len(self.__queue)-length-1
+        idx = len(self.__queue)-length
         return self.__queue[0 if idx < 0 else idx]
     
     def remove(self,val):

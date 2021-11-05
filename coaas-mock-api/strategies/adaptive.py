@@ -28,6 +28,7 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 class Adaptive(Strategy):  
     __window_counter = 0
     __learning_counter = 0
+    __sla_trend = FIFOQueue_2(10)
     __attribute_access_trend = {}
     __cached_hit_access_trend = {}
     __cached_attribute_access_trend = {}
@@ -79,7 +80,13 @@ class Adaptive(Strategy):
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
         self.__reqs_in_window = 0
-        self.__most_expensive_sla = (0,1.0,1.0)
+        
+        curr_his = self.__sla_trend.getlist()
+        avg_freshness = statistics.mean([x[0] for x in curr_his])
+        avg_price = statistics.mean([x[1] for x in curr_his])
+        avg_pen = statistics.mean([x[2] for x in curr_his])
+        self.__sla_trend.push(self.__most_expensive_sla)
+        self.__most_expensive_sla = (avg_freshness,avg_price,avg_pen)
     
     @staticmethod
     def __clear_observed(exp_time):
