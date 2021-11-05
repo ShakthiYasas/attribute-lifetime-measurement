@@ -1,10 +1,11 @@
 import sys, os
-sys.path.append(os.path.abspath(os.path.join('.')))
+sys.path.append(os.path.abspath(os.path.join('..')))
 
 import time
 import secrets
 import traceback
 import configparser
+from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
 from flask import Flask, request
@@ -25,7 +26,7 @@ api = Api(app)
 
 # Global variables
 config = configparser.ConfigParser()
-config.read(os.getcwd()+'/coaas-mock-api/config.ini')
+config.read('config.ini')
 default_config = config['DEFAULT']
 
 # Connecting to a monogo DB instance 
@@ -47,7 +48,7 @@ class PlatformMock(Resource):
             True if default_config['IsStaticLife'] == 'True' else False, int(default_config['LearningCycle']))
     __selected_algo = __strategy_factory.get_retrieval_strategy()
     setattr(__selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
-    if(default_config['IsStaticLife'] == 'True'):
+    if(default_config['IsStaticLife'] != 'True'):
         __selected_algo.init_cache()
         
     # Set current session token
@@ -55,7 +56,9 @@ class PlatformMock(Resource):
 
     # Initalize the SQLLite Instance 
     __service_registry = SQLLiteClient(default_config['SQLDBName'])
-    __service_registry.seed_db_at_start()
+    db_file = Path(default_config['SQLDBName']+'.db')
+    if(not db_file.is_file()):
+        __service_registry.seed_db_at_start()
     setattr(__selected_algo, 'service_registry', __service_registry)
 
     # "Reactive" strategy do not need a cache memory. 

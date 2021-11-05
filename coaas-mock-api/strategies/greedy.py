@@ -4,10 +4,10 @@ from math import trunc
 from dateutil import parser
 from datetime import datetime
 
-from profiler import Profiler
+from profilers.profiler import Profiler
 from lib.event import subscribe
 from strategies.strategy import Strategy
-from restapiwrapper import ServiceSelector
+from serviceresolver.serviceselector import ServiceSelector
 
 # Greedy retrieval strategy
 # This strategy is greedy because it attempts to minimize the number of retrievals.

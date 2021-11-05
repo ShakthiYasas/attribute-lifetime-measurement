@@ -5,7 +5,7 @@ from datetime import datetime
 from cache.cacheagent import CacheAgent
 from lib.limitedsizedict import LimitedSizeDict
 from lib.fifoqueue import FIFOQueue, FIFOQueue_2
-from eviction.evictorfactory import EvictorFactory
+from cache.eviction.evictorfactory import EvictorFactory
 
 # Implementing a simple fixed sized in-memory cache
 class InMemoryCache(CacheAgent):

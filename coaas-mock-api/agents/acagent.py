@@ -1,6 +1,6 @@
 import numpy as np
-from agent import Agent
-from exploreagent import RandomAgent, MRUAgent, MFUAgent
+from agents.agent import Agent
+from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 from keras.layers import Dense
 from keras.models import Sequential

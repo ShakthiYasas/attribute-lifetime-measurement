@@ -1,6 +1,6 @@
-from cacheagent import CacheAgent
-from cloudcache import CloudCache
-from inmemcache import InMemoryCache
+from cache.cacheagent import CacheAgent
+from cache.cloudcache import CloudCache
+from cache.inmemcache import InMemoryCache
 
 from configurations.cacheconfig import CacheConfiguration
 
@@ -15,7 +15,7 @@ class CacheFactory:
 
     # Retruns the singleton instance of a cache
     def get_cache_memory(self, db) -> CacheAgent:
-        if(self.cache == None):
+        if(self.__cache == None):
             if(self.__configuration != None and isinstance(self.__configuration, CacheConfiguration) 
                 and CacheConfiguration.type == 'in-memory'):
                 print('Initializing a local in-memory cache instance.')

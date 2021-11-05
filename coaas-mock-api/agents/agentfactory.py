@@ -1,8 +1,8 @@
-from agent import Agent
-from acagent import ACAgent
-from dqnagent import DQNAgent
-from a3cagent import A3CAgent
-from simpleagent import SimpleAgent
+from agents.agent import Agent
+from agents.acagent import ACAgent
+from agents.dqnagent import DQNAgent
+from agents.a3cagent import A3CAgent
+from agents.simpleagent import SimpleAgent
 
 from configurations.agentconfig import DQNConfiguration, A3CConfiguration, ACConfiguration, SimpleConfiguration
 

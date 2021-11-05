@@ -1,4 +1,4 @@
-from agent import Agent
+from agents.agent import Agent
 
 class A3CAgent(Agent):
     def __init__(self, n_actions, caller): pass

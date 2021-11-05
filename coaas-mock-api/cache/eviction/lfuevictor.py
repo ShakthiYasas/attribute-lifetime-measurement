@@ -1,10 +1,9 @@
 from cache.eviction.evictor import Evictor
-from cache.inmemcache import InMemoryCache
 
 # How many attributes and entities to evict?
 # When to evict?
 class LFUEvictor(Evictor):
-    def __init__(self, cache:InMemoryCache):
+    def __init__(self, cache):
         self.__cache = cache
     
     def select_for_evict(self):

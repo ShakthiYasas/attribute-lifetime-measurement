@@ -1,6 +1,6 @@
 import random
 
-from agent import ExplorationAgent
+from agents.agent import ExplorationAgent
 
 # Takes __observed (in adaptive) as input 
 class RandomAgent(ExplorationAgent):

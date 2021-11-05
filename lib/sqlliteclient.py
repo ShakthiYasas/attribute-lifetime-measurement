@@ -223,8 +223,7 @@ class SQLLiteClient:
             (
                 id INT PRIMARY KEY NOT NULL,
                 name TEXT NOT NULL,
-                isActive BOOLEAN NOT NULL,
-                FOREIGN KEY (slaId) REFERENCES SLA(id)
+                isActive BOOLEAN NOT NULL
             );''')
 
         self.__conn.execute(
@@ -234,7 +233,7 @@ class SQLLiteClient:
                 freshness REAL NOT NULL,
                 price REAL NOT NULL,
                 penalty REAL NOT NULL,
-                maxrt REAL NOT NULL,
+                rtmax REAL NOT NULL,
                 isActive BOOLEAN NOT NULL
             );''')
 
@@ -251,9 +250,8 @@ class SQLLiteClient:
         self.__conn.execute(
             '''CREATE TABLE CachedLifetime
             (
-                Id INT NOT NULL AUTO INCREMENT,
+                Id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 entityid INT NOT NULL,
                 attribute TEXT NOT NULL,
-                lifetime REAL NOT NULL,
-                PRIMARY KEY (Id)
+                lifetime REAL NOT NULL
             );''')

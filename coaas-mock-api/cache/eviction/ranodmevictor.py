@@ -1,12 +1,11 @@
 import numpy as np
 
 from cache.eviction.evictor import Evictor
-from cache.inmemcache import InMemoryCache
 
 # How many attributes and entities to evict?
 # When to evict?
 class RandomEvictor(Evictor):
-    def __init__(self, parent_cache:InMemoryCache):
+    def __init__(self, parent_cache):
         self.__cache = parent_cache
 
     def select_for_evict(self):

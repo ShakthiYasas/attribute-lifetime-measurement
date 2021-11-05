@@ -2,10 +2,9 @@ from datetime import datetime
 import statistics
 
 from cache.eviction.evictor import Evictor
-from cache.inmemcache import InMemoryCache
 
 class LVFEvictor(Evictor):
-    def __init__(self, parent_cache:InMemoryCache):
+    def __init__(self, parent_cache):
         self.__cache = parent_cache
     
     def select_for_evict(self):

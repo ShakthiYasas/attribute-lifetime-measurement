@@ -5,7 +5,7 @@ import time
 import datetime
 import threading
 
-from profiler import Profiler
+from profilers.profiler import Profiler
 from lib.event import post_event
 
 # Profiler class for adaptive lifetime based refreshing

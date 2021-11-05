@@ -1,11 +1,10 @@
-from agent import Agent
-
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow.compat.v1 as tf
 
+from agents.agent import Agent
 from lib.event import subscribe
-from exploreagent import RandomAgent, MRUAgent, MFUAgent
+from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 # Random seeding
 np.random.seed(1)

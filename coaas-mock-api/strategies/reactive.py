@@ -1,10 +1,10 @@
 from math import trunc
 from dateutil import parser
 from datetime import datetime
-from profiler import Profiler
+from profilers.profiler import Profiler
 
 from strategies.strategy import Strategy
-from restapiwrapper import ServiceSelector
+from serviceresolver.serviceselector import ServiceSelector
 
 # Reactive retrieval strategy
 # This strategy would retrieve from the context provider for all the requests.

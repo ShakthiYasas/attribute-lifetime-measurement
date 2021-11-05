@@ -1,8 +1,7 @@
 from cache.eviction.evictor import Evictor
-from cache.inmemcache import InMemoryCache
 
 class NovelEvictor(Evictor):
-    def __init__(self, cache:InMemoryCache):
+    def __init__(self, cache):
         self.__cache = cache
 
     def select_for_evict(self):

@@ -1,7 +1,7 @@
 import numpy as np
 
-from agent import Agent
-from exploreagent import RandomAgent, MRUAgent, MFUAgent
+from agents.agent import Agent
+from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 class SimpleAgent(Agent):
     def __init__(self, config, caller):
