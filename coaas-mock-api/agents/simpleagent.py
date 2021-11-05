@@ -15,13 +15,7 @@ class SimpleAgent(Agent):
         self.__mid = config.mid
         self.__long = config.long
 
-        # Exploration
-        self.__epsilons_max = config.e_greedy_max
-        self.__epsilons_increment = config.e_greedy_increment
-        self.__epsilons_decrement = config.e_greedy_decrement
-
         # e-Greedy Exploration
-        self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
         self.__epsilons = list(config.e_greedy_init)
         if (config.e_greedy_init is None) or (config.e_greedy_decrement is None):
             self.__epsilons = list(self.epsilons_min)
