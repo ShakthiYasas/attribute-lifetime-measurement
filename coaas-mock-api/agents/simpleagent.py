@@ -8,7 +8,7 @@ class SimpleAgent(Agent):
         # General Configurations
         self.__caller = caller
         self.__window = config.window
-        self.__gamma = config.discounting_factor
+        self.__gamma = config.discount_rate
         
         # Extrapolation ranges 
         self.__short = config.short
@@ -16,7 +16,7 @@ class SimpleAgent(Agent):
         self.__long = config.long
 
         # e-Greedy Exploration
-        self.__epsilons = list(config.e_greedy_init)
+        self.__epsilons = config.e_greedy_init
         if (config.e_greedy_init is None) or (config.e_greedy_decrement is None):
             self.__epsilons = list(self.epsilons_min)
 
@@ -85,10 +85,11 @@ class SimpleAgent(Agent):
             random_value = np.random.uniform()
             if(random_value < self.__epsilons):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
-                    return self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+                    # Should the cached lifetime of these random items be calculated
+                    return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),0)
                 else:
-                    return self.__explore_mentor.choose_action(self.__caller.get_observed())          
-            return (0,0)
+                    return (self.__explore_mentor.choose_action(self.__caller.get_observed()),0)         
+            return ((0,0),0)
         else:
             # Here the action is a (entityid,attribute) to cache
             return ((entityid, attribute), estimated_lifetime)

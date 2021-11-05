@@ -6,7 +6,7 @@ class Agent(object):
     def choose_action(self, observation): pass
     def store_transition(self, state, action, reward, new_state): pass
 
-class ExplorationAgent(Agent):
+class ExplorationAgent():
     @staticmethod
     def _choose_action(): pass
     def choose_action(self, observation:dict): pass

@@ -70,7 +70,7 @@ class PlatformMock(Resource):
         setattr(__selected_algo, 'cache_memory', cache_fac.get_cache_memory(db))
 
         # Initialize the Selective Caching Agent
-        agent_fac = AgentFactory(config, __selected_algo)
+        agent_fac = AgentFactory(default_config['RLAgent'], config, __selected_algo)
         setattr(__selected_algo, 'selective_cache_agent', agent_fac.get_agent())
     
     # POST /contexts endpoint

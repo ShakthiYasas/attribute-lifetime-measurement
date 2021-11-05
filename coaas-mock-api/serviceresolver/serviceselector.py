@@ -5,9 +5,10 @@ from lib.fifoqueue import FIFOQueue
 
 # Simple Context Service Resolution
 class ServiceSelector:
+    __statistics = dict()
+
     def __init__(self, db):
         self.requester = Requester()
-        self.__statistics = {}
         self.__db = db
 
     def get_response_for_entity(self, attributes:list, urllist:list):
@@ -15,26 +16,26 @@ class ServiceSelector:
         for prodid, url in urllist:
             now = datetime.now()
             res = self.requester.get_response(url)
-            # res = self.requester.post_response(url)
             aft_time = datetime.now()
-            if(prodid in self.__statistics):
+
+            if(not (prodid in self.__statistics)):
                 self.__statistics[prodid] = {
                     'count': 1,
-                    'queue': FIFOQueue().push((aft_time-now).total_seconds())
+                    'queue': FIFOQueue(100).push((aft_time-now).total_seconds())
                 }
             else:
-                self.__statistics[prodid]['count']+=1
+                self.__statistics[prodid]['count'] += 1
                 self.__statistics[prodid]['queue'].push((aft_time-now).total_seconds())
 
-            if(self.__statistics[prodid]['count'] % 5):
+            if(self.__statistics[prodid]['count'] % 5 == 0):
                 self.__db.insert_one('responsetimes',{
                     'context_producer': prodid,
                     'avg_response_time': statistics.mean(self.__statistics[prodid]['queue'].getlist()),
                     'timestamp': aft_time
                 })
-
+          
             for att in attributes:
-                if(att in output):
+                if(not (att in output)):
                     output[att] = [(prodid,res[att],now)]
                 else:
                     output[att].append((prodid,res[att],now))

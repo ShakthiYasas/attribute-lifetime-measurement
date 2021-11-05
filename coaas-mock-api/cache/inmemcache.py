@@ -50,7 +50,7 @@ class InMemoryCache(CacheAgent):
     def calculate_hitrate(self):
         local = self.__localstats.copy()
         self.__localstats.clear()
-        self.__hitrate_trend.push((sum(local)/len(local),len(local)))
+        self.__hitrate_trend.push((sum(local)/len(local) if local else 0,len(local)))
     
     def getdb(self):
         return self.__db

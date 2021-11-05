@@ -15,6 +15,7 @@ class AgentFactory:
     def __init__(self, type, configuration = None, caller = None):
         self.__caller = caller
         if(configuration != None):
+            
             if(type == 'simple'):
                 self.__configuration = SimpleConfiguration(configuration)
             elif(type == 'ac'):

@@ -2,20 +2,21 @@ import sqlite3
 
 class SQLLiteClient:
     def __init__(self, db_name):
-        self.__conn = sqlite3.connect(db_name+'.db')
+        self.__dbname = db_name
 
     # Check the consumer and retrieve freshness
     def get_freshness_for_consumer(self, consumerid, slaid):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         res = self.__conn.execute(
-            "SELECT * \
-            FROM ContextConsumer \
-            WHERE isActive=1 AND id="+consumerid)
-        if(len(res) != 0):
+            "SELECT *\
+            FROM ContextConsumer\
+            WHERE isActive=1 AND id="+str(consumerid)).fetchall()
+        if(len(res)):
             freshness = self.__conn.execute(
-                "SELECT freshness, price, penalty \
-                FROM SLA \
-                WHERE isActive=1 AND id="+slaid +"\
-                LIMIT 1")
+                "SELECT freshness, price, penalty\
+                FROM SLA\
+                WHERE isActive=1 AND id="+str(slaid)+"\
+                LIMIT 1").fetchone()
             if(len(freshness)==0):
                 # No SLA set at the moment. So, assuming no freshness requirement. 
                 return (0.5,1.0,1.0)
@@ -28,33 +29,35 @@ class SQLLiteClient:
 
     # Retrieve context producers for an entity
     def get_providers_for_entity(self,entityid):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         producers = self.__conn.execute(
                 "SELECT id \
                 FROM ContextProducer \
-                WHERE entityId="+entityid+" AND isActive=1")
+                WHERE entityId="+str(entityid)+" AND isActive=1").fetchall()
         return list(map(lambda x: x[0], producers))
 
     # Retrieve the URLs of the matching providers and lifetimes of the attributes
     def get_context_producers(self, entityid, attributes) -> dict:
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         output = {}
         if(len(attributes)>0):
             producers = self.__conn.execute(
                 "SELECT id, url, price, samplingrate \
                 FROM ContextProducer \
-                WHERE entityId="+entityid+" AND isActive=1")
+                WHERE entityId="+str(entityid)+" AND isActive=1").fetchall()
             
             if(len(producers)>0):
-                att_string = 'name='+attributes[0]
+                att_string = "name='"+attributes[0]+"'"
                 if(len(attributes)>1):
                     for idx in range(1,len(attributes)):
-                        att_string = att_string+'OR name='+attributes[idx]
+                        att_string = att_string+" OR name='"+attributes[idx]+"'"
 
                 for prod in  producers:
                     sampling_interval = 1/prod[3]
                     att_res = self.__conn.execute(
                         "SELECT name, lifetime \
                         FROM ContextAttribute \
-                        WHERE producerId="+prod[0]+"AND ("+att_string+")")
+                        WHERE producerId="+str(prod[0])+" AND ("+att_string+")").fetchall()
                     if(len(att_res)==len(attributes)):
                         lts = {}
                         for att in att_res:
@@ -67,6 +70,7 @@ class SQLLiteClient:
         return output
     
     def add_cached_life(self, entityid, attribute, lifetime):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         cursor=self.__conn.cursor()
         self.__conn.execute(
             "INSERT INTO CachedLifetime (entityid, attribute, lifetime) VALUES\
@@ -74,27 +78,30 @@ class SQLLiteClient:
         return cursor.lastrowid
 
     def remove_cached_life(self, entityid, attribute):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "DELETE FROM CachedLifetime WHERE\
             entityid="+str(entityid)+" AND attribute='"+attribute+"')")
     
     def get_cached_life(self, entityid, attribute):
-        self.__conn.execute(
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        res = self.__conn.execute(
             "SELECT FROM CachedLifetime\
             WHERE entityid="+str(entityid)+" AND attribute='"+attribute+"'\
             ORDER BY Id DESC\
-            LIMIT 1)")
+            LIMIT 1)").fetchone()
+        return res[0]
 
     # Initialize the SQLite instance 
     def seed_db_at_start(self):
-        self.__create_tables()
-        self.__seed_tables_with_data()
         try:
-            self.__conn.commit()
+            self.__create_tables()
+            self.__seed_tables_with_data()
         except(Exception):
             print('An error occured when seeding to database')
 
     def __seed_tables_with_data(self):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "INSERT INTO Entity (id,name) VALUES\
             (1,'Car'),(2,'Bike'),(3,'CarPark')")
@@ -168,8 +175,11 @@ class SQLLiteClient:
         self.__conn.execute(
             "INSERT INTO ContextServiceProducer VALUES\
                 (2,1),(2,3),(2,4),(1,6),(1,7)")
+        
+        self.__conn.commit()
 
     def __create_tables(self):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             '''CREATE TABLE Entity
             (
@@ -255,3 +265,5 @@ class SQLLiteClient:
                 attribute TEXT NOT NULL,
                 lifetime REAL NOT NULL
             );''')
+        
+        self.__conn.commit()

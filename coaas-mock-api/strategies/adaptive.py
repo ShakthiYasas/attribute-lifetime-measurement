@@ -185,7 +185,7 @@ class Adaptive(Strategy):
             if(self.__isstatic):
                 lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'])
 
-            if(entityid in self.cache_memory.entityhash):
+            if(entityid in self.cache_memory.get_statistics_all()):
                 # Entity is cached
                 # Atleast one of the attributes of the entity is already cached 
                 if(not (entityid in self.__cached)):
@@ -527,12 +527,12 @@ class Adaptive(Strategy):
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
         # Retrive raw context from provider according to the entity
         return self.service_selector.get_response_for_entity(attribute_list, 
-                    list(map(lambda key,value: (key,value['url']), metadata.items())))
+                    list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
 
     def __refresh_cache_for_entity(self, new_context) -> None:
         for entityid,attribute_list,metadata in new_context:
             response = self.service_selector.get_response_for_entity(attribute_list, 
-                        list(map(lambda key,value: (key,value['url']), metadata.items())))
+                        list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
             # Save items in cache
             self.cache_memory.save(entityid,response)
             # Push to profiler
