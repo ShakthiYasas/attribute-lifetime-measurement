@@ -33,11 +33,11 @@ class ServiceSelector:
                     'avg_response_time': statistics.mean(self.__statistics[prodid]['queue'].getlist()),
                     'timestamp': aft_time
                 })
-          
+
             for att in attributes:
-                if(not (att in output)):
+                if(not (att in output) and att in res):
                     output[att] = [(prodid,res[att],now)]
-                else:
+                elif(att in res):
                     output[att].append((prodid,res[att],now))
         
         return output

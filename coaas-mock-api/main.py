@@ -98,9 +98,7 @@ class PlatformMock(Resource):
                     'data': str(response), 
                     'response_time': (datetime.now() - start).total_seconds()
                 })
-
-            print(response)
-            
+                
             # Return data and 200 OK code
             return response, 200 
 
@@ -113,30 +111,10 @@ class PlatformMock(Resource):
     # GET /context endpoint.
     # Retrives the details (metadata & statistics) of the current session in progress. 
     def get(self):
-        session = request.args.get('session')
-        if(session == None):
-            session = str(db.read_last('sessions').token)
-
-        plt.xlabel('Request')
-        plt.ylabel('Response Time')
-        
-        responses = db.read_all('responses', 
-            {
-                'session': self.__token if session == None else session
-            })
-
-        requests = []
-        responsetimes = []
-        for res in responses:
-            requests.append(str(res._id))
-            responsetimes.append(res.response_time)
-
-        # Plots the variation of response times
-        plt.plot(requests, responsetimes)  
-        filename = self.__token+'_responsetime_variation.png'
-        plt.savefig(filename)
-
-        return {'fileName': filename}, 200 # file saved
+        ent_id = int(request.args.get('id'))
+        # Start to process the request
+        data = self.__selected_algo.get_cache(ent_id)
+        return data, 200    
 
 api.add_resource(PlatformMock, '/contexts')
 

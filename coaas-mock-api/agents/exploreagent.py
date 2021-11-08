@@ -57,7 +57,8 @@ class MFUAgent(ExplorationAgent):
         if(bool(observation)):
             glo= []
             for entity,attrs in observation.items():
-                local = sorted(list(map(lambda x: (x[0],x[1][-1]), attrs)), key=lambda tup: tup[1])
+                l = list(map(lambda x: (x[0],x[1].getlist()[-1]), attrs.items()))
+                local = sorted(l, key=lambda tup: tup[1])
                 glo.append((entity,local[-1][0],local[-1][1]))
 
             sorted_glo = sorted(glo, key=lambda tup: tup[2])

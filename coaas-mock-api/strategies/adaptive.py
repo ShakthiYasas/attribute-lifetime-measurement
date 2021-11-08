@@ -75,11 +75,13 @@ class Adaptive(Strategy):
     # Clear function that run on the background
     def clear_expired(self) -> None:
         # Multithread the following 3
+        if(self.__window_counter > 3):
+            self.__extrapolate_request_rate()
+
         if(self.__window_counter > self.trend_ranges[1]): 
             self.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
             self.__clear_cached()
-            self.__extrapolate_request_rate()
-        
+            
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
         self.__reqs_in_window = 0
@@ -255,6 +257,8 @@ class Adaptive(Strategy):
                     if(self.__window_counter > self.trend_ranges[1]):
                         caching_attrs = self.__evalute_attributes_for_caching(entityid,
                                                 self.__get_attributes_not_cached(entityid, ent['attributes']))
+                        print('caching attribute')
+                        print(caching_attrs)
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
                         self.__evaluated.append(entityid)
@@ -619,6 +623,10 @@ class Adaptive(Strategy):
         th = LearningThread(self)
         th.start()
         th.join()
+
+    def get_cache(self, entityid):
+        res = self.cache_memory.get_statistics_entity(entityid)
+        return [i for i in res.keys()]
 
 class LearningThread (threading.Thread):
     def __init__(self):

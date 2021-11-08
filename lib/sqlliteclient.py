@@ -74,7 +74,7 @@ class SQLLiteClient:
         cursor=self.__conn.cursor()
         self.__conn.execute(
             "INSERT INTO CachedLifetime (entityid, attribute, lifetime) VALUES\
-            ("+str(entityid)+",'"+attribute+"',"+str(lifetime)+")")
+            ("+str(entityid)+",'"+str(attribute)+"',"+str(lifetime)+")")
         return cursor.lastrowid
 
     def remove_cached_life(self, entityid, attribute):
