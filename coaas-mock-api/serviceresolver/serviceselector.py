@@ -1,5 +1,5 @@
 import statistics
-from datetime import datetime
+from datetime import datetime, timedelta
 from lib.restapiwrapper import Requester
 from lib.fifoqueue import FIFOQueue_2
 
@@ -17,15 +17,16 @@ class ServiceSelector:
             now = datetime.now()
             res = self.requester.get_response(url)
             aft_time = datetime.now()
+            responetime = (aft_time-now).total_seconds()
 
             if(not (prodid in self.__statistics)):
                 queue = FIFOQueue_2(100)
                 self.__statistics[prodid] = {'count': 1}
-                queue.push((aft_time-now).total_seconds())
+                queue.push(responetime)
                 self.__statistics[prodid]['queue'] = queue
             else:
                 self.__statistics[prodid]['count'] += 1
-                self.__statistics[prodid]['queue'].push((aft_time-now).total_seconds())
+                self.__statistics[prodid]['queue'].push(responetime)
 
             if(self.__statistics[prodid]['count'] % 5 == 0):
                 self.__db.insert_one('responsetimes',{
@@ -36,9 +37,9 @@ class ServiceSelector:
 
             for att in attributes:
                 if(not (att in output) and att in res):
-                    output[att] = [(prodid,res[att],now)]
+                    output[att] = [(prodid,res[att],now - timedelta(seconds=responetime))]
                 elif(att in res):
-                    output[att].append((prodid,res[att],now))
+                    output[att].append((prodid,res[att], now - timedelta(seconds=responetime)))
         
         return output
 

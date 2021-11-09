@@ -237,7 +237,7 @@ class Adaptive(Strategy):
                                 if(lt<0):
                                     continue
                                 else:
-                                    extime = lt * (1 - fthresh)
+                                    extime = lt * (1 - fthresh[0])
                                     time_at_expire = lastret + datetime.timedelta(seconds=extime)
                                     if(now > time_at_expire):
                                         # If the attribute doesn't meet the freshness level (Cache miss) from the producer
@@ -570,11 +570,13 @@ class Adaptive(Strategy):
             for ran in self.trend_ranges:
                 fea_vec.append(0)
                 req_at_point = self.req_rate_extrapolation[rr_trend_size-2+ran]*ar_extrapolation[trend_size-2+ran]
-                if(fthr>frt and req_at_point <= 0): 
+
+                if(fthr<frt and req_at_point > 0): 
                     if(delta >= (1/req_at_point)):
                         # It is effective to cache
                         # because multiple requests can be served
-                        fea_vec.append(1/(delta*req_at_point))
+                        exp_hr = (delta*req_at_point)/((delta*req_at_point)+1)
+                        fea_vec.append(exp_hr)
                     else:
                         # It is not effective to cache
                         # because no more that 1 request could be served
