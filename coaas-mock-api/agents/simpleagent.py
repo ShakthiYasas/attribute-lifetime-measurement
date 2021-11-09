@@ -98,46 +98,55 @@ class SimpleAgent(Agent):
     def caclulcate_for_range(self, rang, observation, cur_sla, cur_rr_exp, cur_rr_size):
         if(rang == 'short'):
             count = int(self.__short)
+            step = observation[7]/count
 
-            expected_access = (cur_rr_exp[cur_rr_size-1+self.__short]*observation[1]*self.__window)/1000
-            earning = observation[7]*cur_sla[1]
-            del_pen = (1-observation[7])*cur_sla[2]
-            ret_cost = (1-observation[7])*observation[14]
-            
-            total_earning = expected_access*(earning - del_pen - ret_cost)
+            curr_hr = step
             total_dis_earning = 0
             for i in range(1,count+1):
+                expected_access = (cur_rr_exp[cur_rr_size-1+i]*observation[1]*self.__window)/1000
+                earning = curr_hr*cur_sla[1]
+                del_pen = (1-curr_hr)*cur_sla[2]
+                ret_cost = (1-curr_hr)*observation[14]
+            
+                total_earning = expected_access*(earning - del_pen - ret_cost)
                 total_dis_earning += total_earning/((1+self.__gamma)**i)
+                curr_hr += step
 
             return total_dis_earning
 
         elif(rang == 'mid'):
             count = self.__mid - self.__short
+            step = (observation[9]-observation[7])/count
 
-            expected_access = (cur_rr_exp[cur_rr_size-1+self.__mid]*observation[3]*self.__window)/1000
-            earning = observation[9]*cur_sla[1]
-            del_pen = (1-observation[9])*cur_sla[2]
-            ret_cost = (1-observation[9])*observation[14]
-            
-            total_earning = expected_access*(earning - del_pen - ret_cost)
+            curr_hr = observation[7] + step
             total_dis_earning = 0
             for i in range(self.__mid+1,count+1):
+                expected_access = (cur_rr_exp[cur_rr_size-1+self.__short+i]*observation[3]*self.__window)/1000
+                earning = curr_hr*cur_sla[1]
+                del_pen = (1-curr_hr)*cur_sla[2]
+                ret_cost = (1-curr_hr)*observation[14]
+                
+                total_earning = expected_access*(earning - del_pen - ret_cost)
                 total_dis_earning += total_earning/((1+self.__gamma)^i)
+                curr_hr += step
 
             return total_dis_earning
 
         else:
             count = self.__long - self.__mid
-
-            expected_access = (cur_rr_exp[cur_rr_size-1+self.__long]*observation[3]*self.__window)/1000
-            earning = observation[11]*cur_sla[1]
-            del_pen = observation[11]*cur_sla[2]
-            ret_cost = (1-observation[11])*observation[14]
+            step = (observation[9]-observation[11])/count
             
-            total_earning = expected_access*(earning - del_pen - ret_cost)
+            curr_hr = observation[9] + step
             total_dis_earning = 0
             for i in range(self.__mid+1,count+1):
+                expected_access = (cur_rr_exp[cur_rr_size-1+self.__mid+i]*observation[3]*self.__window)/1000
+                earning = curr_hr*cur_sla[1]
+                del_pen = (1-curr_hr)*cur_sla[2]
+                ret_cost = (1-curr_hr)*observation[14]
+                
+                total_earning = expected_access*(earning - del_pen - ret_cost)
                 total_dis_earning += total_earning/((1+self.__gamma)^i)
+                curr_hr += step
 
             return total_dis_earning
 
