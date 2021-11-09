@@ -509,14 +509,34 @@ class Adaptive(Strategy):
         avg_life = statistics.mean(local_avg_lt) if(local_avg_lt) else 1
             
         if(avg_life < 0):
+            # Infinite or very long lifetimes
             fea_vec = [0,1,0,1,0,1]
         else:
             frt = 1-(avg_rt/avg_life)
             fthr = self.__most_expensive_sla[0]
-            delta = avg_life*(fthr-frt)
+            delta = (avg_life*(frt-fthr))/(1-frt)
+
+
+            attribute_trend = self.__attribute_access_trend[entityid][att]
+            trend_size = attribute_trend.get_queue_size()
+
+            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            yi = attribute_trend.getlist()
+            if(trend_size<3):
+                diff = 3 - len(yi)
+                last_val = yi[-1]
+                for i in range(0,diff):
+                    yi.append(last_val)
+
+            s = InterpolatedUnivariateSpline(xi, yi, k=2)
+            total_size = trend_size + self.trend_ranges[2]
+            ar_extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            rr_trend_size = self.__request_rate_trend.get_queue_size()
+
             for ran in self.trend_ranges:
                 fea_vec.append(0)
-                req_at_point = self.req_rate_extrapolation[self.__request_rate_trend.get_queue_size()-2+ran]
+                req_at_point = self.req_rate_extrapolation[rr_trend_size-2+ran]*ar_extrapolation[trend_size-2+ran]
                 if(fthr>frt): 
                     if(delta >= (1/req_at_point)):
                         # It is effective to cache
