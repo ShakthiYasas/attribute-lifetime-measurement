@@ -26,6 +26,7 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
+    __delay_dict = {}
     rr_trend_size = 0
     __window_counter = 0
     __learning_counter = 0
@@ -78,7 +79,7 @@ class Adaptive(Strategy):
         if(self.__window_counter > 3):
             self.__extrapolate_request_rate()
 
-        if(self.__window_counter > self.trend_ranges[1]): 
+        if(self.__window_counter >= self.trend_ranges[1]): 
             self.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
             self.__clear_cached()
             
@@ -254,14 +255,14 @@ class Adaptive(Strategy):
                     # Should return the attributes that should be cached
                     self.__learning_counter += 1
                     # Doesn't cache any item until atleast the mid range is reached
-                    if(self.__window_counter > self.trend_ranges[1]):
+                    if(self.__window_counter >= self.trend_ranges[1]+1):
                         caching_attrs = self.__evalute_attributes_for_caching(entityid,
                                                 self.__get_attributes_not_cached(entityid, ent['attributes']))
-                        print('caching attribute')
-                        print(caching_attrs)
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
                         self.__evaluated.append(entityid)
+                    else:
+                        self.__update_observed(entityid, ent['attributes'])
 
                 # Multithread this
                 if(len(new_context)>0):
@@ -292,10 +293,12 @@ class Adaptive(Strategy):
                 self.__learning_counter += 1
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
-                if(self.__window_counter > self.trend_ranges[1]):
+                if(self.__window_counter >= self.trend_ranges[1]+1):
                     # Run this in the background
                     self.__evaluate_for_caching(entityid, out)
                     self.__evaluated.append(entityid)
+                else:
+                    self.__update_observed(entityid, out.keys())
 
         if(isinstance(self.selective_cache_agent, DQNAgent) and self.__learning_counter % self.__learning_cycle == 0):
             # Trigger learning for the DQN Agent
@@ -315,17 +318,36 @@ class Adaptive(Strategy):
             # Translate the entity,attribute pair to a state
             observation = self.__translate_to_state(entityid,att)
             # Select the action for the state using the RL Agent
-            action, est_c_lifetime = self.selective_cache_agent.choose_action(observation)
-            self.cache_memory.addcachedlifetime(action, est_c_lifetime)
+            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
             if(action != (0,0)):
+                self.cache_memory.addcachedlifetime(action, est_c_lifetime)
                 self.__last_actions.append(action)
                 actions.append(action[1])
-        
+            else:
+                if(entityid in self.__delay_dict):
+                    self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                else:
+                    self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+
         # Push to Queue to calculate reward in next epoch
         if(not isinstance(self.selective_cache_agent, SimpleAgent)):
             self.__calculate_reward(list(map(lambda x: (entityid, x), actions)))
 
         return actions
+
+    def __check_delay(self,entity,attr):
+        if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
+            if(self.__window_counter < self.__delay_dict[entity][attr]): return False
+            else: return True
+        else: return True
+    
+    def __is_spike(self,entity,attr):
+        if(self.__isobserved(entity, attr)):
+            att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
+            if((att_trend[0]*2)>=att_trend[1]):
+                return True
+            return False
+        else: return False
 
     def __evaluate_for_caching(self, entityid, attributes:dict):
         # Check if this entity has been evaluated for caching in this window
@@ -336,15 +358,21 @@ class Adaptive(Strategy):
         if(not (entityid in self.__evaluated)):
             # Entity hasn't been evaluted in this window before
             for att in attributes.keys():
-                observation = self.__translate_to_state(entityid,att)
-                action, est_c_lifetime = self.selective_cache_agent.choose_action(observation)
-                if(action != (0,0) and action[0] == entityid):
-                    updated_attr_dict.append(action[1])
-                    self.cache_memory.addcachedlifetime(action, est_c_lifetime)
-                    is_caching = True
-                else:
-                    if(action != (0,0)):
-                        random_one.append(action)
+                if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
+                    observation = self.__translate_to_state(entityid,att)
+                    action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                    if(action != (0,0) and action[0] == entityid):
+                        updated_attr_dict.append(action[1])
+                        self.cache_memory.addcachedlifetime(action, est_c_lifetime)
+                        is_caching = True
+                    else:
+                        if(action != (0,0)):
+                            random_one.append(action)
+                        else:
+                            if(entityid in self.__delay_dict):
+                                self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                            else:
+                                self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                         
         if(is_caching):
             # Add to cache 
@@ -470,7 +498,12 @@ class Adaptive(Strategy):
 
             for ran in self.trend_ranges:
                 fea_vec.append(attribute_trend.get_last_position(ran))
-                fea_vec.append(extrapolation[trend_size-2+ran])
+                exp_ar = extrapolation[trend_size-2+ran]
+                if(exp_ar < 0):
+                    exp_ar = 0
+                elif(exp_ar > 1):
+                    exp_ar = 1
+                fea_vec.append(exp_ar)
         else:
             # Actual and Expected Access Rates 
             # No actual or expected access rates becasue the item is already cached
@@ -516,7 +549,6 @@ class Adaptive(Strategy):
             fthr = self.__most_expensive_sla[0]
             delta = (avg_life*(frt-fthr))/(1-frt)
 
-
             attribute_trend = self.__attribute_access_trend[entityid][att]
             trend_size = attribute_trend.get_queue_size()
 
@@ -537,7 +569,7 @@ class Adaptive(Strategy):
             for ran in self.trend_ranges:
                 fea_vec.append(0)
                 req_at_point = self.req_rate_extrapolation[rr_trend_size-2+ran]*ar_extrapolation[trend_size-2+ran]
-                if(fthr>frt): 
+                if(fthr>frt and req_at_point <= 0): 
                     if(delta >= (1/req_at_point)):
                         # It is effective to cache
                         # because multiple requests can be served
@@ -580,7 +612,12 @@ class Adaptive(Strategy):
 
                 for ran in self.trend_ranges:
                     fea_vec.append(hit_trend.get_last_position(ran))
-                    fea_vec.append(extrapolation[trend_size-2+ran])
+                    exp_hr = extrapolation[trend_size-2+ran]
+                    if(exp_hr < 0):
+                        exp_hr = 0
+                    elif(exp_hr > 1):
+                        exp_hr = 1
+                    fea_vec.append(exp_hr)
             else:
                 # No current hit rates to report 
                 # Expected Hit Rate (If Not Cached)

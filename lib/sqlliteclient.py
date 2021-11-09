@@ -17,7 +17,7 @@ class SQLLiteClient:
                 FROM SLA\
                 WHERE isActive=1 AND id="+str(slaid)+"\
                 LIMIT 1").fetchone()
-            if(len(freshness)==0):
+            if(freshness == None or len(freshness)==0):
                 # No SLA set at the moment. So, assuming no freshness requirement. 
                 return (0.5,1.0,1.0)
             else:

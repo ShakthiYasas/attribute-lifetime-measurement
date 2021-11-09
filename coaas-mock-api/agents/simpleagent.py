@@ -52,56 +52,74 @@ class SimpleAgent(Agent):
         cur_sla = self.__caller.get_most_expensive_sla()
         cur_rr_exp = self.__caller.req_rate_extrapolation  
 
-        npv = 0
-        sequence = [0,0,0]
+        disearning_sequence = []
         if(t_for_discounting >= self.__short):
-            dv = self.caclulcate_for_range('short', observation, cur_sla, cur_rr_exp, cur_rr_size)
-            sequence[0] = 1 if dv > 0 else 0
-            npv += dv
+            disearning_sequence += self.caclulcate_for_range('short', observation, cur_sla, cur_rr_exp, cur_rr_size)
         if(t_for_discounting >= self.__mid):
-            dv = self.caclulcate_for_range('mid', observation, cur_sla, cur_rr_exp, cur_rr_size)
-            sequence[1] = 1 if dv > 0 else 0
-            npv += dv
+            disearning_sequence += self.caclulcate_for_range('mid', observation, cur_sla, cur_rr_exp, cur_rr_size)
         if(t_for_discounting == self.__long):
-            dv = self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
-            sequence[2] = 1 if dv > 0 else 0
-            npv += dv
+            disearning_sequence += self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
 
-        npv -= cost_of_caching
-        sequence = tuple(sequence)
-
-        estimated_lifetime = 0
-        if(npv>0): 
-            if(sequence == (1,0,0)):
-                estimated_lifetime = (self.__short*self.__window)/1000
-            elif(sequence == (1,1,0)):
-                estimated_lifetime = (self.__mid*self.__window)/1000
-            elif(any(seq == sequence for seq in [(0,1,1),(1,0,1),(1,1,1)])):
-                estimated_lifetime = max((self.__long*self.__window)/1000, 
-                        observation[12] if observation[12] > 0 else (self.__mid*self.__window)/1000)
-            else:
-                estimated_lifetime = observation[12] if observation[12] > 0 else (self.__mid*self.__window)/1000
+        npv = sum(disearning_sequence) - cost_of_caching
 
         if(npv<=0):
             random_value = np.random.uniform()
             if(random_value < self.__epsilons):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     # Should the cached lifetime of these random items be calculated
-                    return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),(self.__mid*self.__window)/1000)
+                    return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),((self.__mid*self.__window)/1000,0))
                 else:
-                    return (self.__explore_mentor.choose_action(self.__caller.get_observed()),(self.__mid*self.__window)/1000)        
-            return ((0,0),0)
+                    return (self.__explore_mentor.choose_action(self.__caller.get_observed()),((self.__mid*self.__window)/1000,0))        
+            return ((0,0),(0,0))
         else:
             # Here the action is a (entityid,attribute) to cache
-            return ((entityid, attribute), estimated_lifetime)
+            caching_delay = -1
+            estimated_lifetime = 0
+            if(disearning_sequence[0] > disearning_sequence[-1]):
+                # The item could be cached
+                # So, calculate the estimated cached lifetime
+                es_delta = self.cached_life_when_delta(disearning_sequence)
+                es_zero = 0
+                if(disearning_sequence[-1]<0):
+                    es_zero = self.cached_life_when_zero(disearning_sequence)
+                estimated_lifetime = max(es_delta, es_zero)
+                
+            elif(disearning_sequence[-1] > 0):
+                # Item is not cached, but could be cached later
+                for i in range(len(disearning_sequence)):
+                    if(i == 0):
+                        continue
+                    elif(disearning_sequence[i]>=0):
+                        caching_delay = i-1
+
+            return ((entityid, attribute), (estimated_lifetime, caching_delay))
+
+    def cached_life_when_zero(self, disearning_sequence):
+        for i in range(len(disearning_sequence)):
+            if(i == 0):
+                continue
+            elif(disearning_sequence[i]<=0):
+                return ((i-1)*self.__window)/1000
+
+
+    def cached_life_when_delta(self, disearning_sequence):
+        est_life = 0
+        for i in range(len(disearning_sequence)):
+            if(i == 0): continue
+            else:
+                delta = disearning_sequence[i-1] - disearning_sequence[i]
+                if(delta < 0.01): est_life = ((i+1)*self.__window)/1000
+        if(est_life == 0): return (len(disearning_sequence)*self.__window)/1000
+        else: est_life
 
     def caclulcate_for_range(self, rang, observation, cur_sla, cur_rr_exp, cur_rr_size):
+        disearning_list = []
+
         if(rang == 'short'):
             count = int(self.__short)
             step = observation[7]/count
 
             curr_hr = step
-            total_dis_earning = 0
             for i in range(1,count+1):
                 expected_access = (cur_rr_exp[cur_rr_size-1+i]*observation[1]*self.__window)/1000
                 earning = curr_hr*cur_sla[1]
@@ -109,17 +127,14 @@ class SimpleAgent(Agent):
                 ret_cost = (1-curr_hr)*observation[14]
             
                 total_earning = expected_access*(earning - del_pen - ret_cost)
-                total_dis_earning += total_earning/((1+self.__gamma)**i)
+                disearning_list.append(total_earning/((1+self.__gamma)**i))
                 curr_hr += step
-
-            return total_dis_earning
 
         elif(rang == 'mid'):
             count = self.__mid - self.__short
             step = (observation[9]-observation[7])/count
 
             curr_hr = observation[7] + step
-            total_dis_earning = 0
             for i in range(self.__mid+1,count+1):
                 expected_access = (cur_rr_exp[cur_rr_size-1+self.__short+i]*observation[3]*self.__window)/1000
                 earning = curr_hr*cur_sla[1]
@@ -127,17 +142,14 @@ class SimpleAgent(Agent):
                 ret_cost = (1-curr_hr)*observation[14]
                 
                 total_earning = expected_access*(earning - del_pen - ret_cost)
-                total_dis_earning += total_earning/((1+self.__gamma)^i)
+                disearning_list.append(total_earning/((1+self.__gamma)**i))
                 curr_hr += step
-
-            return total_dis_earning
 
         else:
             count = self.__long - self.__mid
             step = (observation[9]-observation[11])/count
             
             curr_hr = observation[9] + step
-            total_dis_earning = 0
             for i in range(self.__mid+1,count+1):
                 expected_access = (cur_rr_exp[cur_rr_size-1+self.__mid+i]*observation[3]*self.__window)/1000
                 earning = curr_hr*cur_sla[1]
@@ -145,10 +157,10 @@ class SimpleAgent(Agent):
                 ret_cost = (1-curr_hr)*observation[14]
                 
                 total_earning = expected_access*(earning - del_pen - ret_cost)
-                total_dis_earning += total_earning/((1+self.__gamma)^i)
+                disearning_list.append(total_earning/((1+self.__gamma)**i))
                 curr_hr += step
 
-            return total_dis_earning
+        return disearning_list
 
     def __closest_point(self, lifeunits):
         s_dis = abs(self.__short-lifeunits)
