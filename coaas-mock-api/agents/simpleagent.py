@@ -70,10 +70,19 @@ class SimpleAgent(Agent):
                     return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),((self.__mid*self.__window)/1000,0))
                 else:
                     return (self.__explore_mentor.choose_action(self.__caller.get_observed()),((self.__mid*self.__window)/1000,0))        
-            return ((0,0),(0,0))
+            
+            caching_delay = -1
+            # Item is not cached, but could be cached later
+            if(disearning_sequence[0] < disearning_sequence[-1]):
+                for i in range(len(disearning_sequence)):
+                    if(i == 0):
+                        continue
+                    elif(disearning_sequence[i]>=0):
+                        caching_delay = i-1
+
+            return ((0,0),(0,caching_delay))
         else:
             # Here the action is a (entityid,attribute) to cache
-            caching_delay = -1
             estimated_lifetime = 0
             if(disearning_sequence[0] > disearning_sequence[-1]):
                 # The item could be cached
@@ -85,14 +94,9 @@ class SimpleAgent(Agent):
                 estimated_lifetime = max(es_delta, es_zero)
                 
             elif(disearning_sequence[-1] > 0):
-                # Item is not cached, but could be cached later
-                for i in range(len(disearning_sequence)):
-                    if(i == 0):
-                        continue
-                    elif(disearning_sequence[i]>=0):
-                        caching_delay = i-1
+                estimated_lifetime = (t_for_discounting*self.__window)/1000
 
-            return ((entityid, attribute), (estimated_lifetime, caching_delay))
+            return ((entityid, attribute), (estimated_lifetime, 0))
 
     def cached_life_when_zero(self, disearning_sequence):
         for i in range(len(disearning_sequence)):

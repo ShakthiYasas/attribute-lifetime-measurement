@@ -1,0 +1,2 @@
+class NewContextException(Exception):
+    pass

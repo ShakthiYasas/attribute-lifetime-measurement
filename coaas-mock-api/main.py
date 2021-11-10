@@ -78,6 +78,7 @@ class PlatformMock(Resource):
         try:
             start = datetime.now()
             json_obj = request.get_json()
+            req_id = secrets.token_hex(nbytes=8)
 
             # Simple Authenticator
             consumer = json_obj['requester']
@@ -87,7 +88,7 @@ class PlatformMock(Resource):
                 return parse_response({'message':'Unauthorized'}), 401  
 
             # Start to process the request
-            data = self.__selected_algo.get_result(json_obj['query'], fthr, self.__token)
+            data = self.__selected_algo.get_result(json_obj['query'], fthr, req_id)
             response = parse_response(data, self.__token)
             _thread.start_new_thread(self.__save_rp_stats, (self.__token,response,start))
                 

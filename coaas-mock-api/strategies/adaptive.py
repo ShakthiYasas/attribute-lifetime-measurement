@@ -8,6 +8,7 @@ from lib.event import post_event
 from agents.dqnagent import DQNAgent
 from lib.fifoqueue import FIFOQueue_2
 from agents.simpleagent import SimpleAgent
+from lib.exceptions import NewContextException
 
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
@@ -110,54 +111,56 @@ class Adaptive(Strategy):
     
     def __clear_observed(self,exp_time):
         dup_obs = self.__observed.copy()
+        __reqs_in_window = self.__reqs_in_window
         for key,value in dup_obs.items():
             if(value['req_ts'][-1] < exp_time):
                 # The entire entity hasn't been accessed recently
                 del self.__observed[key]
                 del self.__attribute_access_trend[key]
             else:
-                for tstamp in value['req_ts']:
-                    if(tstamp < exp_time):
-                        value['req_ts'].pop(0)
-                    else:
-                        access_freq = 0
-                        if(self.__reqs_in_window>0):
-                            access_freq = len(value['req_ts'])/self.__reqs_in_window
-                        self.__entity_access_trend.push(access_freq)
-                        break
+                invalidtss = [num for num in value['req_ts'] if num < exp_time]
+                for i in invalidtss:
+                    value['req_ts'].remove(i)
+
+                validtss = value['req_ts']
+                access_freq = 0
+                if(__reqs_in_window>0):
+                    access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
+                self.__entity_access_trend.push(access_freq)
                 
                 for curr_attr, access_list in value['attributes'].items():
-                    for tstamp in access_list:
-                        if(tstamp < exp_time):
-                            value['attributes'][curr_attr].pop(0)
+                    invalidtss = [num for num in access_list if num < exp_time]
+                    for i in invalidtss:
+                        value['attributes'][curr_attr].remove(i)
+
+                    validtss = value['attributes'][curr_attr]
+                    access_freq = 0
+                    if(__reqs_in_window>0):
+                        access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
+
+                    if(key in self.__attribute_access_trend):
+                        if(curr_attr in self.__attribute_access_trend[key]):
+                            self.__attribute_access_trend[key][curr_attr].push(access_freq)
                         else:
-                            access_freq = 0
-                            if(self.__reqs_in_window>0):
-                                access_freq = len(value['attributes'][curr_attr])/self.__reqs_in_window 
-                            if(key in self.__attribute_access_trend):
-                                if(curr_attr in self.__attribute_access_trend[key]):
-                                    self.__attribute_access_trend[key][curr_attr].push(access_freq)
-                                else:
-                                    que = FIFOQueue_2(1000)
-                                    que.push(access_freq)
-                                    self.__attribute_access_trend[key][curr_attr] = que
-                            else:
-                                que = FIFOQueue_2(1000)
-                                que.push(access_freq)
-                                self.__attribute_access_trend[key] = {
-                                    curr_attr : que
-                                }
-                                
-                            break
+                            que = FIFOQueue_2(1000)
+                            que.push(access_freq)
+                            self.__attribute_access_trend[key][curr_attr] = que
+                    else:
+                        que = FIFOQueue_2(1000)
+                        que.push(access_freq)
+                        self.__attribute_access_trend[key] = {
+                            curr_attr : que
+                        }
 
     def __clear_cached(self):
+        __reqs_in_window = self.__reqs_in_window
         for key,attributes in self.__cached.items():                
             for curr_attr, access_list in attributes.items():
                 hit_rate = 0
                 if(len(access_list)>0):
                     hit_rate = sum(access_list)/len(access_list)  
                 
-                access_ratio = 0 if(self.__reqs_in_window == 0) else len(access_list)/self.__reqs_in_window 
+                access_ratio = 0 if(__reqs_in_window == 0) else len(access_list)/__reqs_in_window 
 
                 if(key in self.__cached_hit_access_trend):
                     if(curr_attr in self.__cached_hit_access_trend[key]):
@@ -200,7 +203,7 @@ class Adaptive(Strategy):
     ###################################################################################
 
     # Retrieving context data
-    def get_result(self, json = None, fthresh = (0.5,1.0,1.0), session = None) -> dict: 
+    def get_result(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None) -> dict: 
         self.__reqs_in_window+=1
         if(self.__most_expensive_sla == None):
             self.__most_expensive_sla = fthresh
@@ -214,12 +217,13 @@ class Adaptive(Strategy):
                     if(fthresh[1]<self.__most_expensive_sla[1]):
                         self.__most_expensive_sla[1] = fthresh[1]
 
-        refetching = [] # Freshness not met for the value generated by a producer [(entityid, prodid)]
-        new_context = [] # Need to fetch the entity with all attributes [(entityid, [attributes])]
         now = datetime.datetime.now()
 
         output = {}
         for ent in json:
+            refetching = [] # Freshness not met for the value generated by a producer [(entityid, prodid)]
+            new_context = [] # Need to fetch the entity with all attributes [(entityid, [attributes])]
+
             # Check freshness of requested attributes
             entityid = ent['entityId']
             lifetimes = None
@@ -312,7 +316,7 @@ class Adaptive(Strategy):
                         output[entityid][att_name] = [x[1] for x in res[att_name]]
                         # Update observed
                         self.__observedLock.acquire()
-                        self.__update_observed(entityid, att_name)
+                        self.__update_observed(entityid, [att_name])
                         self.__observedLock.release()
             else:
                 # Even the entity is not cached previously
@@ -352,19 +356,26 @@ class Adaptive(Strategy):
         # Evaluate the attributes to cache or not
         actions = []
         for att in attributes:
-            # Translate the entity,attribute pair to a state
-            observation = self.__translate_to_state(entityid,att)
-            # Select the action for the state using the RL Agent
-            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
-            if(action != (0,0)):
-                self.cache_memory.addcachedlifetime(action, est_c_lifetime)
-                self.__last_actions.append(action)
-                actions.append(action[1])
-            else:
+            try:
+                if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
+                    # Translate the entity,attribute pair to a state
+                    observation = self.__translate_to_state(entityid,att)
+                    # Select the action for the state using the RL Agent
+                    action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                    if(action != (0,0)):
+                        self.cache_memory.addcachedlifetime(action, est_c_lifetime)
+                        self.__last_actions.append(action)
+                        actions.append(action[1])
+                    else:
+                        if(entityid in self.__delay_dict):
+                            self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                        else:
+                            self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+            except NewContextException:
                 if(entityid in self.__delay_dict):
-                    self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                    self.__delay_dict[entityid][att] = self.__window_counter + 1
                 else:
-                    self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                    self.__delay_dict[entityid] = { att: self.__window_counter + 1 }
 
         # Push to Queue to calculate reward in next epoch
         if(not isinstance(self.selective_cache_agent, SimpleAgent)):
@@ -397,21 +408,27 @@ class Adaptive(Strategy):
             # Entity hasn't been evaluted in this window before
             for att in attributes.keys():
                 if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
-                    observation = self.__translate_to_state(entityid,att)
-                    action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
-                    if(action != (0,0) and action[0] == entityid):
-                        updated_attr_dict.append(action[1])
-                        self.cache_memory.addcachedlifetime(action, est_c_lifetime)
-                        is_caching = True
-                    else:
-                        if(action != (0,0)):
-                            random_one.append(action)
+                    try:
+                        observation = self.__translate_to_state(entityid,att)
+                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                        if(action != (0,0) and action[0] == entityid):
+                            updated_attr_dict.append(action[1])
+                            self.cache_memory.addcachedlifetime(action, est_c_lifetime)
+                            is_caching = True
                         else:
-                            if(entityid in self.__delay_dict):
-                                self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                            if(action != (0,0)):
+                                random_one.append(action)
                             else:
-                                self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
-                        
+                                if(entityid in self.__delay_dict):
+                                    self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                                else:
+                                    self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                    except NewContextException:
+                        if(entityid in self.__delay_dict):
+                            self.__delay_dict[entityid][att] = self.__window_counter + 1
+                        else:
+                            self.__delay_dict[entityid] = { att: self.__window_counter + 1 }
+                     
         if(is_caching):
             # Add to cache 
             self.__last_actions = [(entityid, x) for x in updated_attr_dict]
@@ -632,9 +649,10 @@ class Adaptive(Strategy):
     def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
         fea_vec = []
         avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items())))
+
         if(isobserved):
             # No current hit rates to report 
-            # Expected Hit Rate (If Not Cached)
+            # Expected Hit Rate (If not Cached)
             fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)
         else:
             # Current Hit Rate (If Cached)
@@ -663,9 +681,10 @@ class Adaptive(Strategy):
                         exp_hr = 1
                     fea_vec.append(exp_hr)
             else:
-                # No current hit rates to report 
+                # The item is not in cache or not observed either.
+                # This means the item is very new. So, delay it by 1 window.
                 # Expected Hit Rate (If Not Cached)
-                fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)
+                raise NewContextException()
                 
         return fea_vec, avg_rt
 

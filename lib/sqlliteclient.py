@@ -128,7 +128,7 @@ class SQLLiteClient:
                 (3,1,1,'http://localhost:5000/cars?id=3',0.25, 0.5),\
                 (4,1,1,'http://localhost:5000/cars?id=4',0.4, 1),\
                 (5,1,1,'http://localhost:5000/cars?id=5',0.3, 0.2),\
-                (6,1,1,'http://localhost:5000/cars?id=6',0.2, 1),\
+                (6,1,1,'http://localhost:5000/cars?id=6',0.2, 4),\
                 (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017),\
                 (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033),\
                 (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017)")
