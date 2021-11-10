@@ -58,6 +58,8 @@ class Adaptive(Strategy):
         self.service_selector = ServiceSelector(db)
         if(not self.__isstatic):
             self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
+
+        setattr(self.cache_memory, 'caller_strategy', self)
     
     # Init_cache initializes the cache memory. 
     def init_cache(self):
@@ -160,7 +162,9 @@ class Adaptive(Strategy):
                 if(len(access_list)>0):
                     hit_rate = sum(access_list)/len(access_list)  
                 
-                access_ratio = 0 if(__reqs_in_window == 0) else len(access_list)/__reqs_in_window 
+                access_ratio = 0 if(__reqs_in_window == 0) else len(access_list)/__reqs_in_window
+                if(len(access_list) > __reqs_in_window):
+                    access_ratio = 1
 
                 if(key in self.__cached_hit_access_trend):
                     if(curr_attr in self.__cached_hit_access_trend[key]):
@@ -347,14 +351,11 @@ class Adaptive(Strategy):
             self.__update_observed(entityid, out.keys())
             self.__observedLock.release()
 
-    # Get attributes not cached for the entity
-    def __get_attributes_not_cached(self, entityid, attributes):
-        return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
-
     # Evaluate for caching
     def __evalute_attributes_for_caching(self, entityid, attributes:list) -> list:
         # Evaluate the attributes to cache or not
         actions = []
+        now = datetime.datetime.now()
         for att in attributes:
             try:
                 if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
@@ -363,7 +364,7 @@ class Adaptive(Strategy):
                     # Select the action for the state using the RL Agent
                     action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
                     if(action != (0,0)):
-                        self.cache_memory.addcachedlifetime(action, est_c_lifetime)
+                        self.cache_memory.addcachedlifetime(action, now + datetime.timedelta(seconds=est_c_lifetime))
                         self.__last_actions.append(action)
                         actions.append(action[1])
                     else:
@@ -387,7 +388,11 @@ class Adaptive(Strategy):
         if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
             if(self.__delay_dict[entity][attr] == -1): return False
             if(self.__window_counter < self.__delay_dict[entity][attr]): return False
-            else: return True
+            else: 
+                del self.__delay_dict[entity][attr]
+                if(not self.__delay_dict[entity]):
+                    del self.__delay_dict[entity]
+                return True
         else: return True
     
     def __is_spike(self,entity,attr):
@@ -398,12 +403,20 @@ class Adaptive(Strategy):
             return False
         else: return False
 
+    def reevaluate_for_eviction(self, entityid, att):
+        try:
+            observation = self.__translate_to_state(entityid,att)
+            return self.selective_cache_agent.choose_action(observation, skipRandom = True)
+        except Exception:
+            return ((0,0),(0,0))               
+
     def __evaluate_for_caching(self, entityid, attributes:dict):
         # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
+        random_one = []
         is_caching = False
         updated_attr_dict = []
-        random_one = []
+        now = datetime.datetime.now()
         if(not (entityid in self.__evaluated)):
             # Entity hasn't been evaluted in this window before
             for att in attributes.keys():
@@ -413,7 +426,7 @@ class Adaptive(Strategy):
                         action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
                         if(action != (0,0) and action[0] == entityid):
                             updated_attr_dict.append(action[1])
-                            self.cache_memory.addcachedlifetime(action, est_c_lifetime)
+                            self.cache_memory.addcachedlifetime(action, now + datetime.timedelta(seconds=est_c_lifetime))
                             is_caching = True
                         else:
                             if(action != (0,0)):
@@ -563,6 +576,34 @@ class Adaptive(Strategy):
                 elif(exp_ar > 1):
                     exp_ar = 1
                 fea_vec.append(exp_ar)
+
+        elif(entityid in self.__cached_attribute_access_trend 
+            and att in self.__cached_attribute_access_trend[entityid]):
+            # The item is rather cached
+            attribute_trend = self.__cached_attribute_access_trend[entityid][att]
+            trend_size = attribute_trend.get_queue_size()
+
+            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            yi = attribute_trend.getlist()
+            if(trend_size<3):
+                diff = 3 - len(yi)
+                last_val = yi[-1]
+                for i in range(0,diff):
+                    yi.append(last_val)
+
+            s = InterpolatedUnivariateSpline(xi, yi, k=2)
+            total_size = trend_size + self.trend_ranges[2]
+            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            for ran in self.trend_ranges:
+                fea_vec.append(attribute_trend.get_last_position(ran))
+                exp_ar = extrapolation[trend_size-2+ran]
+                if(exp_ar < 0):
+                    exp_ar = 0
+                elif(exp_ar > 1):
+                    exp_ar = 1
+                fea_vec.append(exp_ar)
+                
         else:
             # Actual and Expected Access Rates 
             # No actual or expected access rates becasue the item is already cached
@@ -699,6 +740,10 @@ class Adaptive(Strategy):
         # Do the next if agent is not DQN
         # self.selective_cache_agent.reward_history.append(reward)
         pass
+    
+    # Get attributes not cached for the entity
+    def __get_attributes_not_cached(self, entityid, attributes):
+        return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
 
     # Get Observed Data
     def get_observed(self):
@@ -744,7 +789,6 @@ class Adaptive(Strategy):
         th.start()
         th.join()
 
-    
     def get_cache(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
         return [i for i in res.keys()]

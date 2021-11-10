@@ -30,7 +30,7 @@ class SimpleAgent(Agent):
             self.__explore_mentor = RandomAgent()
 
     # Decide whether to cache or not cache
-    def choose_action(self, observation): 
+    def choose_action(self, observation, skipRandom=False): 
         entityid = observation['entityid']
         attribute = observation['attribute']
         observation = observation['features']
@@ -64,7 +64,7 @@ class SimpleAgent(Agent):
 
         if(npv<=0):
             random_value = np.random.uniform()
-            if(random_value < self.__epsilons):
+            if((random_value < self.__epsilons) and not skipRandom):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     # Should the cached lifetime of these random items be calculated
                     return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),((self.__mid*self.__window)/1000,0))
@@ -114,7 +114,7 @@ class SimpleAgent(Agent):
                 delta = disearning_sequence[i-1] - disearning_sequence[i]
                 if(delta < 0.01): est_life = ((i+1)*self.__window)/1000
         if(est_life == 0): return (len(disearning_sequence)*self.__window)/1000
-        else: est_life
+        else: return est_life
 
     def caclulcate_for_range(self, rang, observation, cur_sla, cur_rr_exp, cur_rr_size):
         disearning_list = []

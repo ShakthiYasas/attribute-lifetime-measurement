@@ -41,8 +41,12 @@ class InMemoryCache(CacheAgent):
             if(self.__evictor):
                 items_to_evict = self.__evictor.select_for_evict()
                 if(isinstance(items_to_evict,list)):
-                    for ent,att in items_to_evict:
-                        self.evict_attribute(ent, att)
+                    if(all(isinstance(item, tuple) for item in items_to_evict)):
+                        for ent,att in items_to_evict:
+                            self.evict_attribute(ent, att)
+                    else:
+                        for ent in items_to_evict:
+                            self.evict(ent)
                 else:
                     self.evict(items_to_evict)
             time.sleep(self.window/1000)
@@ -57,6 +61,9 @@ class InMemoryCache(CacheAgent):
     
     def get_cachedlifetime(self, entityid, attribute):
         return self.__registry.get_cached_life(entityid, attribute)
+
+    def get_expired_lifetimes(self):
+        return self.__registry.get_expired_cached_lifetimes()
 
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
@@ -83,6 +90,10 @@ class InMemoryCache(CacheAgent):
     # Add to cached lifetime
     def addcachedlifetime(self, action, cachedlife):
         self.__registry.add_cached_life(action[0], action[1], cachedlife)
+
+    # Update cached lifetime
+    def updatecachedlifetime(self, action, cachedlife):
+        self.__registry.update_cached_life(action[0], action[1], cachedlife)
 
     # Evicts an entity from cache
     def evict(self, entityid) -> None:
@@ -187,3 +198,6 @@ class InMemoryCache(CacheAgent):
 
     def get_providers_for_entity(self, entityid):
         return self.__registry.get_providers_for_entity(entityid)
+    
+    def reevaluate_for_eviction(self, entity, attribute):
+        return self.caller_strategy.reevaluate_for_eviction(entity, attribute)

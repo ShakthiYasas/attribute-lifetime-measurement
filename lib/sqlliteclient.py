@@ -77,6 +77,12 @@ class SQLLiteClient:
             ("+str(entityid)+",'"+str(attribute)+"',"+str(lifetime)+")")
         return cursor.lastrowid
 
+    def update_cached_life(self, entityid, attribute, lifetime):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        self.__conn.execute(
+            "UPDATE CachedLifetime SET lifetime="+str(lifetime)+"\
+            entityid="+str(entityid)+" AND attribute='"+attribute+"')")
+
     def remove_cached_life(self, entityid, attribute):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
@@ -91,6 +97,14 @@ class SQLLiteClient:
             ORDER BY Id DESC\
             LIMIT 1)").fetchone()
         return res[0]
+
+    def get_expired_cached_lifetimes(self):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        res = self.__conn.execute(
+            "SELECT entityid, attribute FROM CachedLifetime\
+            WHERE lifetime<=datetime('now')").fetchall()
+        return res[0]
+
 
     # Initialize the SQLite instance 
     def seed_db_at_start(self):
@@ -263,7 +277,7 @@ class SQLLiteClient:
                 Id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 entityid INT NOT NULL,
                 attribute TEXT NOT NULL,
-                lifetime REAL NOT NULL
+                lifetime DATETIME NOT NULL
             );''')
         
         self.__conn.commit()

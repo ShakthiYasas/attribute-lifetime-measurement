@@ -4,8 +4,9 @@ import statistics
 from cache.eviction.evictor import Evictor
 
 class LVFEvictor(Evictor):
-    def __init__(self, parent_cache):
+    def __init__(self, parent_cache, threshold = 1.0):
         self.__cache = parent_cache
+        self.__threshold = threshold
     
     def select_for_evict(self):
         # Value = Delay + Popularity + Remaining Cache Life
@@ -15,9 +16,13 @@ class LVFEvictor(Evictor):
         
         totalreqs = sum(j for i, j in y)  
 
-        rel_popularities = list(map(lambda entityid,stat: 
-            (entityid, (stat[0].get_queue_size()*((len(y)*(self.__cache.window/1000))/(stat[0].get_head()-stat[0].get_last()).total_seconds()))/totalreqs), 
+        # rel_popularity = "number of accesses" within the time that the hit rate trend was recorded
+        rel_popularities = list(map(lambda stat: 
+            (stat[0], (stat[1][0].get_queue_size()*((len(y)*(self.__cache.window/1000))/(stat[1][0].get_head()-stat[1][0].get_last()).total_seconds()))/totalreqs), 
             entities))
+
+        most_popular = sorted(rel_popularities, key=lambda item: item[1])[-1][1]
+        rel_popularities = dict([(entity, access/most_popular) for entity, access in rel_popularities])
 
         calculated_value = {}
         ent_delays = {}
@@ -58,6 +63,6 @@ class LVFEvictor(Evictor):
         for entityid, value in calculated_value.items():
             calculated_value[entityid] = value + (ent_delays[entityid]/most_delaying[1])
 
-        return sorted(calculated_value.items(), key=lambda item: item[1])[0][0]
+        return [entity for entity, value in sorted(calculated_value.items(), key=lambda item: item[1]) if value < self.__threshold]
 
         

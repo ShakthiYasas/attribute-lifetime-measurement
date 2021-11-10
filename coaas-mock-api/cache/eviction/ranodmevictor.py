@@ -5,7 +5,7 @@ from cache.eviction.evictor import Evictor
 # How many attributes and entities to evict?
 # When to evict?
 class RandomEvictor(Evictor):
-    def __init__(self, parent_cache):
+    def __init__(self, parent_cache, threshold = 1.0):
         self.__cache = parent_cache
 
     def select_for_evict(self):

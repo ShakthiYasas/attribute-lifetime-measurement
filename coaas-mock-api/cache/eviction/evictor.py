@@ -1,4 +1,4 @@
 # Abstract Class
 class Evictor(object):
-    def __init__(self, cache): pass
+    def __init__(self, cache, threshold = 1.0): pass
     def select_for_evict(self): pass

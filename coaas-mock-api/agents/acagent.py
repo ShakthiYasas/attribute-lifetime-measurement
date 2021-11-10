@@ -92,7 +92,7 @@ class ACAgent(Agent):
     # The biggest challenge here is the change of state with changes in the environment. 
     # So, there is no gurantee that the state will remain unchanged. 
     # So, the only option is to find the state that is the most similar using clustering.
-    def choose_action(self, observation): 
+    def choose_action(self, observation, skipRandom=False): 
         random_value = np.random.uniform()
         if(random_value < self.__epsilons):
             if(isinstance(self.__explore_mentor,MFUAgent)):
