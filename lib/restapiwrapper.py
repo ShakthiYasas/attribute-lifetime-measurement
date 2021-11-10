@@ -9,11 +9,15 @@ invalid = {'time_stamp', 'session_id'}
 class Requester:
     def get_response(self, url) -> dict:
         response = self.get_retry(url)
-        return without_keys(response.json(), invalid) 
+        if(response):
+            return without_keys(response.json(), invalid) 
+        return response
     
     def post_response(self, url) -> dict:
         response = self.post_retry(url)
-        return without_keys(response.json(), invalid) 
+        if(response):
+            return without_keys(response.json(), invalid) 
+        return response 
 
     # Retries connecting to the context service upto 20 times
     # At 500ms intervals
@@ -23,7 +27,11 @@ class Requester:
         while count<20:
             try:
                 response = requests.get(url)
-                break
+                if(response.status_code == 200):
+                    break
+                else:
+                    count+=1
+                    time.sleep(0.5)
             except(Exception):
                 count+=1
                 time.sleep(0.5)

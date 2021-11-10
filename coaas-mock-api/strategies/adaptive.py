@@ -1,4 +1,5 @@
 import time
+import _thread
 import datetime
 import threading
 import statistics
@@ -37,6 +38,8 @@ class Adaptive(Strategy):
     __entity_access_trend = FIFOQueue_2(100)
     __request_rate_trend = FIFOQueue_2(1000)
 
+    __observedLock = threading.Lock()
+
     def __init__(self, db, window, isstatic=True, learncycle = 20): 
         self.__db = db
         self.__cached = {}
@@ -65,6 +68,13 @@ class Adaptive(Strategy):
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True               
         thread.start() 
+
+    ###################################################################################
+    # Section 01 - Background Thread
+    # This section of the code runs a background thread that, 
+    # a) clear expired data from the statistical data structures 
+    # b) calculate/estimate the statistics for the current window
+    ###################################################################################
 
     def run(self):
         while True:
@@ -174,9 +184,20 @@ class Adaptive(Strategy):
 
                 self.__cached[key][curr_attr].clear()
 
-    # Returns the current statistics from the profiler
-    def get_current_profile(self):
-        self.__profiler.get_details()
+    ###################################################################################
+    # Section 02 - Retrive Context
+    # This section of the code runs multiple forground threads to retrive the context
+    # as per the request. This, 
+    # 1. First checks the hash tables of the cache memory (to verify whether the item 
+    #   is in cache)
+    # 2.1. If available fecth from cache and checks the freshness
+    #   2.1.1 If fresh returns the value 
+    #   2.1.2 If not fresh, refreshes the cache memory and returns the refrehsed item
+    # 2.2 If not availeble, then select the suitable context providers and retrive.
+    #   Then checks whether the item could be cached in the background.
+    #   2.2.1 If could be cached, cache and update the statistcs. 
+    #   2.2.2 Else, update waits.
+    ###################################################################################
 
     # Retrieving context data
     def get_result(self, json = None, fthresh = (0.5,1.0,1.0), session = None) -> dict: 
@@ -211,6 +232,7 @@ class Adaptive(Strategy):
                 if(not (entityid in self.__cached)):
                     self.__cached[entityid] = {}
 
+                output[entityid] = {}
                 # Refetch from the producer if atleast 1 of it's attributes are not available or not fresh
                 if(self.cache_memory.are_all_atts_cached(entityid, ent['attributes'])):
                     # All of the attributes requested are in cache for the entity
@@ -264,47 +286,62 @@ class Adaptive(Strategy):
                     else:
                         self.__update_observed(entityid, ent['attributes'])
 
-                # Multithread this
+                threads = []
                 if(len(new_context)>0):
-                    self.__refresh_cache_for_entity(new_context)
+                    en_re_th = threading.Thread(target=self.__refresh_cache_for_entity(new_context))
+                    en_re_th.start()
+                    threads.append(en_re_th)
                 if(len(refetching)>0):
-                    self.__refresh_cache_for_producers(refetching)
+                    at_re_th = threading.Thread(target=self.__refresh_cache_for_producers(refetching))
+                    at_re_th.start()
+                    threads.append(at_re_th)
+                
+                # Waiting for all refreshing to complete
+                for t in threads:
+                    t.join()
                 
                 val = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
-                output[entityid] = {}
+                
                 for att_name,prod_values in val.items():
                     if(prod_values != None):
-                        output[entityid][att_name] = [res_v for prod, res_v, dt in prod_values]
+                        output[entityid][att_name] = [res[1] for res in prod_values]
                     else:
                         # This is when the entity is not even evaluated to be cached
                         res = self.service_selector.get_response_for_entity([att_name], 
                             list(map(lambda k: (k[0],k[1]['url']), lifetimes.items())))   
                         output[entityid][att_name] = [x[1] for x in res[att_name]]
                         # Update observed
+                        self.__observedLock.acquire()
                         self.__update_observed(entityid, att_name)
+                        self.__observedLock.release()
             else:
                 # Even the entity is not cached previously
                 # So, first retrieving the entity
                 out = self.__retrieve_entity(ent['attributes'],lifetimes)
                 output[entityid] = {}
                 for att_name,prod_values in out.items():
-                    output[entityid][att_name] = [res_v for prod, res_v, dt in prod_values]
+                    output[entityid][att_name] = [res[1] for res in prod_values]
                     
                 self.__learning_counter += 1
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
-                if(self.__window_counter >= self.trend_ranges[1]+1):
-                    # Run this in the background
-                    self.__evaluate_for_caching(entityid, out)
-                    self.__evaluated.append(entityid)
-                else:
-                    self.__update_observed(entityid, out.keys())
+                _thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread,(entityid, out))
 
         if(isinstance(self.selective_cache_agent, DQNAgent) and self.__learning_counter % self.__learning_cycle == 0):
             # Trigger learning for the DQN Agent
             self.trigger_agent_learning()
 
         return output
+
+    def __evaluate_and_updated_observed_in_thread(self, entityid, out):
+        if(self.__window_counter >= self.trend_ranges[1]+1):
+            # Run this in the background
+            self.__evaluate_for_caching(entityid, out)
+            self.__evaluated.append(entityid)
+        else:
+            self.__observedLock.acquire()
+            self.__update_observed(entityid, out.keys())
+            self.__observedLock.release()
 
     # Get attributes not cached for the entity
     def __get_attributes_not_cached(self, entityid, attributes):
@@ -387,10 +424,14 @@ class Adaptive(Strategy):
                 self.__profiler.reactive_push({entityid:updated_attr_dict})     
             del self.__observed[entityid]
             # Update the observed list for uncached entities and attributes 
+            self.__observedLock.acquire()
             self.__update_observed(entityid, list(set(updated_attr_dict) - set(attributes)))
+            self.__observedLock.release()
         else:
             # Update the observed list for uncached entities and attributes 
+            self.__observedLock.acquire()
             self.__update_observed(entityid, attributes)
+            self.__observedLock.release()
         
         # Push to Queue to calculate reward in next epoch
         if(not isinstance(self.selective_cache_agent, SimpleAgent)):
@@ -684,9 +725,14 @@ class Adaptive(Strategy):
         th.start()
         th.join()
 
+    
     def get_cache(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
         return [i for i in res.keys()]
+
+    # Returns the current statistics from the profiler
+    def get_current_profile(self):
+        self.__profiler.get_details()
 
 class LearningThread (threading.Thread):
     def __init__(self):
@@ -694,5 +740,3 @@ class LearningThread (threading.Thread):
 
     def run(self):
         post_event("need_to_learn")
-
-            

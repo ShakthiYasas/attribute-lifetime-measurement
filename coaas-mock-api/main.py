@@ -1,7 +1,7 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join('..')))
 
-import time
+import _thread
 import secrets
 import traceback
 import configparser
@@ -89,24 +89,24 @@ class PlatformMock(Resource):
             # Start to process the request
             data = self.__selected_algo.get_result(json_obj['query'], fthr, self.__token)
             response = parse_response(data, self.__token)
-            # End of processing the request
-            
-            # Statistics
-            db.insert_one('responses-history', 
-                {
-                    'session': self.__token, 
-                    'data': str(response), 
-                    'response_time': (datetime.now() - start).total_seconds()
-                })
+            _thread.start_new_thread(self.__save_rp_stats, (self.__token,response,start))
                 
             # Return data and 200 OK code
-            return response, 200 
-
+            return response, 200    
+                
         except(Exception):
             print('An error occured : ' + traceback.format_exc())
-            
             # Return message and 400 Error code
-            return parse_response({'message':'An error occured'}), 400  
+            return parse_response({'message':'An error occured'}), 400 
+
+    def __save_rp_stats(self, token,response,start):
+        # Statistics
+        db.insert_one('responses-history', 
+            {
+                'session': token, 
+                'data': str(response), 
+                'response_time': (datetime.now() - start).total_seconds()
+            })
 
     # GET /context endpoint.
     # Retrives the details (metadata & statistics) of the current session in progress. 
