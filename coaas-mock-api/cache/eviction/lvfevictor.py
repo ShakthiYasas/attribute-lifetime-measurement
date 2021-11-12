@@ -14,7 +14,7 @@ class LVFEvictor(Evictor):
         entities = self.__cache.get_statistics_all().items()
         y = self.__cache.get_hitrate_trend().getlist()
         
-        totalreqs = sum(j for i, j in y)  
+        totalreqs = sum([j[1] for j in y])  
 
         # rel_popularity = "number of accesses" within the time that the hit rate trend was recorded
         rel_popularities = list(map(lambda stat: 
@@ -28,7 +28,7 @@ class LVFEvictor(Evictor):
         ent_delays = {}
         providers_dict = {}
         for entityid, stats in entities:
-            # Poularity
+            # Popularity
             cached_lt_res = self.__db.read_all_with_limit('entity-cached-lifetime',{
                         'entity': entityid,
                     },10)

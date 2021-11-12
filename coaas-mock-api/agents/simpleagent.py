@@ -170,6 +170,7 @@ class SimpleAgent(Agent):
 
         return disearning_list
 
+    # Select the closet range boundary for the current state 
     def __closest_point(self, lifeunits):
         s_dis = abs(self.__short - lifeunits)
         m_dis = abs(self.__mid - lifeunits)
@@ -183,6 +184,7 @@ class SimpleAgent(Agent):
 
         return closest
     
+    # Modify Discount Rate
     def modify_dicount_rate(self, increment=True):
         if(increment):
             self.__gamma = self.discount_max if self.__gamma + self.discount_increment > self.discount_max else self.__gamma + self.discount_increment

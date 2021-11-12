@@ -38,6 +38,7 @@ class Adaptive(Strategy):
     __cached_attribute_access_trend = {}
     __entity_access_trend = FIFOQueue_2(100)
     __request_rate_trend = FIFOQueue_2(1000)
+    __retrieval_cost_trend = FIFOQueue_2(10)
 
     __observedLock = threading.Lock()
 
@@ -49,10 +50,11 @@ class Adaptive(Strategy):
         self.__last_actions = []
         self.__reqs_in_window = 0
         self.__isstatic = isstatic
+        self.__local_ret_costs = []
         self.__moving_window = window
         self.__most_expensive_sla = (0.5,1.0,1.0)
         self.__learning_cycle = learncycle
-
+        
         self.req_rate_extrapolation = None
 
         self.service_selector = ServiceSelector(db)
@@ -103,6 +105,8 @@ class Adaptive(Strategy):
 
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
+        self.__retrieval_cost_trend.push(statistics.mean(self.__local_ret_costs))
+        self.__local_ret_costs.clear()
         self.__reqs_in_window = 0
         
         curr_his = self.__sla_trend.getlist()
@@ -399,28 +403,7 @@ class Adaptive(Strategy):
         if(not isinstance(self.selective_cache_agent, SimpleAgent)):
             self.__calculate_reward(list(map(lambda x: (entityid, x), actions)))
 
-        return actions
-
-    # Check if the context attribute has been evaluated to be delayed for caching
-    def __check_delay(self,entity,attr):
-        if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
-            if(self.__delay_dict[entity][attr] == -1): return False
-            if(self.__window_counter < self.__delay_dict[entity][attr]): return False
-            else: 
-                del self.__delay_dict[entity][attr]
-                if(not self.__delay_dict[entity]):
-                    del self.__delay_dict[entity]
-                return True
-        else: return True
-    
-    # Check if the context attribute is observed to show a spike in demand
-    def __is_spike(self,entity,attr):
-        if(self.__isobserved(entity, attr)):
-            att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
-            if((att_trend[0]*2)>=att_trend[1]):
-                return True
-            return False
-        else: return False           
+        return actions         
 
     def __evaluate_for_caching(self, entityid, attributes:dict):
         # Check if this entity has been evaluated for caching in this window
@@ -483,6 +466,27 @@ class Adaptive(Strategy):
             self.__cache_entity_attribute_pairs(random_one)
             if(not isinstance(self.selective_cache_agent, SimpleAgent)):
                 self.__calculate_reward(random_one)
+    
+    # Check if the context attribute has been evaluated to be delayed for caching
+    def __check_delay(self,entity,attr):
+        if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
+            if(self.__delay_dict[entity][attr] == -1): return False
+            if(self.__window_counter < self.__delay_dict[entity][attr]): return False
+            else: 
+                del self.__delay_dict[entity][attr]
+                if(not self.__delay_dict[entity]):
+                    del self.__delay_dict[entity]
+                return True
+        else: return True
+    
+    # Check if the context attribute is observed to show a spike in demand
+    def __is_spike(self,entity,attr):
+        if(self.__isobserved(entity, attr)):
+            att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
+            if((att_trend[0]*2)>=att_trend[1]):
+                return True
+            return False
+        else: return False  
 
     ###################################################################################
     # Section 04 - Caching
@@ -878,12 +882,13 @@ class Adaptive(Strategy):
 
             slas = self.__sla_trend.getlist()
             request_rates = self.__request_rate_trend.get_last_range(10)
+            ret_costs = self.__retrieval_cost_trend.get_last_range(10)
             for i in range(0,10):
                 idx = -1-i
                 try:
                     hr = hit_rate[idx]
                     sla = slas[idx]
-                    ret_cost = 0.4
+                    ret_cost = ret_costs[idx]
                     output[idx] = (idx, request_rates[idx]*((hr*sla[1]) - ((1-hr)*sla[2]) - ((1-hr)*ret_cost)))
                 except Exception:
                     output[idx] = (idx, 0)
@@ -892,15 +897,13 @@ class Adaptive(Strategy):
     
     def get_current_cost(self):
         hit_rate = 0
-        ret_cost = 0.4
         if(self.__window_counter >= self.trend_ranges[1]):
             hit_rate = self.cache_memory.get_hitrate_trend().get_last(10)
-            ret_cost = 0.4
         
         sla = self.__sla_trend.get_last()
         request_rate = self.__request_rate_trend.get_last()
+        ret_cost = self.__retrieval_cost_trend.get_last()
         
-
         return request_rate*((hit_rate*sla[1]) - ((1-hit_rate)*sla[2]) - ((1-hit_rate)*ret_cost))
 
 class LearningThread (threading.Thread):
