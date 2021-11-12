@@ -82,6 +82,7 @@ class Adaptive(Strategy):
     def run(self):
         while True:
             self.clear_expired()
+            _thread.start_new_thread(self.__save_current_cost, args=())
             # Observing the attributes that has not been cached within the window
             self.__window_counter+=1
             time.sleep(self.__moving_window/1000) 
@@ -807,7 +808,15 @@ class Adaptive(Strategy):
         # Retrive raw context from provider according to the entity
         return self.service_selector.get_response_for_entity(attribute_list, 
                     list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
-    
+
+    # Save cost variation
+    def __save_current_cost(self):
+        self.__db.insert_one('returnofcaching', {
+            'session':self.session,
+            'window': self.__window_counter - 1,
+            'return': self.get_current_cost()
+        })
+
     ###################################################################################
     # Section 08 - Eviction Helpers
     ###################################################################################
@@ -843,13 +852,56 @@ class Adaptive(Strategy):
         th.join()
 
     # Get a snap shot of the cache memory statistics
-    def get_cache(self, entityid):
+    def get_cache_statistics(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
-        return [i for i in res.keys()]
+        return {
+            'cached_attributes': [i for i in res.keys()],
+            'discount_rate': self.selective_cache_agent.get_discount_rate()
+        }
 
     # Returns the current statistics from the profiler
     def get_current_profile(self):
         self.__profiler.get_details()
+
+    # Returns the variation of average cost of context caching
+    def get_cost_variation(self, session = None):
+        output = []
+        hit_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        
+        if(session):
+            stats = self.__db.read_all('returnofcaching', {'session': session})
+            if(stats):
+                output = [(stat['window'],stat['return']) for stat in stats]
+        else:
+            if(self.__window_counter >= self.trend_ranges[1]):
+                hit_rate = self.cache_memory.get_hitrate_trend().get_last_range(10)
+
+            slas = self.__sla_trend.getlist()
+            request_rates = self.__request_rate_trend.get_last_range(10)
+            for i in range(0,10):
+                idx = -1-i
+                try:
+                    hr = hit_rate[idx]
+                    sla = slas[idx]
+                    ret_cost = 0.4
+                    output[idx] = (idx, request_rates[idx]*((hr*sla[1]) - ((1-hr)*sla[2]) - ((1-hr)*ret_cost)))
+                except Exception:
+                    output[idx] = (idx, 0)
+
+        return output
+    
+    def get_current_cost(self):
+        hit_rate = 0
+        ret_cost = 0.4
+        if(self.__window_counter >= self.trend_ranges[1]):
+            hit_rate = self.cache_memory.get_hitrate_trend().get_last(10)
+            ret_cost = 0.4
+        
+        sla = self.__sla_trend.get_last()
+        request_rate = self.__request_rate_trend.get_last()
+        
+
+        return request_rate*((hit_rate*sla[1]) - ((1-hit_rate)*sla[2]) - ((1-hit_rate)*ret_cost))
 
 class LearningThread (threading.Thread):
     def __init__(self):

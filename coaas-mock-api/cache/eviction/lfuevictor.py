@@ -1,7 +1,5 @@
 from cache.eviction.evictor import Evictor
 
-# How many attributes and entities to evict?
-# When to evict?
 class LFUEvictor(Evictor):
     def __init__(self, cache, threshold = 1.0):
         self.__cache = cache

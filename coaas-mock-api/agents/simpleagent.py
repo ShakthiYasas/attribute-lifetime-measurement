@@ -188,3 +188,7 @@ class SimpleAgent(Agent):
             self.__gamma = self.discount_max if self.__gamma + self.discount_increment > self.discount_max else self.__gamma + self.discount_increment
         else:
             self.__gamma = self.epsilons_min if self.__gamma - self.discount_decrement < self.epsilons_min else self.__gamma - self.discount_increment
+
+    # Get current discunt rate
+    def get_discount_rate(self):
+        return self.__gamma

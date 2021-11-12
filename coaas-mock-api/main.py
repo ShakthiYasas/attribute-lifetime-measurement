@@ -32,6 +32,9 @@ default_config = config['DEFAULT']
 # Connecting to a monogo DB instance 
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
+# Selected Strategy
+__selected_algo = None
+
 class PlatformMock(Resource):
     # Initialize this session
     __token = secrets.token_hex(nbytes=16)
@@ -88,7 +91,7 @@ class PlatformMock(Resource):
                 return parse_response({'message':'Unauthorized'}), 401  
 
             # Start to process the request
-            data = self.__selected_algo.get_result(json_obj['query'], fthr, req_id)
+            data = __selected_algo.get_result(json_obj['query'], fthr, req_id)
             response = parse_response(data, self.__token)
             _thread.start_new_thread(self.__save_rp_stats, (self.__token,response,start))
                 
@@ -109,15 +112,32 @@ class PlatformMock(Resource):
                 'response_time': (datetime.now() - start).total_seconds()
             })
 
-    # GET /context endpoint.
+class Statistics(Resource):
+    # GET /statistics endpoint.
     # Retrives the details (metadata & statistics) of the current session in progress. 
-    def get(self):
-        ent_id = int(request.args.get('id'))
-        # Start to process the request
-        data = self.__selected_algo.get_cache(ent_id)
-        return data, 200    
+    def get(self, name):
+        if(name == 'caches'):
+            ent_id = int(request.args.get('id'))
+            data = __selected_algo.get_cache_statistics(ent_id)
+            return data, 200   
+        elif(name == 'returns'):
+            is_curr = str(request.args.get('current')).lower()
+            if(is_curr == 'true'):
+                data = __selected_algo.get_current_cost()
+                return {
+                    'cost': data
+                }, 200   
+            else:
+                session = str(request.args.get('session'))
+                data = __selected_algo.get_cost_variation(session)
+                return {
+                    'variation': data
+                }, 200   
+        else:
+            return {'message': 'Invalid URL'}, 404   
 
 api.add_resource(PlatformMock, '/contexts')
+api.add_resource(Statistics, '/statistics/<string:name>')
 
 if __name__ == '__main__':
     app.run(debug=False, port=5001)
