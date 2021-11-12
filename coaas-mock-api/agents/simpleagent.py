@@ -33,7 +33,7 @@ class SimpleAgent(Agent):
         else:
             self.__explore_mentor = RandomAgent()
 
-    # Decide whether to cache or not cache
+    # Decide whether to cache or not cache for the observation
     def choose_action(self, observation, skipRandom=False): 
         entityid = observation['entityid']
         attribute = observation['attribute']
@@ -102,6 +102,7 @@ class SimpleAgent(Agent):
 
             return ((entityid, attribute), (estimated_lifetime, 0))
 
+    # Calculate the expected cached lifetime for the when the discounted value reaches 0.
     def cached_life_when_zero(self, disearning_sequence):
         for i in range(len(disearning_sequence)):
             if(i == 0):
@@ -109,7 +110,7 @@ class SimpleAgent(Agent):
             elif(disearning_sequence[i]<=0):
                 return ((i-1)*self.__window)/1000
 
-
+    # Calculate the expected lifetime of caching considering the convergence of the variation
     def cached_life_when_delta(self, disearning_sequence):
         est_life = 0
         for i in range(len(disearning_sequence)):
@@ -120,6 +121,7 @@ class SimpleAgent(Agent):
         if(est_life == 0): return (len(disearning_sequence)*self.__window)/1000
         else: return est_life
 
+    # Calculating the expected return with in each range
     def caclulcate_for_range(self, rang, observation, cur_sla, cur_rr_exp, cur_rr_size):
         disearning_list = []
 
