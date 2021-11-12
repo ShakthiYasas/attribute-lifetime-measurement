@@ -18,7 +18,11 @@ class SimpleAgent(Agent):
         # e-Greedy Exploration
         self.__epsilons = config.e_greedy_init
         if (config.e_greedy_init is None) or (config.e_greedy_decrement is None):
-            self.__epsilons = list(self.epsilons_min)
+            self.__epsilons = self.epsilons_min
+
+        self.discount_max = config.e_greedy_max
+        self.discount_increment = config.e_greedy_increment
+        self.discount_decrement = config.e_greedy_decrement
 
         # Selecting the algorithem to execute during the exploration phase
         self.__explore_mentor = None
@@ -167,9 +171,9 @@ class SimpleAgent(Agent):
         return disearning_list
 
     def __closest_point(self, lifeunits):
-        s_dis = abs(self.__short-lifeunits)
-        m_dis = abs(self.__mid-lifeunits)
-        l_dis = abs(self.__long-lifeunits)
+        s_dis = abs(self.__short - lifeunits)
+        m_dis = abs(self.__mid - lifeunits)
+        l_dis = abs(self.__long - lifeunits)
 
         closest = self.__short
         if(m_dis<s_dis or m_dis==s_dis):
@@ -178,3 +182,9 @@ class SimpleAgent(Agent):
                 closest = self.__long
 
         return closest
+    
+    def modify_dicount_rate(self, increment=True):
+        if(increment):
+            self.__gamma = self.discount_max if self.__gamma + self.discount_increment > self.discount_max else self.__gamma + self.discount_increment
+        else:
+            self.__gamma = self.epsilons_min if self.__gamma - self.discount_decrement < self.epsilons_min else self.__gamma - self.discount_increment

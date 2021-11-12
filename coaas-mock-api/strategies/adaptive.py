@@ -95,7 +95,11 @@ class Adaptive(Strategy):
         if(self.__window_counter >= self.trend_ranges[1]): 
             self.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
             self.__clear_cached()
-            
+            if(not self.__already_modified):
+                _thread.start_new_thread(function=self.selective_cache_agent.modify_dicount_rate, args=(False,))
+            else:
+                self.__already_modified = False
+
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
         self.__reqs_in_window = 0
@@ -243,6 +247,7 @@ class Adaptive(Strategy):
                 output[entityid] = {}
                 # Refetch from the producer if atleast 1 of it's attributes are not available or not fresh
                 if(self.cache_memory.are_all_atts_cached(entityid, ent['attributes'])):
+                    self.__learning_counter -= 1
                     # All of the attributes requested are in cache for the entity
                     for att_name in ent['attributes']:
                         # Get all values from the context producers for the attribute in cache
@@ -333,11 +338,16 @@ class Adaptive(Strategy):
                 self.__learning_counter += 1
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
-                _thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread,(entityid, out))
+                _thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread,args=(entityid, out))
 
-        if(isinstance(self.selective_cache_agent, DQNAgent) and self.__learning_counter % self.__learning_cycle == 0):
-            # Trigger learning for the DQN Agent
-            self.trigger_agent_learning()
+        if(self.__learning_counter % self.__learning_cycle == 0):
+            if(isinstance(self.selective_cache_agent, DQNAgent)):
+                # Trigger learning for the DQN Agent
+                self.trigger_agent_learning()
+            elif(isinstance(self.selective_cache_agent, SimpleAgent)):
+                # Modify the discount rate
+                self.__already_modified = True
+                _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, args=())
 
         return output
 
@@ -350,6 +360,12 @@ class Adaptive(Strategy):
             self.__observedLock.acquire()
             self.__update_observed(entityid, out.keys())
             self.__observedLock.release()
+
+    ###################################################################################
+    # Section 03 - Evluating to Cache
+    # This section performs the actions which are required to estimate the value of 
+    # caching a context item. 
+    ###################################################################################
 
     # Evaluate for caching
     def __evalute_attributes_for_caching(self, entityid, attributes:list) -> list:
@@ -384,6 +400,7 @@ class Adaptive(Strategy):
 
         return actions
 
+    # Check if the context attribute has been evaluated to be delayed for caching
     def __check_delay(self,entity,attr):
         if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
             if(self.__delay_dict[entity][attr] == -1): return False
@@ -395,20 +412,14 @@ class Adaptive(Strategy):
                 return True
         else: return True
     
+    # Check if the context attribute is observed to show a spike in demand
     def __is_spike(self,entity,attr):
         if(self.__isobserved(entity, attr)):
             att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
             if((att_trend[0]*2)>=att_trend[1]):
                 return True
             return False
-        else: return False
-
-    def reevaluate_for_eviction(self, entityid, att):
-        try:
-            observation = self.__translate_to_state(entityid,att)
-            return self.selective_cache_agent.choose_action(observation, skipRandom = True)
-        except Exception:
-            return ((0,0),(0,0))               
+        else: return False           
 
     def __evaluate_for_caching(self, entityid, attributes:dict):
         # Check if this entity has been evaluated for caching in this window
@@ -471,7 +482,13 @@ class Adaptive(Strategy):
             self.__cache_entity_attribute_pairs(random_one)
             if(not isinstance(self.selective_cache_agent, SimpleAgent)):
                 self.__calculate_reward(random_one)
-        
+
+    ###################################################################################
+    # Section 04 - Caching
+    # This section performs the caching actions by calling the methods in cache memory
+    # instance and updating the statistics. 
+    ###################################################################################
+       
     def __cache_entity_attribute_pairs(self, entityttpairs):
         ent_att = {}
         for entity,att in entityttpairs:
@@ -497,6 +514,7 @@ class Adaptive(Strategy):
             # Update the observed list for uncached entities and attributes 
             self.__update_observed(entityid, [att])
 
+    # Update statistics when an item is transitioned from not cached to cached.
     def __update_observed(self, entityid, attributes):
         now = datetime.datetime.now()
         if(entityid in self.__observed):
@@ -514,6 +532,11 @@ class Adaptive(Strategy):
                 'req_ts': [now],
                 'attributes': attrs
             } 
+
+    ###################################################################################
+    # Section 05 - Transformation (Feature Vector Generation)
+    # This section creates feature vectors for observations.
+    ###################################################################################
 
     # Translating an observation to a state
     def __translate_to_state(self, entityid, att):
@@ -549,6 +572,7 @@ class Adaptive(Strategy):
             'features': fea_vec
         }
 
+    # Calculates the access rates for the given observation
     def __calculate_access_rates(self, isobserved, entityid, att):
         fea_vec = []
         if(isobserved):
@@ -611,6 +635,78 @@ class Adaptive(Strategy):
 
         return fea_vec
     
+    # Calculates the hit rates for the given observation
+    def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
+        fea_vec = []
+        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items())))
+
+        if(isobserved):
+            # No current hit rates to report 
+            # Expected Hit Rate (If not Cached)
+            fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)
+        else:
+            # Current Hit Rate (If Cached)
+            if(entityid in self.__cached_hit_access_trend and att in self.__cached_hit_access_trend[entityid]):
+                hit_trend = self.__cached_hit_access_trend[entityid][att]
+                trend_size = hit_trend.get_queue_size()
+
+                xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+                yi = hit_trend.getlist()
+                if(trend_size<3):
+                    diff = 3 - len(yi)
+                    last_val = yi[-1]
+                    for i in range(0,diff):
+                        yi.append(last_val)
+
+                s = InterpolatedUnivariateSpline(xi, yi, k=2)
+                total_size = trend_size + self.trend_ranges[2]
+                extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+                for ran in self.trend_ranges:
+                    fea_vec.append(hit_trend.get_last_position(ran))
+                    exp_hr = extrapolation[trend_size-2+ran]
+                    if(exp_hr < 0):
+                        exp_hr = 0
+                    elif(exp_hr > 1):
+                        exp_hr = 1
+                    fea_vec.append(exp_hr)
+            else:
+                # The item is not in cache or not observed either.
+                # This means the item is very new. So, delay it by 1 window.
+                # Expected Hit Rate (If Not Cached)
+                raise NewContextException()
+                
+        return fea_vec, avg_rt
+
+    ###################################################################################
+    # Section 06 - Cache Refreshing
+    ###################################################################################
+    # Execute cache refreshing for entity
+    def __refresh_cache_for_entity(self, new_context) -> None:
+        for entityid,attribute_list,metadata in new_context:
+            response = self.service_selector.get_response_for_entity(attribute_list, 
+                        list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
+            # Save items in cache
+            self.cache_memory.save(entityid,response)
+            # Push to profiler
+            if(not self.__isstatic):
+                self.__profiler.reactive_push({entityid:response})
+
+    # Refreshing for selected context producers
+    def __refresh_cache_for_producers(self, refresh_context) -> None:
+        # Retrive raw context from provider according to the provider
+        for entityid,attribute_list,prodid,url in refresh_context:
+            response = self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
+            # Save items in cache
+            self.cache_memory.save(entityid,response)
+            # Push to profiler
+            if(not self.__isstatic):
+                self.__profiler.reactive_push({entityid:response})
+
+    ###################################################################################
+    # Section 07 - Helper Methods
+    ###################################################################################
+    # Extrapolate the 1-D variation
     def __extrapolate_request_rate(self):
         req_rate_trend = self.__request_rate_trend
         trend_size = req_rate_trend.get_queue_size()
@@ -628,6 +724,7 @@ class Adaptive(Strategy):
         total_size = trend_size + self.trend_ranges[2]
         self.req_rate_extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
+    # Using extrapolation, get the projected hit rate for the given time ranges
     def get_projected_hit_rate(self, entityid, att, avg_rt, lifetimes):
         fea_vec = []
         local_avg_lt = []
@@ -687,63 +784,45 @@ class Adaptive(Strategy):
         
         return fea_vec
 
-    def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
-        fea_vec = []
-        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items())))
-
-        if(isobserved):
-            # No current hit rates to report 
-            # Expected Hit Rate (If not Cached)
-            fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)
-        else:
-            # Current Hit Rate (If Cached)
-            if(entityid in self.__cached_hit_access_trend and att in self.__cached_hit_access_trend[entityid]):
-                hit_trend = self.__cached_hit_access_trend[entityid][att]
-                trend_size = hit_trend.get_queue_size()
-
-                xi = np.array(range(0,trend_size if trend_size>=3 else 3))
-                yi = hit_trend.getlist()
-                if(trend_size<3):
-                    diff = 3 - len(yi)
-                    last_val = yi[-1]
-                    for i in range(0,diff):
-                        yi.append(last_val)
-
-                s = InterpolatedUnivariateSpline(xi, yi, k=2)
-                total_size = trend_size + self.trend_ranges[2]
-                extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
-
-                for ran in self.trend_ranges:
-                    fea_vec.append(hit_trend.get_last_position(ran))
-                    exp_hr = extrapolation[trend_size-2+ran]
-                    if(exp_hr < 0):
-                        exp_hr = 0
-                    elif(exp_hr > 1):
-                        exp_hr = 1
-                    fea_vec.append(exp_hr)
-            else:
-                # The item is not in cache or not observed either.
-                # This means the item is very new. So, delay it by 1 window.
-                # Expected Hit Rate (If Not Cached)
-                raise NewContextException()
-                
-        return fea_vec, avg_rt
-
+    # Check if the entity attribute pair has been observed previously within the window
     def __isobserved(self, entityid, attribute):
         if(entityid in self.__observed and attribute in self.__observed[entityid]['attributes']):
             return True
         return False
 
+     # Get attributes not cached for the entity
+    def __get_attributes_not_cached(self, entityid, attributes):
+        return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
+
+    # Calculate the rewards actions taken in the previous window
     def __calculate_reward(self, actions):   
         # new_state, reward = self.selective_cache_agent.step(action)
         # self.selective_cache_agent.store_transition(self.state, action, reward, new_state)
         # Do the next if agent is not DQN
         # self.selective_cache_agent.reward_history.append(reward)
         pass
+
+    # Retrieving context for an entity
+    def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
+        # Retrive raw context from provider according to the entity
+        return self.service_selector.get_response_for_entity(attribute_list, 
+                    list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
     
-    # Get attributes not cached for the entity
-    def __get_attributes_not_cached(self, entityid, attributes):
-        return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
+    ###################################################################################
+    # Section 08 - Eviction Helpers
+    ###################################################################################
+
+    # Reevaluating the nessecity to continue caching an item for the eviction algorithm.
+    def reevaluate_for_eviction(self, entityid, att):
+        try:
+            observation = self.__translate_to_state(entityid,att)
+            return self.selective_cache_agent.choose_action(observation, skipRandom = True)
+        except Exception:
+            return ((0,0),(0,0))  
+
+    ###################################################################################
+    # Section 09 - Getters and Setters
+    ###################################################################################
 
     # Get Observed Data
     def get_observed(self):
@@ -753,42 +832,17 @@ class Adaptive(Strategy):
     def get_attribute_access_trend(self):
         return self.__attribute_access_trend
 
-    # Retrieving context for an entity
-    def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
-        # Retrive raw context from provider according to the entity
-        return self.service_selector.get_response_for_entity(attribute_list, 
-                    list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
-
-    def __refresh_cache_for_entity(self, new_context) -> None:
-        for entityid,attribute_list,metadata in new_context:
-            response = self.service_selector.get_response_for_entity(attribute_list, 
-                        list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
-            # Save items in cache
-            self.cache_memory.save(entityid,response)
-            # Push to profiler
-            if(not self.__isstatic):
-                self.__profiler.reactive_push({entityid:response})
-
-    # Refreshing for selected context producers
-    def __refresh_cache_for_producers(self, refresh_context) -> None:
-        # Retrive raw context from provider according to the provider
-        for entityid,attribute_list,prodid,url in refresh_context:
-            response = self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
-            # Save items in cache
-            self.cache_memory.save(entityid,response)
-            # Push to profiler
-            if(not self.__isstatic):
-                self.__profiler.reactive_push({entityid:response})
-
-    # Retrive the current configuration of the most expensive SLA  
+    # Get the current configuration of the most expensive SLA  
     def get_most_expensive_sla(self):
         return self.__most_expensive_sla
 
+    # Set off the learning routine for the reforcement learnign agent
     def trigger_agent_learning(self) -> None:
         th = LearningThread(self)
         th.start()
         th.join()
 
+    # Get a snap shot of the cache memory statistics
     def get_cache(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
         return [i for i in res.keys()]
