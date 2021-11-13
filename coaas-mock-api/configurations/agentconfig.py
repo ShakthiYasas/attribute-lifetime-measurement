@@ -70,6 +70,10 @@ class ACConfiguration(Configuration):
         self.history_size = int(defaults['HistorySize'])
         self.reward_threshold = float(defaults['MaxReward'])
 
+        self.pair_similarity_maximum = float(defaults['MaxPairSimilarity'])
+        self.cluster_similarity_threshold = float(defaults['ClusterSimilarityThreshold'])
+        self.subcluster_similarity_threshold = float(defaults['SubClusterSimilarityThreshold'])
+
 # Configuration for the A3C Agent
 class A3CConfiguration(Configuration):
     explore_mentor = 'Random'
@@ -95,3 +99,7 @@ class A3CConfiguration(Configuration):
 
         self.history_size = int(defaults['HistorySize'])
         self.reward_threshold = float(defaults['MaxReward'])
+
+        self.pair_similarity_maximum = float(defaults['MaxPairSimilarity'])
+        self.cluster_similarity_threshold = float(defaults['ClusterSimilarityThreshold'])
+        self.subcluster_similarity_threshold = float(defaults['SubClusterSimilarityThreshold'])

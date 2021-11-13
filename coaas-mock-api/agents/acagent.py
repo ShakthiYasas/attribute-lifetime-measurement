@@ -1,12 +1,21 @@
+import threading
 import numpy as np
+from datetime import datetime
 from agents.agent import Agent
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
+from tensorflow.python.framework.ops import disable_eager_execution
 
-from keras.layers import Dense
-from keras.models import Sequential
+from keras.models import Model 
 from keras.optimizers import Adam
+from keras.layers import Input, Dense
+
+from agents.classifier.linkedcluster import LinkedCluster
+
+disable_eager_execution()
 
 class ACAgent(Agent):
+    __hashLock = threading.Lock()
+
     def __init__(self, config, caller):
         # General Configurations
         self.__value_size = 1
@@ -16,39 +25,29 @@ class ACAgent(Agent):
         # Setting the hyper-parameters
         self.__actor_lr = config.learning_rate 
         self.__critic_lr = config.learning_rate*5
+
         self.__gamma = config.discounting_factor
         self.__epsilons_max = config.e_greedy_max
         self.__epsilons_increment = config.e_greedy_increment
         self.__epsilons_decrement = config.e_greedy_decrement
 
         # Overriding the action space as cache or not cache
-        self.action_space = [0,1]
+        self.action_space = range(-1,32) # -1 is not caching
 
         # Setting the features
-        self.__feature_vector = [
-            'short_term_access (0)', 'expected_short_term_access (1)', 
-            'mid_term_access (2)', 'expected_mid_term_access (3)',
-            'long_term_access (4)', 'expected_long_term_access (5)',   
-            'short_term_hitrate (6)', 'expected_short_term_hitrate (7)',
-            'mid_term_hitrate (8)', 'expected_mid_term_hitrate (9)',
-            'long_term_hitrate (10)', 'expected_long_term_hitrate (11)',         
-            'average_cached_lifetime (12)', 
-            'average_latency (13)',
-            'average_retrieval_cost (14)'
-            ]
-        self.__n_features = len(self.__feature_vector)
+        self.__n_features = 16
 
-        # e-Greedy Exploration
-        self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
+        # e-Greedy Exploration  
         self.__epsilons = list(config.e_greedy_init)
-        if (config.e_greedy_init is None) or (config.e_greedy_decrement is None):
+        self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
+        if ((config.e_greedy_init is None) or (config.e_greedy_decrement is None)):
             self.__epsilons = list(self.epsilons_min)
         
         # Selecting the algorithem to execute during the exploration phase
         self.__explore_mentor = None
-        if config.explore_mentor.lower() == 'mru':
+        if (config.explore_mentor.lower() == 'mru'):
             self.__explore_mentor = MRUAgent()
-        elif config.explore_mentor.lower() == 'mfu':
+        elif (config.explore_mentor.lower() == 'mfu'):
             self.__explore_mentor = MFUAgent()
         else:
             self.__explore_mentor = RandomAgent()
@@ -59,74 +58,136 @@ class ACAgent(Agent):
         # History of rewards
         self.reward_history = []
 
-        # Setting up Actor and Critic Networks
-        self.__actor = self.__build_actor()
-        self.__critic = self.__build_critic()
+        # Initializing state space clustering algorithm
+        self.__stateclusters = LinkedCluster(config.cluster_similarity_threshold, 
+                    config.subcluster_similarity_threshold, config.pair_similarity_maximum)
 
+        # Setting up Actor and Critic Networks
+        self.__critic = self.__build_critic()
+        self.__actor, self.__policy = self.__build_actor()
+
+        # Cluster, Entity, Attribute Mapping for currently executing operations
+        self.__cluster_context_map = {}
+        
     # Approximates the policy and value using the Neural Network
     # Actor: state is input and probability of each action is output of model
     def __build_actor(self):
-        actor = Sequential()
-        actor.add(Dense(24, input_dim=self.__n_features, activation='relu',
-                        kernel_initializer='he_uniform'))
-        actor.add(Dense(len(self.action_space), activation='softmax',
-                        kernel_initializer='he_uniform'))
-        actor.summary()
+        delta = Input(shape=[1])
+
+        # NN Layers
+        input_layer = Input(shape=(self.__n_features,))
+        hidden_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(input_layer)
+        output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer)
+
+        actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
         actor.compile(loss='categorical_crossentropy', optimizer=Adam(lr=self.__actor_lr))
+
+        policy = Model(inputs=[input_layer], outputs=[output_layer])
        
-        return actor
+        return actor, policy
 
     # Critic: state is input and value of state is output of model
     def __build_critic(self):
-        critic = Sequential()
-        critic.add(Dense(24, input_dim=self.__n_features, activation='relu',
-                         kernel_initializer='he_uniform'))
-        critic.add(Dense(self.__value_size, activation='softmax',
-                         kernel_initializer='he_uniform'))
-        critic.summary()
-        critic.compile(loss="mse", optimizer=Adam(lr=self.__critic_lr))
+        # NN Layers
+        input_layer = Input(shape=(self.__n_features,))
+        hidden_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(input_layer)
+        output_layer = Dense(self.__value_size, activation='softmax')(hidden_layer)
+
+        critic = Model(inputs=[input_layer], outputs=[output_layer])
+        critic.compile(loss='mean_squared_error', optimizer=Adam(lr=self.__critic_lr))
         
         return critic
+
+    # Map this observation to the state space.
+    # This is done by predicting with cluster that that this observation falls into.
+    def modify_state_space(self, observation, is_cached=False):
+        idx = self.__stateclusters.predict(np.array(observation['features'])[np.newaxis, :])
+        key = (observation['entityid'], observation['attribute'])
+        if(key in self.__cluster_context_map):
+            if(not is_cached):
+                self.__hashLock.acquire()
+                value = self.__cluster_context_map[key]
+                self.__cluster_context_map[key] = (value[0], value[1]+1, datetime.now())
+                self.__hashLock.release()
+
+            return self.__cluster_context_map[key][0]
+        else:
+            if(not is_cached):
+                self.__cluster_context_map[key] = (idx, 1, datetime.now())
+
+            return idx
 
     # Select the most suitable action given a state
     # The biggest challenge here is the change of state with changes in the environment. 
     # So, there is no gurantee that the state will remain unchanged. 
     # So, the only option is to find the state that is the most similar using clustering.
-    def choose_action(self, observation, skipRandom=False): 
-        random_value = np.random.uniform()
-        if(random_value < self.__epsilons):
-            if(isinstance(self.__explore_mentor,MFUAgent)):
-                return self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+    def choose_action(self, entity_att_list, skip_random=False): 
+        state = self.__stateclusters.get_current_state()
+        probabilities = self.__policy.predict(state)[0]
+        action = np.random.choice(len(self.action_space), 1, p=probabilities)
+
+        actions_list = {}
+        for key in entity_att_list:
+            cluster_id = self.__cluster_context_map[key][0]
+            if(cluster_id in actions_list):
+                actions_list[cluster_id] = [key]
             else:
-                return self.__explore_mentor.choose_action(self.__caller.get_observed())
-                # Here the action is a (entityid,attribute) to cache
+                actions_list[cluster_id].append(key)
+            
+            if(self.__cluster_context_map[key][1] == 1):
+                del self.__cluster_context_map[key][1]
+            else:
+                count = self.__cluster_context_map[key][1] - 1 
+                self.__cluster_context_map[key] = (self.__cluster_context_map[key][0], 
+                                count, self.__cluster_context_map[key][2])
+
+        if(action == -1 or not(action in actions_list.keys())):
+            # Item is defenitly not to be cached
+            random_value = np.random.uniform()
+            if(random_value < self.__epsilons and not skip_random):
+                if(isinstance(self.__explore_mentor,MFUAgent)):
+                    action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+                    if(action != (0,0)):
+                        cached_lifetime = 10 # This need to set
+                        return [(action, (cached_lifetime, 0))]
+                else:
+                    action = self.__explore_mentor.choose_action(self.__caller.get_observed())
+                    if(action != (0,0)):
+                        cached_lifetime = 10 # This need to set
+                        return [(action, (cached_lifetime, 0))]
+            else:
+                delaying_actions = []
+                for entityid, att in entity_att_list:
+                    delay_time = 10 # This need to be calculated
+                    delaying_actions.append(((entityid, att),(0, delay_time)))
+                
+                return delaying_actions
         else:
-            # This needs to be looked into
-            policy = self.actor.predict(np.array(observation['features']), batch_size=1).flatten()
-            base_action = np.random.choice(len(self.action_space), 1, p=policy)[0]
-            return (observation['entityid'], observation['attribute']) if base_action > 0.7 else (0,0)
+            # Decided to be cached
+            concurr_actions = []
+            for entityid, attr in actions_list[action]:
+                translated_action = (entityid, attr) 
+                cached_lifetime = 10 # This need to set
+                concurr_actions.append((translated_action, (cached_lifetime, 0)))
 
-    # Update the transition probabilities
-    def store_transition(self, s, a, r, s_): 
-        pass
-
+            return concurr_actions
+                
     # Learn the network
     def learn(self, state, action, reward, next_state):
-        target = np.zeros((1, self.__value_size))
-        advantages = np.zeros((1, len(self.action_space)))
+        critic_value = self.__critic.predict(state)
+        new_critic_value = self.__critic.predict(next_state)
 
-        value = self.__critic.predict(state)[0]
-        next_value = self.__critic.predict(next_state)[0]
+        target_value = reward + self.__gamma*new_critic_value
+        delta = target_value - critic_value
 
-        advantages[0][action] = reward + self.__gamma * (next_value) - value
-        target[0][0] = reward + self.__gamma * next_value
+        actions = np.zeros([1, len(self.action_space)])
+        actions[np.arange(1), action] = 1.0
 
-        self.__actor.fit(state, advantages, epochs=1, verbose=0)
-        self.__critic.fit(state, target, epochs=1, verbose=0)
+        self.__actor.fit([state, delta], actions, verbose=0)
+        self.__critic.fit(state, target_value, verbose=0)
 
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:
-
             # If e-greedy
             if self.__epsilons_decrement is not None:
                 # Dynamic bidirectional e-greedy 
@@ -138,8 +199,7 @@ class ACAgent(Agent):
                     if rho >= self.__reward_threshold:
                         self.__epsilons -= self.__epsilons_decrement
                     else:
-                        self.__epsilons += self.__epsilons_increment
-                
+                        self.__epsilons += self.__epsilons_increment              
                 # Traditional e-greedy
                 else:
                     self.__epsilons -= self.__epsilons_decrement
@@ -149,7 +209,3 @@ class ACAgent(Agent):
             self.__epsilons = truncate(self.__epsilons, self.epsilons_min, self.__epsilons_max)
 
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
-
-    # Getter method for feature vetcor labels
-    def get_feature_vector(self):
-        return self.__feature_vector

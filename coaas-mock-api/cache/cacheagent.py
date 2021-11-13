@@ -11,7 +11,7 @@ class CacheAgent(object):
     def get_value_by_key(self,entityid,attribute): pass
     def get_values_for_entity(self,entityid,attr_list): pass
     # Check Cache (private method)
-    def __is_cached(self,entityid,attribute): pass
+    def is_cached(self,entityid,attribute): pass
     # Get Statistics
     def get_statistics(self): pass
     def get_hitrate_trend(self): pass

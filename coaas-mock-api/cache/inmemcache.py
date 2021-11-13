@@ -140,7 +140,7 @@ class InMemoryCache(CacheAgent):
         return list(self.__entityhash[entityid].keys())
 
     # Check if the entity is cached
-    def __is_cached(self,entityid,attribute):
+    def is_cached(self,entityid,attribute):
         res = entityid in self.__entityhash.freq_table and attribute in self.__entityhash[entityid].freq_table
         if(res):
             self.__localstats.append(1)
@@ -158,7 +158,7 @@ class InMemoryCache(CacheAgent):
     # Read from cache using key
     def get_value_by_key(self,entityid,attribute):
         # Check if both the entity and the the attribute are already cached
-        if(self.__is_cached(entityid,attribute)):
+        if(self.is_cached(entityid,attribute)):
             # Updating frequency table for context attributes
             att_stat = list(self.__entityhash[entityid].freq_table[attribute])
             att_stat[0].push(datetime.now())
