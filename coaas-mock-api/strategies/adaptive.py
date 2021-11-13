@@ -498,7 +498,7 @@ class Adaptive(Strategy):
     def __check_delay(self,entity,attr):
         if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
             if(self.__delay_dict[entity][attr] == -1): return False
-            if(self.__window_counter < self.__delay_dict[entity][attr]): return False
+            if(self.__window_counter <= self.__delay_dict[entity][attr]): return False
             else: 
                 del self.__delay_dict[entity][attr]
                 if(not self.__delay_dict[entity]):
