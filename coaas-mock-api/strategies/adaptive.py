@@ -28,19 +28,26 @@ from profilers.adaptiveprofiler import AdaptiveProfiler
 # Therefore, a compromise between the greedy and reactive.
 
 class Adaptive(Strategy):  
+    # Dictionaries
     __delay_dict = {}
-    rr_trend_size = 0
-    __window_counter = 0
-    __learning_counter = 0
-    __sla_trend = FIFOQueue_2(10)
+    __decision_history = {}
     __attribute_access_trend = {}
     __cached_hit_access_trend = {}
     __cached_attribute_access_trend = {}
+
+    # Counters
+    rr_trend_size = 0
+    __window_counter = 0
+    __learning_counter = 0
+
+    # Queues
+    __sla_trend = FIFOQueue_2(10)
     __entity_access_trend = FIFOQueue_2(100)
     __request_rate_trend = FIFOQueue_2(1000)
     __retrieval_cost_trend = FIFOQueue_2(10)
 
     __observedLock = threading.Lock()
+    __decision_history_lock = threading.Lock()
 
     def __init__(self, db, window, isstatic=True, learncycle = 20): 
         self.__db = db
@@ -104,6 +111,8 @@ class Adaptive(Strategy):
                 _thread.start_new_thread(function=self.selective_cache_agent.modify_dicount_rate, args=(False,))
             else:
                 self.__already_modified = False
+            if(self.__decision_history):
+                _thread.start_new_thread(self.__learning_after_action, args=())
 
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
@@ -201,6 +210,25 @@ class Adaptive(Strategy):
                     }
 
                 self.__cached[key][curr_attr].clear()
+
+    # Executes learning the agent (parameter synchornization)
+    def __learning_after_action(self):
+        for action, values in self.__decision_history.items():
+            if(values[1] == False and values[2] >= self.__window_counter+4):
+                self.__decision_history_lock.acquire()
+                updated_val = list(values)
+                updated_val[1] = True
+                self.__decision_history(action) = tuple(updated_val)
+                self.__decision_history_lock.release()
+
+                curr_state = self.__translate_to_state(action[0], action[1])
+                diff = self.__window_counter - values[2]
+                reward, is_cached = self.__calculate_reward(action[0], action[1], values[0], diff) # 
+                self.selective_cache_agent.learn(values[0], 1 if is_cached else 0, reward, curr_state)
+
+                self.__decision_history_lock.acquire()
+                del self.__decision_history[action]
+                self.__decision_history_lock.release()
 
     ###################################################################################
     # Section 02 - Retrive Context
@@ -411,6 +439,9 @@ class Adaptive(Strategy):
                     observation = self.__translate_to_state(entityid,att)
                     # Select the action for the state using the RL Agent
                     action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                    if(not self.__is_simple_agent and (action == (entityid,att) or action == (0,0))):
+                        self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
+
                     if(action != (0,0)):
                         self.cache_memory.addcachedlifetime(action, now + datetime.timedelta(seconds=est_c_lifetime))
                         self.__last_actions.append(action)
@@ -425,10 +456,6 @@ class Adaptive(Strategy):
                     self.__delay_dict[entityid][att] = self.__window_counter + 1
                 else:
                     self.__delay_dict[entityid] = { att: self.__window_counter + 1 }
-
-        # Push to Queue to calculate reward in next epoch
-        if(not isinstance(self.selective_cache_agent, SimpleAgent)):
-            self.__calculate_reward(list(map(lambda x: (entityid, x), actions)))
 
         return actions         
 
@@ -446,6 +473,9 @@ class Adaptive(Strategy):
                     try:
                         observation = self.__translate_to_state(entityid,att)
                         action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                        if(not self.__is_simple_agent and (action == (entityid,att) or action == (0,0))):
+                            self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
+
                         if(action != (0,0) and action[0] == entityid):
                             updated_attr_dict.append(action[1])
                             self.cache_memory.addcachedlifetime(action, now + datetime.timedelta(seconds=est_c_lifetime))
@@ -484,15 +514,9 @@ class Adaptive(Strategy):
             self.__observedLock.acquire()
             self.__update_observed(entityid, attributes)
             self.__observedLock.release()
-        
-        # Push to Queue to calculate reward in next epoch
-        if(not isinstance(self.selective_cache_agent, SimpleAgent)):
-            self.__calculate_reward(list(map(lambda x: (entityid, x), updated_attr_dict)))
 
         if(random_one):
             self.__cache_entity_attribute_pairs(random_one)
-            if(not isinstance(self.selective_cache_agent, SimpleAgent)):
-                self.__calculate_reward(random_one)
     
     # Check if the context attribute has been evaluated to be delayed for caching
     def __check_delay(self,entity,attr):
@@ -604,10 +628,10 @@ class Adaptive(Strategy):
         fea_vec.append(avg_ret_cost)
 
         # Whether cached or not [15]
-        if(self.cache_memory.is_cached(entityid, att)):
-            fea_vec.append(1)
-        else:
-            fea_vec.append(0)
+        #if(self.cache_memory.is_cached(entityid, att)):
+        #    fea_vec.append(1)
+        #else:
+        #    fea_vec.append(0)
 
         return {
             'entityid': entityid,
@@ -838,12 +862,92 @@ class Adaptive(Strategy):
         return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
 
     # Calculate the rewards actions taken in the previous window
-    def __calculate_reward(self, actions):   
-        # new_state, reward = self.selective_cache_agent.step(action)
-        # self.selective_cache_agent.store_transition(self.state, action, reward, new_state)
-        # Do the next if agent is not DQN
-        # self.selective_cache_agent.reward_history.append(reward)
-        pass
+    def __calculate_reward(self, entityid, att, previous_state, diff):   
+        is_cached = False
+        past_sla = self.__sla_trend.get_last_range(diff)
+        past_ret_costs = self.__retrieval_cost_trend.get_last_range(diff)
+        past_request_rate = self.__request_rate_trend.get_last_range(diff)
+        
+        total_gain = 0
+        total_requests = 0
+
+        if(entityid in self.__cached_attribute_access_trend and 
+                att in self.__cached_attribute_access_trend[entityid]):
+            # This item has been cached in the last decision epoch
+            is_cached = True   
+            past_hr = self.__cached_hit_access_trend[entityid][att].get_last_range(diff)
+            past_ar = self.__cached_attribute_access_trend[entityid][att].get_last_range(diff)
+
+            for idx in range(0,len(past_ar)):
+                price = past_hr[idx]*past_sla[idx][1]
+                penalty = (1-past_hr[idx])*past_sla[idx][2]
+                out = (1/past_request_rate[idx])*past_ar[idx]
+                retrieval = (1-past_hr[idx])*past_ret_costs[idx]
+
+                total_requests += out
+                total_gain += out*(price - penalty - retrieval)
+            
+            # This returns the gain or loss of caching an item per request
+            return total_gain/total_requests if total_requests>0 else -10, action
+        else:
+            # This item was not cached
+            expected_vals = []
+
+            expected_ar = []
+            short_inc = (previous_state[1] - previous_state[0])/self.trend_ranges[0]
+            mid_inc = (previous_state[3] - previous_state[1])/(self.trend_ranges[1] - self.trend_ranges[0])
+            long_inc = (previous_state[5] - previous_state[3])/(self.trend_ranges[2] - self.trend_ranges[1])
+            
+            curr_ar = previous_state[1]
+            for i in range(0,self.self.trend_ranges[2]):
+                if(i < self.trend_ranges[0]):
+                    curr_ar += short_inc
+                elif(self.trend_ranges[0] <= i < self.trend_ranges[1]):
+                    curr_ar += mid_inc
+                else:
+                    curr_ar += long_inc
+                expected_ar.append(curr_ar)
+
+            expected_hr = []
+            short_inc = (previous_state[6] - previous_state[7])/self.trend_ranges[0]
+            mid_inc = (previous_state[9] - previous_state[7])/(self.trend_ranges[1] - self.trend_ranges[0])
+            long_inc = (previous_state[11] - previous_state[9])/(self.trend_ranges[2] - self.trend_ranges[1])
+
+            curr_hr = previous_state[1]
+            for i in range(0,self.self.trend_ranges[2]):
+                if(i < self.trend_ranges[0]):
+                    curr_hr += short_inc
+                elif(self.trend_ranges[0] <= i < self.trend_ranges[1]):
+                    curr_hr += mid_inc
+                else:
+                    curr_hr += long_inc
+                expected_hr.append(curr_hr)
+            
+            # Expected Values
+            for idx in range(1,len(diff)):
+                price = expected_hr[idx]*past_sla[idx][1]  
+                penalty = (1-expected_hr[idx])*past_sla[idx][2]
+                retrieval = (1-expected_hr[idx])*past_ret_costs[idx]
+                out = (1/past_request_rate[idx])*expected_ar[idx]
+
+                total_requests += out
+                expected_vals.append(out*(price - penalty - retrieval))
+
+            # Observed Values
+            observed_vals = []
+            past_ar = self.__attribute_access_trend[entityid][att].get_last_range(diff)
+            for idx in range(0,len(past_ar)):            
+                penalty = past_sla[idx][2]
+                retrieval = past_ret_costs[idx]
+                out = (1/past_request_rate[idx])*past_ar[idx]
+
+                total_requests += out
+                observed_vals.append(out*(0 - penalty - retrieval))
+
+            diff = sum([observed_vals[i] - expected_vals[i] for i in range(0,diff)])
+            
+            # This returns the regret of not caching the item
+            return diff/total_requests if total_requests>0 else 5, action
 
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
@@ -867,7 +971,12 @@ class Adaptive(Strategy):
     def reevaluate_for_eviction(self, entityid, att):
         try:
             observation = self.__translate_to_state(entityid,att)
-            return self.selective_cache_agent.choose_action(observation, skipRandom = True)
+            # action, (est_c_lifetime, est_delay)
+            action = self.selective_cache_agent.choose_action(observation, skipRandom = True)
+            if(not self.__is_simple_agent and (action[0] == (entityid,att) or action[0] == (0,0))):
+                self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
+
+            return action
         except Exception:
             return ((0,0),(0,0))  
 

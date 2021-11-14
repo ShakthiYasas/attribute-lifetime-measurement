@@ -22,6 +22,11 @@ class ACAgent(Agent):
         self.__caller = caller
         self.__reward_threshold = config.reward_threshold
 
+        # Extrapolation ranges 
+        self.__short = config.short
+        self.__mid = config.mid
+        self.__long = config.long
+
         # Setting the hyper-parameters
         self.__actor_lr = config.learning_rate 
         self.__critic_lr = config.learning_rate*5
@@ -32,10 +37,10 @@ class ACAgent(Agent):
         self.__epsilons_decrement = config.e_greedy_decrement
 
         # Overriding the action space as cache or not cache
-        self.action_space = range(-1,32) # -1 is not caching
+        self.action_space = [0,1]
 
         # Setting the features
-        self.__n_features = 16
+        self.__n_features = 15
 
         # e-Greedy Exploration  
         self.__epsilons = list(config.e_greedy_init)
@@ -76,7 +81,7 @@ class ACAgent(Agent):
 
         # NN Layers
         input_layer = Input(shape=(self.__n_features,))
-        hidden_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(input_layer)
+        hidden_layer = Dense(8, activation='relu', kernel_initializer='he_uniform')(input_layer)
         output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer)
 
         actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
@@ -90,7 +95,7 @@ class ACAgent(Agent):
     def __build_critic(self):
         # NN Layers
         input_layer = Input(shape=(self.__n_features,))
-        hidden_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(input_layer)
+        hidden_layer = Dense(8, activation='relu', kernel_initializer='he_uniform')(input_layer)
         output_layer = Dense(self.__value_size, activation='softmax')(hidden_layer)
 
         critic = Model(inputs=[input_layer], outputs=[output_layer])
@@ -121,27 +126,15 @@ class ACAgent(Agent):
     # The biggest challenge here is the change of state with changes in the environment. 
     # So, there is no gurantee that the state will remain unchanged. 
     # So, the only option is to find the state that is the most similar using clustering.
-    def choose_action(self, entity_att_list, skip_random=False): 
-        state = self.__stateclusters.get_current_state()
-        probabilities = self.__policy.predict(state)[0]
+    def choose_action(self, observation, skip_random=False): 
+        obs = observation['features']
+        entityid = observation['entityid']
+        attribute = observation['attribute']
+
+        probabilities = self.__policy.predict(obs)[0]
         action = np.random.choice(len(self.action_space), 1, p=probabilities)
 
-        actions_list = {}
-        for key in entity_att_list:
-            cluster_id = self.__cluster_context_map[key][0]
-            if(cluster_id in actions_list):
-                actions_list[cluster_id] = [key]
-            else:
-                actions_list[cluster_id].append(key)
-            
-            if(self.__cluster_context_map[key][1] == 1):
-                del self.__cluster_context_map[key][1]
-            else:
-                count = self.__cluster_context_map[key][1] - 1 
-                self.__cluster_context_map[key] = (self.__cluster_context_map[key][0], 
-                                count, self.__cluster_context_map[key][2])
-
-        if(action == -1 or not(action in actions_list.keys())):
+        if(action == 0):
             # Item is defenitly not to be cached
             random_value = np.random.uniform()
             if(random_value < self.__epsilons and not skip_random):
@@ -149,29 +142,27 @@ class ACAgent(Agent):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
                         cached_lifetime = 10 # This need to set
-                        return [(action, (cached_lifetime, 0))]
+                        return (action, (cached_lifetime, 0))
+                    else:
+                        delay_time = 10 # This need to be set
+                        return (action, (0, delay_time))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
                         cached_lifetime = 10 # This need to set
                         return [(action, (cached_lifetime, 0))]
+                    else:
+                        delay_time = 10 # This need to be set
+                        return (action, (0, delay_time))
             else:
-                delaying_actions = []
-                for entityid, att in entity_att_list:
-                    delay_time = 10 # This need to be calculated
-                    delaying_actions.append(((entityid, att),(0, delay_time)))
-                
-                return delaying_actions
+                delay_time = 10 # This need to be set
+                return (action, (0, delay_time))
         else:
             # Decided to be cached
-            concurr_actions = []
-            for entityid, attr in actions_list[action]:
-                translated_action = (entityid, attr) 
-                cached_lifetime = 10 # This need to set
-                concurr_actions.append((translated_action, (cached_lifetime, 0)))
+            translated_action = (entityid, attribute) 
+            cached_lifetime = 10 # This need to set
+            return (translated_action, (cached_lifetime, 0))
 
-            return concurr_actions
-                
     # Learn the network
     def learn(self, state, action, reward, next_state):
         critic_value = self.__critic.predict(state)
