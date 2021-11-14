@@ -1,5 +1,6 @@
 # Abstract class
 class Agent(object):
+    MIN_CACHE_LIFE = 4
     action_space = [(0,0)]
     epsilons_min = 0.001
     def __init__(self, config, caller): pass

@@ -71,9 +71,39 @@ class SimpleAgent(Agent):
             if((random_value < self.__epsilons) and not skipRandom):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     # Should the cached lifetime of these random items be calculated
-                    return (self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend()),((self.__mid*self.__window)/1000,0))
+                    action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+                    if(action != (0,0)):
+                        return (action,((self.__mid*self.__window)/1000,0))
+                    else:
+                        caching_delay = 0
+                        if(disearning_sequence[0] < disearning_sequence[-1]):
+                            es_long = (t_for_discounting*self.__window)/1000
+                            es_zero = 1
+                            if(disearning_sequence[-1]<0):
+                                es_zero = self.get_delay_time(disearning_sequence)
+                                caching_delay = min(es_long, es_zero)
+                            
+                        elif(disearning_sequence[-1] > 0):
+                            caching_delay = (t_for_discounting*self.__window)/1000
+                        
+                        return ((0,0),(0,caching_delay))
                 else:
-                    return (self.__explore_mentor.choose_action(self.__caller.get_observed()),((self.__mid*self.__window)/1000,0))        
+                    action = self.__explore_mentor.choose_action(self.__caller.get_observed())
+                    if(action != (0,0)):
+                        return (action,((self.__mid*self.__window)/1000,0))   
+                    else:
+                        caching_delay = 0
+                        if(disearning_sequence[0] < disearning_sequence[-1]):
+                            es_long = (t_for_discounting*self.__window)/1000
+                            es_zero = 1
+                            if(disearning_sequence[-1]<0):
+                                es_zero = self.get_delay_time(disearning_sequence)
+                                caching_delay = min(es_long, es_zero)
+                            
+                        elif(disearning_sequence[-1] > 0):
+                            caching_delay = (t_for_discounting*self.__window)/1000
+                        
+                        return ((0,0),(0,caching_delay))   
             
             caching_delay = -1
             # Item is not cached, but could be cached later
@@ -91,11 +121,12 @@ class SimpleAgent(Agent):
             if(disearning_sequence[0] > disearning_sequence[-1]):
                 # The item could be cached
                 # So, calculate the estimated cached lifetime
+                min_caching_time = (self.MIN_CACHE_LIFE*self.__window)/1000
                 es_delta = self.cached_life_when_delta(disearning_sequence)
                 es_zero = 0
                 if(disearning_sequence[-1]<0):
                     es_zero = self.cached_life_when_zero(disearning_sequence)
-                estimated_lifetime = max(es_delta, es_zero)
+                estimated_lifetime = max([es_delta, es_zero, min_caching_time])
                 
             elif(disearning_sequence[-1] > 0):
                 estimated_lifetime = (t_for_discounting*self.__window)/1000
@@ -108,6 +139,14 @@ class SimpleAgent(Agent):
             if(i == 0):
                 continue
             elif(disearning_sequence[i]<=0):
+                return ((i-1)*self.__window)/1000
+    
+    # Calculate the expected cached lifetime for the when the discounted value reaches 0.
+    def get_delay_time(self, disearning_sequence):
+        for i in range(len(disearning_sequence)):
+            if(i == 0):
+                continue
+            elif(disearning_sequence[i]>=0):
                 return ((i-1)*self.__window)/1000
 
     # Calculate the expected lifetime of caching considering the convergence of the variation
