@@ -33,7 +33,7 @@ default_config = config['DEFAULT']
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 # Selected Strategy
-__selected_algo = None
+selected_algo = None
 
 class PlatformMock(Resource):
     # Initialize this session
@@ -49,19 +49,20 @@ class PlatformMock(Resource):
     # Create an instance of the refreshing strategy
     __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']), 
             True if default_config['IsStaticLife'] == 'True' else False, int(default_config['LearningCycle']))
-    __selected_algo = __strategy_factory.get_retrieval_strategy()
-    setattr(__selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
-    __selected_algo.init_cache()
+    
+    global selected_algo
+    selected_algo = __strategy_factory.get_retrieval_strategy()
+    setattr(selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
         
     # Set current session token
-    setattr(__selected_algo, 'session', __token)
+    setattr(selected_algo, 'session', __token)
 
     # Initalize the SQLLite Instance 
     __service_registry = SQLLiteClient(default_config['SQLDBName'])
     db_file = Path(default_config['SQLDBName']+'.db')
     if(not db_file.is_file()):
         __service_registry.seed_db_at_start()
-    setattr(__selected_algo, 'service_registry', __service_registry)
+    setattr(selected_algo, 'service_registry', __service_registry)
 
     # "Reactive" strategy do not need a cache memory. 
     # Therefore, skipping cache initializing for "Reactive".
@@ -69,12 +70,14 @@ class PlatformMock(Resource):
     if(strategy != 'reactive' or isCaching != 'True'):
         #Initializing cache memory
         cache_fac = CacheFactory(CacheConfiguration(default_config), __service_registry)
-        setattr(__selected_algo, 'cache_memory', cache_fac.get_cache_memory(db))
+        setattr(selected_algo, 'cache_memory', cache_fac.get_cache_memory(db))
 
         # Initialize the Selective Caching Agent
-        agent_fac = AgentFactory(default_config['RLAgent'], config, __selected_algo)
-        setattr(__selected_algo, 'selective_cache_agent', agent_fac.get_agent())
+        agent_fac = AgentFactory(default_config['RLAgent'], config, selected_algo)
+        setattr(selected_algo, 'selective_cache_agent', agent_fac.get_agent())
     
+    selected_algo.init_cache()
+
     # POST /contexts endpoint
     # Retrives context data. 
     def post(self):
@@ -91,7 +94,7 @@ class PlatformMock(Resource):
                 return parse_response({'message':'Unauthorized'}), 401  
 
             # Start to process the request
-            data = __selected_algo.get_result(json_obj['query'], fthr, req_id)
+            data = selected_algo.get_result(json_obj['query'], fthr, req_id)
             response = parse_response(data, self.__token)
             _thread.start_new_thread(self.__save_rp_stats, (self.__token,response,start))
                 
@@ -116,20 +119,21 @@ class Statistics(Resource):
     # GET /statistics endpoint.
     # Retrives the details (metadata & statistics) of the current session in progress. 
     def get(self, name):
+        global selected_algo
         if(name == 'caches'):
             ent_id = int(request.args.get('id'))
-            data = __selected_algo.get_cache_statistics(ent_id)
+            data = selected_algo.get_cache_statistics(ent_id)
             return data, 200   
         elif(name == 'returns'):
             is_curr = str(request.args.get('current')).lower()
             if(is_curr == 'true'):
-                data = __selected_algo.get_current_cost()
+                data = selected_algo.get_current_cost()
                 return {
                     'cost': data
                 }, 200   
             else:
                 session = str(request.args.get('session'))
-                data = __selected_algo.get_cost_variation(session)
+                data = selected_algo.get_cost_variation(session)
                 return {
                     'variation': data
                 }, 200   

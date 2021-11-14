@@ -33,6 +33,8 @@ class FIFOQueue_2():
         return self.__queue[0]
 
     def get_last_range(self, length):
+        if(len(self.__queue) <= length):
+            return self.__queue
         return self.__queue[len(self.__queue)-length : len(self.__queue)]
     
     def get_last_position(self, length):

@@ -3,6 +3,7 @@ import _thread
 import datetime
 import threading
 import statistics
+from typing import Tuple
 
 from lib.event import post_event
 from agents.dqnagent import DQNAgent
@@ -40,6 +41,9 @@ class Adaptive(Strategy):
     __window_counter = 0
     __learning_counter = 0
 
+    # Status
+    __already_modified = False
+
     # Queues
     __sla_trend = FIFOQueue_2(10)
     __entity_access_trend = FIFOQueue_2(100)
@@ -59,23 +63,21 @@ class Adaptive(Strategy):
         self.__isstatic = isstatic
         self.__local_ret_costs = []
         self.__moving_window = window
-        self.__most_expensive_sla = (0.5,1.0,1.0)
-        self.__learning_cycle = learncycle
-        
         self.req_rate_extrapolation = None
+        self.__learning_cycle = learncycle
+        self.__most_expensive_sla = (0.5,1.0,1.0)
 
         self.service_selector = ServiceSelector(db)
         if(not self.__isstatic):
             self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
-
-        setattr(self.cache_memory, 'caller_strategy', self)
-    
+          
     # Init_cache initializes the cache memory. 
     def init_cache(self):
         # Set current session to profiler if not set
         if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
             self.__profiler.session = self.session
         
+        setattr(self.cache_memory, 'caller_strategy', self)
         self.__is_simple_agent = isinstance(self.selective_cache_agent, SimpleAgent)
 
         # Initializing background thread clear observations.
@@ -93,7 +95,7 @@ class Adaptive(Strategy):
     def run(self):
         while True:
             self.clear_expired()
-            _thread.start_new_thread(self.__save_current_cost, args=())
+            _thread.start_new_thread(self.__save_current_cost, ())
             # Observing the attributes that has not been cached within the window
             self.__window_counter+=1
             time.sleep(self.__moving_window/1000) 
@@ -105,18 +107,19 @@ class Adaptive(Strategy):
             self.__extrapolate_request_rate()
 
         if(self.__window_counter >= self.trend_ranges[1]): 
-            self.__clear_observed(datetime.datetime.now() - datetime.timedelta(milliseconds=self.__moving_window))
+            exp_time = datetime.datetime.now()-datetime.timedelta(seconds=self.__moving_window/1000)
+            self.__clear_observed(exp_time)
             self.__clear_cached()
-            if(not self.__already_modified):
-                _thread.start_new_thread(function=self.selective_cache_agent.modify_dicount_rate, args=(False,))
+            if(not self.__already_modified and self.__is_simple_agent):
+                _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, (False,))
             else:
                 self.__already_modified = False
             if(self.__decision_history):
-                _thread.start_new_thread(self.__learning_after_action, args=())
+                _thread.start_new_thread(self.__learning_after_action, ())
 
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
-        self.__retrieval_cost_trend.push(statistics.mean(self.__local_ret_costs))
+        self.__retrieval_cost_trend.push(statistics.mean(self.__local_ret_costs) if self.__local_ret_costs else 0)
         self.__local_ret_costs.clear()
         self.__reqs_in_window = 0
         
@@ -142,7 +145,7 @@ class Adaptive(Strategy):
             else:
                 invalidtss = [num for num in value['req_ts'] if num < exp_time]
                 for i in invalidtss:
-                    value['req_ts'].remove(i)
+                    value['req_ts'].pop(0)
 
                 validtss = value['req_ts']
                 access_freq = 0
@@ -153,7 +156,7 @@ class Adaptive(Strategy):
                 for curr_attr, access_list in value['attributes'].items():
                     invalidtss = [num for num in access_list if num < exp_time]
                     for i in invalidtss:
-                        value['attributes'][curr_attr].remove(i)
+                        value['attributes'][curr_attr].pop(0)
 
                     validtss = value['attributes'][curr_attr]
                     access_freq = 0
@@ -218,7 +221,7 @@ class Adaptive(Strategy):
                 self.__decision_history_lock.acquire()
                 updated_val = list(values)
                 updated_val[1] = True
-                self.__decision_history(action) = tuple(updated_val)
+                self.__decision_history[action] = tuple(updated_val)
                 self.__decision_history_lock.release()
 
                 curr_state = self.__translate_to_state(action[0], action[1])
@@ -250,7 +253,8 @@ class Adaptive(Strategy):
         if(self.__is_simple_agent):
             return self.__get_result_when_simple(json, fthresh, req_id)
         else:
-            return self.__get_result_when_other(json, fthresh, req_id)
+            return self.__get_result_when_simple(json, fthresh, req_id)
+            # return self.__get_result_when_other(json, fthresh, req_id)
 
     # Retrive function when the agent is Simple
     def __get_result_when_simple(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None) -> dict: 
@@ -380,7 +384,7 @@ class Adaptive(Strategy):
                 self.__learning_counter += 1
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
-                _thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread,args=(entityid, out))
+                _thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread, (entityid, out))
 
         if(self.__learning_counter % self.__learning_cycle == 0):
             if(isinstance(self.selective_cache_agent, DQNAgent)):
@@ -389,7 +393,7 @@ class Adaptive(Strategy):
             elif(isinstance(self.selective_cache_agent, SimpleAgent)):
                 # Modify the discount rate
                 self.__already_modified = True
-                _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, args=())
+                _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, ())
 
         return output
 
@@ -534,6 +538,8 @@ class Adaptive(Strategy):
     def __is_spike(self,entity,attr):
         if(self.__isobserved(entity, attr)):
             att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
+            if(len(att_trend)<2):
+                return False
             if((att_trend[0]*2)>=att_trend[1]):
                 return True
             return False
@@ -1045,7 +1051,8 @@ class Adaptive(Strategy):
     def get_current_cost(self):
         hit_rate = 0
         if(self.__window_counter >= self.trend_ranges[1]):
-            hit_rate = self.cache_memory.get_hitrate_trend().get_last(10)
+            hr = self.cache_memory.get_hitrate_trend().get_last()
+            hit_rate = hr[0] if isinstance(hr,Tuple) else hr
         
         sla = self.__sla_trend.get_last()
         request_rate = self.__request_rate_trend.get_last()

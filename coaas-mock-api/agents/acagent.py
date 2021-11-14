@@ -5,6 +5,7 @@ from agents.agent import Agent
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 from tensorflow.python.framework.ops import disable_eager_execution
 
+import keras.backend as kb
 from keras.models import Model 
 from keras.optimizers import Adam
 from keras.layers import Input, Dense
@@ -17,21 +18,19 @@ class ACAgent(Agent):
     __hashLock = threading.Lock()
 
     def __init__(self, config, caller):
+        # Start with a new keras session
+        kb.clear_session()
+        
         # General Configurations
         self.__value_size = 1
         self.__caller = caller
         self.__reward_threshold = config.reward_threshold
 
-        # Extrapolation ranges 
-        self.__short = config.short
-        self.__mid = config.mid
-        self.__long = config.long
-
         # Setting the hyper-parameters
         self.__actor_lr = config.learning_rate 
         self.__critic_lr = config.learning_rate*5
 
-        self.__gamma = config.discounting_factor
+        self.__gamma = config.discount_rate
         self.__epsilons_max = config.e_greedy_max
         self.__epsilons_increment = config.e_greedy_increment
         self.__epsilons_decrement = config.e_greedy_decrement
@@ -43,10 +42,10 @@ class ACAgent(Agent):
         self.__n_features = 15
 
         # e-Greedy Exploration  
-        self.__epsilons = list(config.e_greedy_init)
+        self.__epsilons = config.e_greedy_init
         self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
         if ((config.e_greedy_init is None) or (config.e_greedy_decrement is None)):
-            self.__epsilons = list(self.epsilons_min)
+            self.__epsilons = self.epsilons_min
         
         # Selecting the algorithem to execute during the exploration phase
         self.__explore_mentor = None
@@ -127,7 +126,7 @@ class ACAgent(Agent):
     # So, there is no gurantee that the state will remain unchanged. 
     # So, the only option is to find the state that is the most similar using clustering.
     def choose_action(self, observation, skip_random=False): 
-        obs = observation['features']
+        obs = np.array(observation['features'])[np.newaxis, :]
         entityid = observation['entityid']
         attribute = observation['attribute']
 
@@ -165,6 +164,9 @@ class ACAgent(Agent):
 
     # Learn the network
     def learn(self, state, action, reward, next_state):
+        state = np.array(state['features'])[np.newaxis, :]
+        next_state = np.array(next_state['features'])[np.newaxis, :]
+
         critic_value = self.__critic.predict(state)
         new_critic_value = self.__critic.predict(next_state)
 

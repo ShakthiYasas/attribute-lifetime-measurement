@@ -72,15 +72,15 @@ class SQLLiteClient:
     def add_cached_life(self, entityid, attribute, lifetime):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         cursor=self.__conn.cursor()
-        self.__conn.execute(
-            "INSERT INTO CachedLifetime (entityid, attribute, lifetime) VALUES\
-            ("+str(entityid)+",'"+str(attribute)+"',"+str(lifetime)+")")
+        statement = "INSERT INTO CachedLifetime (entityid, attribute, lifetime) VALUES\
+            ("+str(entityid)+",'"+str(attribute)+"','"+str(lifetime)+"')"
+        self.__conn.execute(statement)
         return cursor.lastrowid
 
     def update_cached_life(self, entityid, attribute, lifetime):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
-            "UPDATE CachedLifetime SET lifetime="+str(lifetime)+"\
+            "UPDATE CachedLifetime SET lifetime='"+str(lifetime)+"'\
             entityid="+str(entityid)+" AND attribute='"+attribute+"')")
 
     def remove_cached_life(self, entityid, attribute):
