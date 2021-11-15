@@ -447,7 +447,8 @@ class Adaptive(Strategy):
                         self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
 
                     if(action != (0,0)):
-                        self.cache_memory.addcachedlifetime(action, now + datetime.timedelta(seconds=est_c_lifetime))
+                        wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                        self.cache_memory.addcachedlifetime(action, wait_time)
                         self.__last_actions.append(action)
                         actions.append(action[1])
                     else:
@@ -894,7 +895,7 @@ class Adaptive(Strategy):
                 total_gain += out*(price - penalty - retrieval)
             
             # This returns the gain or loss of caching an item per request
-            return total_gain/total_requests if total_requests>0 else -10, action
+            return total_gain/total_requests if total_requests>0 else -10, is_cached
         else:
             # This item was not cached
             expected_vals = []
@@ -953,7 +954,7 @@ class Adaptive(Strategy):
             diff = sum([observed_vals[i] - expected_vals[i] for i in range(0,diff)])
             
             # This returns the regret of not caching the item
-            return diff/total_requests if total_requests>0 else 5, action
+            return diff/total_requests if total_requests>0 else 5, is_cached
 
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
@@ -1012,7 +1013,7 @@ class Adaptive(Strategy):
     def get_cache_statistics(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
         return {
-            'cached_attributes': [i for i in res.keys()],
+            'cached_attributes': [i for i in res.keys()] if res else {},
             'discount_rate': self.selective_cache_agent.get_discount_rate()
         }
 

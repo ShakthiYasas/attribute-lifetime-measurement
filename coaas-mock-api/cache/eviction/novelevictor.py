@@ -24,6 +24,7 @@ class NovelEvictor(Evictor):
                     if(action == (0,0)):
                         eviction_list.append((entity,att))
                     else:
-                        self.__cache.updatecachedlifetime(action[0], action[1], datetime.now()+timedelta(seconds=est_c_lifetime))
+                        wait_time = datetime.now()+timedelta(seconds=est_c_lifetime)
+                        self.__cache.updatecachedlifetime(action[0], action[1], wait_time)
 
         return eviction_list

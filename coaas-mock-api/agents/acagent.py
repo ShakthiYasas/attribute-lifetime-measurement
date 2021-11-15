@@ -1,27 +1,26 @@
 import threading
 import numpy as np
+import tensorflow as tf
 from datetime import datetime
 from agents.agent import Agent
+from keras import backend as K
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 from tensorflow.python.framework.ops import disable_eager_execution
 
 import keras.backend as kb
-from keras.models import Model 
+from keras.models import Model
 from keras.optimizers import Adam
 from keras.layers import Input, Dense
 
 from agents.classifier.linkedcluster import LinkedCluster
 
-disable_eager_execution()
-
 class ACAgent(Agent):
     __hashLock = threading.Lock()
 
     def __init__(self, config, caller):
-        # Start with a new keras session
-        kb.clear_session()
-        
-        # General Configurations
+        disable_eager_execution()
+
+        # General Configuration
         self.__value_size = 1
         self.__caller = caller
         self.__reward_threshold = config.reward_threshold
@@ -67,40 +66,37 @@ class ACAgent(Agent):
                     config.subcluster_similarity_threshold, config.pair_similarity_maximum)
 
         # Setting up Actor and Critic Networks
-        self.__critic = self.__build_critic()
-        self.__actor, self.__policy = self.__build_actor()
+        self.actor, self.policy, self.critic = self.__build_actor_critic()
 
         # Cluster, Entity, Attribute Mapping for currently executing operations
         self.__cluster_context_map = {}
         
     # Approximates the policy and value using the Neural Network
     # Actor: state is input and probability of each action is output of model
-    def __build_actor(self):
-        delta = Input(shape=[1])
-
+    def __build_actor_critic(self):
         # NN Layers
+        delta = Input(shape=[1])
         input_layer = Input(shape=(self.__n_features,))
-        hidden_layer = Dense(8, activation='relu', kernel_initializer='he_uniform')(input_layer)
-        output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer)
+        hidden_layer = Dense(8, activation='relu')(input_layer)
+        hidden_layer_2 = Dense(4, activation='relu')(hidden_layer)
+        output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer_2)
+        value_layer = Dense(self.__value_size, activation='linear')(hidden_layer_2)
+
+        def custom_loss(y_true, y_pred):
+            out = K.clip(y_pred, 1e-8, 1-1e-8)
+            log_lik = y_true*K.log(out)
+
+            return K.sum(-log_lik*delta)
 
         actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
-        actor.compile(loss='categorical_crossentropy', optimizer=Adam(lr=self.__actor_lr))
+        actor.compile(loss=custom_loss, optimizer=Adam(lr=self.__actor_lr)) # 'categorical_crossentropy'
 
-        policy = Model(inputs=[input_layer], outputs=[output_layer])
-       
-        return actor, policy
-
-    # Critic: state is input and value of state is output of model
-    def __build_critic(self):
-        # NN Layers
-        input_layer = Input(shape=(self.__n_features,))
-        hidden_layer = Dense(8, activation='relu', kernel_initializer='he_uniform')(input_layer)
-        output_layer = Dense(self.__value_size, activation='softmax')(hidden_layer)
+        policy = Model(inputs=[input_layer], outputs=[value_layer])
 
         critic = Model(inputs=[input_layer], outputs=[output_layer])
         critic.compile(loss='mean_squared_error', optimizer=Adam(lr=self.__critic_lr))
-        
-        return critic
+       
+        return actor, policy, critic
 
     # Map this observation to the state space.
     # This is done by predicting with cluster that that this observation falls into.
@@ -130,7 +126,7 @@ class ACAgent(Agent):
         entityid = observation['entityid']
         attribute = observation['attribute']
 
-        probabilities = self.__policy.predict(obs)[0]
+        probabilities = self.policy.predict(obs, verbose=0)[0]
         action = np.random.choice(len(self.action_space), 1, p=probabilities)
 
         if(action == 0):
@@ -154,7 +150,7 @@ class ACAgent(Agent):
                         delay_time = 10 # This need to be set
                         return (action, (0, delay_time))
             else:
-                delay_time = 10 # This need to be set
+                delay_time = 5 # This need to be set
                 return (action, (0, delay_time))
         else:
             # Decided to be cached
@@ -167,8 +163,8 @@ class ACAgent(Agent):
         state = np.array(state['features'])[np.newaxis, :]
         next_state = np.array(next_state['features'])[np.newaxis, :]
 
-        critic_value = self.__critic.predict(state)
-        new_critic_value = self.__critic.predict(next_state)
+        critic_value = self.critic.predict(state)
+        new_critic_value = self.critic.predict(next_state)
 
         target_value = reward + self.__gamma*new_critic_value
         delta = target_value - critic_value
@@ -176,8 +172,8 @@ class ACAgent(Agent):
         actions = np.zeros([1, len(self.action_space)])
         actions[np.arange(1), action] = 1.0
 
-        self.__actor.fit([state, delta], actions, verbose=0)
-        self.__critic.fit(state, target_value, verbose=0)
+        self.actor.fit([state, delta], actions, verbose=0)
+        self.critic.fit(state, target_value, verbose=0)
 
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:

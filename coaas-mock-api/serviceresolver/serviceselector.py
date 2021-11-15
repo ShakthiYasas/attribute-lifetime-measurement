@@ -53,10 +53,12 @@ class ServiceSelector:
 
             for att in attributes:
                 if(not (att in output) and att in res):
-                    output[att] = [(prodid,res[att],now - timedelta(seconds=responetime))]
+                    wait_time = now - timedelta(seconds=responetime)
+                    output[att] = [(prodid,res[att],wait_time)]
                 elif(att in res):
                     self.__statsLock.acquire()
-                    output[att].append((prodid,res[att], now - timedelta(seconds=responetime)))
+                    wait_time = now - timedelta(seconds=responetime)
+                    output[att].append((prodid,res[att], wait_time))
                     self.__statsLock.release()
         else:
             # This producer is either invalid or currently having issues
