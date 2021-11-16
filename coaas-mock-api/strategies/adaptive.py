@@ -257,10 +257,7 @@ class Adaptive(Strategy):
 
     # Retrieving context data
     def get_result(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None) -> dict: 
-        #if(self.__is_simple_agent):
         return self.__get_result_when_simple(json, fthresh, req_id)
-        #else:
-            # return self.__get_result_when_other(json, fthresh, req_id)
 
     # Retrive function when the agent is Simple
     def __get_result_when_simple(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None) -> dict: 
@@ -403,24 +400,6 @@ class Adaptive(Strategy):
                 self.__already_modified = True
                 _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, ())
 
-        return output
-
-    # Retrive function when the agent is RL
-    def __get_result_when_other(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None) -> dict: 
-        self.__reqs_in_window+=1
-        if(self.__most_expensive_sla == None):
-            self.__most_expensive_sla = fthresh
-        else:
-            if(fthresh != self.__most_expensive_sla):
-                if(fthresh[0]>self.__most_expensive_sla[0]):
-                    self.__most_expensive_sla = fthresh
-                else:
-                    if(fthresh[2]>self.__most_expensive_sla[2]):
-                        self.__most_expensive_sla[2] = fthresh[2]
-                    if(fthresh[1]<self.__most_expensive_sla[1]):
-                        self.__most_expensive_sla[1] = fthresh[1]
-
-        output = {}
         return output
 
     def __evaluate_and_updated_observed_in_thread(self, entityid, out):
