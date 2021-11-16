@@ -34,7 +34,7 @@ class SimpleAgent(Agent):
             self.__explore_mentor = RandomAgent()
 
     # Decide whether to cache or not cache for the observation
-    def choose_action(self, observation, skipRandom=False): 
+    def choose_action(self, observation, skip_random=False): 
         entityid = observation['entityid']
         attribute = observation['attribute']
         observation = observation['features']
@@ -68,7 +68,7 @@ class SimpleAgent(Agent):
 
         if(npv<=0):
             random_value = np.random.uniform()
-            if((random_value < self.__epsilons) and not skipRandom):
+            if((random_value < self.__epsilons) and not skip_random):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     # Should the cached lifetime of these random items be calculated
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())

@@ -1,18 +1,22 @@
 import threading
-import numpy as np
-import tensorflow as tf
 from datetime import datetime
-from agents.agent import Agent
-from keras import backend as K
-from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
-from tensorflow.python.framework.ops import disable_eager_execution
 
+from agents.agent import Agent
+from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
+
+import numpy as np
 import keras.backend as kb
+from tensorflow import keras
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.layers import Input, Dense
+from tensorflow.python.framework.ops import disable_eager_execution
 
 from agents.classifier.linkedcluster import LinkedCluster
+
+ACTOR_MODEL_PATH = 'agents/saved-models/actor-model'
+CRITIC_MODEL_PATH = 'agents/saved-models/critic-model'
+POLICY_MODEL_PATH = 'agents/saved-models/policy-model'
 
 class ACAgent(Agent):
     __hashLock = threading.Lock()
@@ -74,29 +78,39 @@ class ACAgent(Agent):
     # Approximates the policy and value using the Neural Network
     # Actor: state is input and probability of each action is output of model
     def __build_actor_critic(self):
-        # NN Layers
-        delta = Input(shape=[1])
+        # NN Layers  
         input_layer = Input(shape=(self.__n_features,))
-        hidden_layer = Dense(8, activation='relu')(input_layer)
-        hidden_layer_2 = Dense(4, activation='relu')(hidden_layer)
-        output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer_2)
+        hidden_layer = Dense(512, activation='relu')(input_layer)
+        hidden_layer_2 = Dense(128, activation='relu')(hidden_layer)
         value_layer = Dense(self.__value_size, activation='linear')(hidden_layer_2)
+        output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer_2)
+        
+        try:
+            # Loading Existing Models
+            # Useful for Fault recovery and re-starts
+            actor = keras.models.load_model(ACTOR_MODEL_PATH)
+            critic = keras.models.load_model(CRITIC_MODEL_PATH)
+            policy = keras.models.load_model(POLICY_MODEL_PATH)
 
-        def custom_loss(y_true, y_pred):
-            out = K.clip(y_pred, 1e-8, 1-1e-8)
-            log_lik = y_true*K.log(out)
+            return actor, policy, critic
+        except(Exception):
+            print('new models')
+            # Actor Model
+            delta = Input(shape=[1])
+            actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
+            actor.compile(loss='categorical_crossentropy', optimizer=Adam(lr=self.__actor_lr))
+            actor.save(ACTOR_MODEL_PATH)
 
-            return K.sum(-log_lik*delta)
+            # Critic Model      
+            critic = Model(inputs=[input_layer], outputs=[value_layer])
+            critic.compile(loss='mean_squared_error', optimizer=Adam(lr=self.__critic_lr))
+            critic.save(CRITIC_MODEL_PATH)
 
-        actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
-        actor.compile(loss=custom_loss, optimizer=Adam(lr=self.__actor_lr)) # 'categorical_crossentropy'
-
-        policy = Model(inputs=[input_layer], outputs=[value_layer])
-
-        critic = Model(inputs=[input_layer], outputs=[output_layer])
-        critic.compile(loss='mean_squared_error', optimizer=Adam(lr=self.__critic_lr))
-       
-        return actor, policy, critic
+            # Policy Model 
+            policy = Model(inputs=[input_layer], outputs=[output_layer])
+            policy.save(POLICY_MODEL_PATH)
+        
+            return actor, policy, critic
 
     # Map this observation to the state space.
     # This is done by predicting with cluster that that this observation falls into.
@@ -122,12 +136,12 @@ class ACAgent(Agent):
     # So, there is no gurantee that the state will remain unchanged. 
     # So, the only option is to find the state that is the most similar using clustering.
     def choose_action(self, observation, skip_random=False): 
-        obs = np.array(observation['features'])[np.newaxis, :]
+        obs = np.asarray(observation['features'])[np.newaxis, :]
         entityid = observation['entityid']
         attribute = observation['attribute']
 
         probabilities = self.policy.predict(obs, verbose=0)[0]
-        action = np.random.choice(len(self.action_space), 1, p=probabilities)
+        action = probabilities[1] if (probabilities[0] == probabilities[1]) else np.argmax(probabilities, axis=0)
 
         if(action == 0):
             # Item is defenitly not to be cached
@@ -151,7 +165,7 @@ class ACAgent(Agent):
                         return (action, (0, delay_time))
             else:
                 delay_time = 5 # This need to be set
-                return (action, (0, delay_time))
+                return ((0,0), (0, delay_time))
         else:
             # Decided to be cached
             translated_action = (entityid, attribute) 
@@ -172,8 +186,13 @@ class ACAgent(Agent):
         actions = np.zeros([1, len(self.action_space)])
         actions[np.arange(1), action] = 1.0
 
+        # Re-learning the model
         self.actor.fit([state, delta], actions, verbose=0)
         self.critic.fit(state, target_value, verbose=0)
+
+        # Saving the model again as an update
+        self.actor.save(ACTOR_MODEL_PATH)
+        self.critic.save(CRITIC_MODEL_PATH)
 
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:

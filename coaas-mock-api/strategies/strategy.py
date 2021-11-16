@@ -1,7 +1,7 @@
 # Abstract class
 class Strategy(object):
     """Base class of all the strategies"""
-
+    selective_agent_factory = None
     selective_cache_agent = None
     service_registry = None
     cache_memory = None

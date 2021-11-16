@@ -73,6 +73,8 @@ class Adaptive(Strategy):
           
     # Init_cache initializes the cache memory. 
     def init_cache(self):
+        if(self.selective_cache_agent == None):
+            self.selective_cache_agent = self.selective_agent_factory.get_agent()
         # Set current session to profiler if not set
         if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
             self.__profiler.session = self.session
@@ -162,7 +164,6 @@ class Adaptive(Strategy):
                     access_freq = 0
                     if(__reqs_in_window>0):
                         access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
-
                     if(key in self.__attribute_access_trend):
                         if(curr_attr in self.__attribute_access_trend[key]):
                             self.__attribute_access_trend[key][curr_attr].push(access_freq)

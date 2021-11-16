@@ -1,5 +1,6 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join('..')))
+import numpy as np
 
 import _thread
 import secrets
@@ -74,7 +75,11 @@ class PlatformMock(Resource):
 
         # Initialize the Selective Caching Agent
         agent_fac = AgentFactory(default_config['RLAgent'], config, selected_algo)
-        setattr(selected_algo, 'selective_cache_agent', agent_fac.get_agent())
+        if(default_config['RLAgent'].lower() == 'simple'):
+            agent = agent_fac.get_agent()
+            setattr(selected_algo, 'selective_cache_agent', agent_fac.get_agent())
+        else:
+            setattr(selected_algo, 'selective_agent_factory', agent_fac)
     
     selected_algo.init_cache()
 
