@@ -1,3 +1,5 @@
+import time
+import queue
 import threading
 from datetime import datetime
 
@@ -18,11 +20,16 @@ ACTOR_MODEL_PATH = 'agents/saved-models/actor-model'
 CRITIC_MODEL_PATH = 'agents/saved-models/critic-model'
 POLICY_MODEL_PATH = 'agents/saved-models/policy-model'
 
-class ACAgent(Agent):
+class ACAgent(threading.Thread, Agent):
     __hashLock = threading.Lock()
 
     def __init__(self, config, caller):
         disable_eager_execution()
+        
+        # Thread
+        self.q = queue.Queue()
+        self.timeout = 1.0/60
+        super(ACAgent, self).__init__()
 
         # General Configuration
         self.__value_size = 1
@@ -74,7 +81,21 @@ class ACAgent(Agent):
 
         # Cluster, Entity, Attribute Mapping for currently executing operations
         self.__cluster_context_map = {}
-        
+    
+    def onThread(self, function, *args, **kwargs):
+        self.q.put((function, args, kwargs))
+    
+    def run(self):
+        while True:
+            try:
+                function, args, kwargs = self.q.get(timeout=self.timeout)
+                function(*args, **kwargs)
+            except queue.Empty:
+                self.__idle()
+
+    def __idle(self):
+        time.sleep(0.5) 
+
     # Approximates the policy and value using the Neural Network
     # Actor: state is input and probability of each action is output of model
     def __build_actor_critic(self):

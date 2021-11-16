@@ -75,6 +75,7 @@ class Adaptive(Strategy):
     def init_cache(self):
         if(self.selective_cache_agent == None):
             self.selective_cache_agent = self.selective_agent_factory.get_agent()
+            self.selective_cache_agent.start()
         # Set current session to profiler if not set
         if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
             self.__profiler.session = self.session
@@ -228,7 +229,9 @@ class Adaptive(Strategy):
                 curr_state = self.__translate_to_state(action[0], action[1])
                 diff = self.__window_counter - values[2]
                 reward, is_cached = self.__calculate_reward(action[0], action[1], values[0], diff) # 
-                self.selective_cache_agent.learn(values[0], 1 if is_cached else 0, reward, curr_state)
+                if(not self.__is_simple_agent):
+                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, [values[0], 1 if is_cached else 0, reward, curr_state])
+                    #self.selective_cache_agent.learn(values[0], 1 if is_cached else 0, reward, curr_state)
 
                 self.__decision_history_lock.acquire()
                 del self.__decision_history[action]
@@ -385,7 +388,8 @@ class Adaptive(Strategy):
                 self.__learning_counter += 1
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
-                _thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread, (entityid, out))
+                #_thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread, (entityid, out))
+                self.__evaluate_and_updated_observed_in_thread(entityid, out)
 
         if(self.__learning_counter % self.__learning_cycle == 0):
             if(isinstance(self.selective_cache_agent, DQNAgent)):
@@ -443,7 +447,12 @@ class Adaptive(Strategy):
                     # Translate the entity,attribute pair to a state
                     observation = self.__translate_to_state(entityid,att)
                     # Select the action for the state using the RL Agent
-                    action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                    action, (est_c_lifetime, est_delay) = None, (None, None)
+                    if(self.__is_simple_agent):
+                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                    else:
+                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, [observation])
+
                     if(not self.__is_simple_agent and (action == (entityid,att) or action == (0,0))):
                         self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
 
@@ -478,7 +487,13 @@ class Adaptive(Strategy):
                 if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
                     try:
                         observation = self.__translate_to_state(entityid,att)
-                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                        
+                        action, (est_c_lifetime, est_delay) = None, (None, None)
+                        if(self.__is_simple_agent):
+                            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                        else:
+                            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, [observation])
+                            
                         if(not self.__is_simple_agent and (action == (entityid,att) or action == (0,0))):
                             self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
 
@@ -979,8 +994,14 @@ class Adaptive(Strategy):
     def reevaluate_for_eviction(self, entityid, att):
         try:
             observation = self.__translate_to_state(entityid,att)
+            
+            action = None
+            if(self.__is_simple_agent):
+                action = self.selective_cache_agent.choose_action(observation, skipRandom = True)
+            else:
+                action = self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, [observation, True])
+
             # action, (est_c_lifetime, est_delay)
-            action = self.selective_cache_agent.choose_action(observation, skipRandom = True)
             if(not self.__is_simple_agent and (action[0] == (entityid,att) or action[0] == (0,0))):
                 self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
 
