@@ -4,6 +4,7 @@ import threading
 from datetime import datetime
 
 from agents.agent import Agent
+from lib.event import post_event_with_params
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 import numpy as np
@@ -76,9 +77,6 @@ class ACAgent(threading.Thread, Agent):
         self.__stateclusters = LinkedCluster(config.cluster_similarity_threshold, 
                     config.subcluster_similarity_threshold, config.pair_similarity_maximum)
 
-        # Setting up Actor and Critic Networks
-        self.actor, self.policy, self.critic = self.__build_actor_critic()
-
         # Cluster, Entity, Attribute Mapping for currently executing operations
         self.__cluster_context_map = {}
     
@@ -86,6 +84,9 @@ class ACAgent(threading.Thread, Agent):
         self.q.put((function, args, kwargs))
     
     def run(self):
+        # Setting up Actor and Critic Networks
+        self.actor, self.policy, self.critic = self.__build_actor_critic()
+
         while True:
             try:
                 function, args, kwargs = self.q.get(timeout=self.timeout)
@@ -115,7 +116,6 @@ class ACAgent(threading.Thread, Agent):
 
             return actor, policy, critic
         except(Exception):
-            print('new models')
             # Actor Model
             delta = Input(shape=[1])
             actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
@@ -156,7 +156,10 @@ class ACAgent(threading.Thread, Agent):
     # The biggest challenge here is the change of state with changes in the environment. 
     # So, there is no gurantee that the state will remain unchanged. 
     # So, the only option is to find the state that is the most similar using clustering.
-    def choose_action(self, observation, skip_random=False): 
+    def choose_action(self, paramters): 
+        observation = paramters[0]
+        skip_random = paramters[1]
+
         obs = np.asarray(observation['features'])[np.newaxis, :]
         entityid = observation['entityid']
         attribute = observation['attribute']
@@ -172,29 +175,34 @@ class ACAgent(threading.Thread, Agent):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
                         cached_lifetime = 10 # This need to set
-                        return (action, (cached_lifetime, 0))
+                        # entity, attribute, est_c_lifetime, est_delay, action, observation
+                        post_event_with_params("subscribed_actions", (action[0], action[1], cached_lifetime, 0, 1, observation['features']))
                     else:
                         delay_time = 10 # This need to be set
-                        return (action, (0, delay_time))
+                        post_event_with_params("subscribed_actions", (action[0], action[1], 0, delay_time, 0, observation['features']))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
                         cached_lifetime = 10 # This need to set
-                        return [(action, (cached_lifetime, 0))]
+                        post_event_with_params("subscribed_actions", (action[0], action[1], cached_lifetime, 0, 1, observation['features']))
                     else:
                         delay_time = 10 # This need to be set
-                        return (action, (0, delay_time))
+                        post_event_with_params("subscribed_actions", (action[0], action[1], 0, delay_time, 0, observation['features']))
             else:
-                delay_time = 5 # This need to be set
-                return ((0,0), (0, delay_time))
+                delay_time = 10 # This need to be set
+                post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
         else:
             # Decided to be cached
-            translated_action = (entityid, attribute) 
             cached_lifetime = 10 # This need to set
-            return (translated_action, (cached_lifetime, 0))
+            post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features']))
 
     # Learn the network
-    def learn(self, state, action, reward, next_state):
+    def learn(self, parameters):
+        state = parameters[0]
+        action = parameters[1]
+        reward = parameters[2]
+        next_state = parameters[3]
+
         state = np.array(state['features'])[np.newaxis, :]
         next_state = np.array(next_state['features'])[np.newaxis, :]
 

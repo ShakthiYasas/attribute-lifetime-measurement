@@ -6,7 +6,7 @@ import datetime
 import threading
 
 from profilers.profiler import Profiler
-from lib.event import post_event
+from lib.event import post_event_with_params
 
 # Profiler class for adaptive lifetime based refreshing
 # Perform the inferencing of average lifetime by intercepting the responses from the context providers.
@@ -152,7 +152,7 @@ class GreedyRetrievalThread (threading.Thread):
     def refresh(self):
         while True:
             # Trigger refresh event
-            post_event("need_to_refresh", self.name)
+            post_event_with_params("need_to_refresh", self.name)
             
             # Get the currently inffered lifetime of the attribute
             means = getattr(self.caller,'mean')

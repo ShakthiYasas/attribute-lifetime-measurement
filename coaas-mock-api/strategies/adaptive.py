@@ -6,6 +6,7 @@ import statistics
 from typing import Tuple
 
 from lib.event import post_event
+from lib.event import subscribe
 from agents.dqnagent import DQNAgent
 from lib.fifoqueue import FIFOQueue_2
 from agents.simpleagent import SimpleAgent
@@ -70,6 +71,8 @@ class Adaptive(Strategy):
         self.service_selector = ServiceSelector(db)
         if(not self.__isstatic):
             self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
+
+        subscribe("subscribed_actions", self.sub_cache_item)
           
     # Init_cache initializes the cache memory. 
     def init_cache(self):
@@ -219,18 +222,18 @@ class Adaptive(Strategy):
     # Executes learning the agent (parameter synchornization)
     def __learning_after_action(self):
         for action, values in self.__decision_history.items():
-            if(values[1] == False and values[2] >= self.__window_counter+4):
+            if(values[2] == False and values[3] >= self.__window_counter+4):
                 self.__decision_history_lock.acquire()
                 updated_val = list(values)
-                updated_val[1] = True
+                updated_val[2] = True
                 self.__decision_history[action] = tuple(updated_val)
                 self.__decision_history_lock.release()
 
                 curr_state = self.__translate_to_state(action[0], action[1])
-                diff = self.__window_counter - values[2]
-                reward, is_cached = self.__calculate_reward(action[0], action[1], values[0], diff) # 
+                diff = self.__window_counter - values[3]
+                reward, is_cached = self.__calculate_reward(action[0], action[1], values[0], diff)  
                 if(not self.__is_simple_agent):
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, [values[0], 1 if is_cached else 0, reward, curr_state])
+                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward, curr_state))
                     #self.selective_cache_agent.learn(values[0], 1 if is_cached else 0, reward, curr_state)
 
                 self.__decision_history_lock.acquire()
@@ -254,10 +257,9 @@ class Adaptive(Strategy):
 
     # Retrieving context data
     def get_result(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None) -> dict: 
-        if(self.__is_simple_agent):
-            return self.__get_result_when_simple(json, fthresh, req_id)
-        else:
-            return self.__get_result_when_simple(json, fthresh, req_id)
+        #if(self.__is_simple_agent):
+        return self.__get_result_when_simple(json, fthresh, req_id)
+        #else:
             # return self.__get_result_when_other(json, fthresh, req_id)
 
     # Retrive function when the agent is Simple
@@ -318,18 +320,19 @@ class Adaptive(Strategy):
                         else:
                             # Checking if any of the attributes are not fresh
                             for prodid,val,lastret in att_in_cache:
-                                lt = lifetimes[prodid]['lifetimes'][att_name]
-                                if(lt<0):
-                                    continue
-                                else:
-                                    extime = lt * (1 - fthresh[0])
-                                    time_at_expire = lastret + datetime.timedelta(seconds=extime)
-                                    if(now > time_at_expire):
-                                        # If the attribute doesn't meet the freshness level (Cache miss) from the producer
-                                        # add the entity and producer to the need to refresh list.
-                                        ishit = 0
-                                        refetching.append((entityid,ent['attributes'],prodid,lifetimes[prodid]['url']))
-                                        break
+                                if(prodid in lifetimes):
+                                    lt = lifetimes[prodid]['lifetimes'][att_name]
+                                    if(lt<0):
+                                        continue
+                                    else:
+                                        extime = lt * (1 - fthresh[0])
+                                        time_at_expire = lastret + datetime.timedelta(seconds=extime)
+                                        if(now > time_at_expire):
+                                            # If the attribute doesn't meet the freshness level (Cache miss) from the producer
+                                            # add the entity and producer to the need to refresh list.
+                                            ishit = 0
+                                            refetching.append((entityid,ent['attributes'],prodid,lifetimes[prodid]['url']))
+                                            break
                         
                         if(not (att_name in self.__cached[entityid])):
                             self.__cached[entityid][att_name] = [ishit]
@@ -450,22 +453,35 @@ class Adaptive(Strategy):
                     action, (est_c_lifetime, est_delay) = None, (None, None)
                     if(self.__is_simple_agent):
                         action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
-                    else:
-                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, [observation])
-
-                    if(not self.__is_simple_agent and (action == (entityid,att) or action == (0,0))):
-                        self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
-
-                    if(action != (0,0)):
-                        wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                        self.cache_memory.addcachedlifetime(action, wait_time)
-                        self.__last_actions.append(action)
-                        actions.append(action[1])
-                    else:
-                        if(entityid in self.__delay_dict):
-                            self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                        if(action != (0,0)):
+                            wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                            self.cache_memory.addcachedlifetime(action, wait_time)
+                            self.__last_actions.append(action)
+                            actions.append(action[1])
                         else:
-                            self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                            if(entityid in self.__delay_dict):
+                                self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                            else:
+                                self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                        
+                        if(action != (0,0) and action[0] == entityid):
+                                wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                                self.cache_memory.addcachedlifetime(action, wait_time)
+                                self.__last_actions.append(action)
+                                actions.append(action[1])
+                        else:
+                            if(action != (0,0)):
+                                wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                                self.cache_memory.addcachedlifetime(action, wait_time)
+                                self.__last_actions.append(action)
+                                self.__cache_entity_attribute_pairs([action])
+                            else:
+                                if(entityid in self.__delay_dict):
+                                    self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                                else:
+                                    self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                    else:
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False))                    
             except NewContextException:
                 if(entityid in self.__delay_dict):
                     self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -491,24 +507,22 @@ class Adaptive(Strategy):
                         action, (est_c_lifetime, est_delay) = None, (None, None)
                         if(self.__is_simple_agent):
                             action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
-                        else:
-                            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, [observation])
                             
-                        if(not self.__is_simple_agent and (action == (entityid,att) or action == (0,0))):
-                            self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
-
-                        if(action != (0,0) and action[0] == entityid):
-                            updated_attr_dict.append(action[1])
-                            self.cache_memory.addcachedlifetime(action, now + datetime.timedelta(seconds=est_c_lifetime))
-                            is_caching = True
-                        else:
-                            if(action != (0,0)):
-                                random_one.append(action)
+                            if(action != (0,0) and action[0] == entityid):
+                                updated_attr_dict.append(action[1])
+                                wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                                self.cache_memory.addcachedlifetime(action, wait_time)
+                                is_caching = True
                             else:
-                                if(entityid in self.__delay_dict):
-                                    self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                                if(action != (0,0)):
+                                    random_one.append((action[0], action[1], est_c_lifetime))
                                 else:
-                                    self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                                    if(entityid in self.__delay_dict):
+                                        self.__delay_dict[entityid][att] = self.__window_counter + est_delay
+                                    else:
+                                        self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
+                        else:
+                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False))  
                     except NewContextException:
                         if(entityid in self.__delay_dict):
                             self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -517,27 +531,38 @@ class Adaptive(Strategy):
                      
         if(is_caching):
             # Add to cache 
-            self.__last_actions = [(entityid, x) for x in updated_attr_dict]
+            self.__last_actions += [(entityid, x) for x in updated_attr_dict]
             updated_dict = {}
             for att in updated_attr_dict:
                 updated_dict[att] = attributes[att]
             self.cache_memory.save(entityid,updated_dict)
             # Push to profiler
             if(not self.__isstatic):
-                self.__profiler.reactive_push({entityid:updated_attr_dict})     
-            del self.__observed[entityid]
+                self.__profiler.reactive_push({entityid:updated_attr_dict})  
+            
+            for att in updated_attr_dict:
+                del self.__attribute_access_trend[entityid][att]
+                del self.__observed[entityid][att]
+            if(self.__observed[entityid]):
+                del self.__observed[entityid]
             # Update the observed list for uncached entities and attributes 
             self.__observedLock.acquire()
             self.__update_observed(entityid, list(set(updated_attr_dict) - set(attributes)))
             self.__observedLock.release()
         else:
             # Update the observed list for uncached entities and attributes 
-            self.__observedLock.acquire()
-            self.__update_observed(entityid, attributes)
-            self.__observedLock.release()
+            if(self.__is_simple_agent):
+                self.__observedLock.acquire()
+                self.__update_observed(entityid, attributes)
+                self.__observedLock.release()
 
         if(random_one):
-            self.__cache_entity_attribute_pairs(random_one)
+            for entity, att, cachelife in random_one:
+                
+                wait_time = now + datetime.timedelta(seconds=cachelife)
+                self.cache_memory.addcachedlifetime(action, wait_time)
+                self.__last_actions.append((entity, att))
+            self.__cache_entity_attribute_pairs(random_one, True)
     
     # Check if the context attribute has been evaluated to be delayed for caching
     def __check_delay(self,entity,attr):
@@ -549,7 +574,8 @@ class Adaptive(Strategy):
                 if(not self.__delay_dict[entity]):
                     del self.__delay_dict[entity]
                 return True
-        else: return True
+        else: 
+            return True
     
     # Check if the context attribute is observed to show a spike in demand
     def __is_spike(self,entity,attr):
@@ -562,13 +588,41 @@ class Adaptive(Strategy):
             return False
         else: return False  
 
+    # Subcriber method to cache an item
+    def sub_cache_item(self, parameters):
+        entity = parameters[0]
+        attribute = parameters[1]
+        est_c_lifetime = parameters[2]
+        est_delay = parameters[3]
+        action = parameters[4]
+        observation = parameters[5]
+
+        now = datetime.datetime.now()
+        if(action != 0):
+            # The item is to be cached
+            # Could be a random one or an item evulated to be cached
+            wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+            self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
+            self.__last_actions.append((entity, attribute))
+            self.__cache_entity_attribute_pairs([(entity, attribute)]) 
+        else:
+            self.__observedLock.acquire()
+            if(entity in self.__delay_dict):
+                self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+            else:
+                self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
+            self.__update_observed(entity, attribute)
+            self.__observedLock.release()
+
+        self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter)
+
     ###################################################################################
     # Section 04 - Caching
     # This section performs the caching actions by calling the methods in cache memory
     # instance and updating the statistics. 
     ###################################################################################
        
-    def __cache_entity_attribute_pairs(self, entityttpairs):
+    def __cache_entity_attribute_pairs(self, entityttpairs, is_random=False):
         ent_att = {}
         for entity,att in entityttpairs:
             if(entity in ent_att):
@@ -579,19 +633,22 @@ class Adaptive(Strategy):
             else:
                 ent_att[entity] = [att]
 
-        for entityid, attlist in ent_att:
+        for entityid, attlist in ent_att.items():
             lifetimes = self.service_registry.get_context_producers(entityid,attlist)
             li = [(prodid,value['url']) for prodid, value in lifetimes.items()]
             response = self.service_selector.get_response_for_entity(attlist,li)
-
             self.cache_memory.save(entityid, response)
             # Push to profiler
-            if(not self.__isstatic):
-                self.__profiler.reactive_push({entityid:[att]})     
-            del self.__observed[entityid]
-            del self.__entity_access_trend[entityid]
-            # Update the observed list for uncached entities and attributes 
-            self.__update_observed(entityid, [att])
+
+            for att in attlist:
+                if(not self.__isstatic):
+                    self.__profiler.reactive_push({entityid:[att]})    
+                del self.__attribute_access_trend[entityid][att]
+                if(entityid in self.__observed and att in self.__observed[entityid]):
+                    del self.__observed[entityid][att]
+            
+            if(entityid in self.__observed and not self.__observed[entityid]):
+                del self.__observed[entityid]
 
     # Update statistics when an item is transitioned from not cached to cached.
     def __update_observed(self, entityid, attributes):
@@ -999,11 +1056,7 @@ class Adaptive(Strategy):
             if(self.__is_simple_agent):
                 action = self.selective_cache_agent.choose_action(observation, skipRandom = True)
             else:
-                action = self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, [observation, True])
-
-            # action, (est_c_lifetime, est_delay)
-            if(not self.__is_simple_agent and (action[0] == (entityid,att) or action[0] == (0,0))):
-                self.__decision_history[(entityid,att)] = (observation, False, self.__window_counter)
+                self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation, True))
 
             return action
         except Exception:
