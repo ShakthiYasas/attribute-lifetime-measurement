@@ -4,8 +4,10 @@ import threading
 from datetime import datetime
 
 from agents.agent import Agent
+from lib.fifoqueue import FIFOQueue_2
 from lib.event import post_event_with_params
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
+
 
 import numpy as np
 import keras.backend as kb
@@ -17,9 +19,12 @@ from tensorflow.python.framework.ops import disable_eager_execution
 
 from agents.classifier.linkedcluster import LinkedCluster
 
-ACTOR_MODEL_PATH = 'agents/saved-models/actor-model'
-CRITIC_MODEL_PATH = 'agents/saved-models/critic-model'
-POLICY_MODEL_PATH = 'agents/saved-models/policy-model'
+LAYER_1_NEURONS = 512
+LAYER_2_NEURONS = 256
+
+ACTOR_MODEL_PATH = 'agents/saved-models/ac/actor-model'
+CRITIC_MODEL_PATH = 'agents/saved-models/ac/critic-model'
+POLICY_MODEL_PATH = 'agents/saved-models/ac/policy-model'
 
 class ACAgent(threading.Thread, Agent):
     __hashLock = threading.Lock()
@@ -35,11 +40,12 @@ class ACAgent(threading.Thread, Agent):
         # General Configuration
         self.__value_size = 1
         self.__caller = caller
+        self.__midtime =  (config.mid*config.window)/1000
         self.__reward_threshold = config.reward_threshold
 
         # Setting the hyper-parameters
-        self.__actor_lr = config.learning_rate 
-        self.__critic_lr = config.learning_rate*5
+        self.__actor_lr = config.learning_rate # i.e. 0.0001
+        self.__critic_lr = config.learning_rate*10 # i.e. 0.001
 
         self.__gamma = config.discount_rate
         self.__epsilons_max = config.e_greedy_max
@@ -71,7 +77,7 @@ class ACAgent(threading.Thread, Agent):
         self.__learn_step_counter = 0
 
         # History of rewards
-        self.reward_history = []
+        self.reward_history = FIFOQueue_2()
 
         # Initializing state space clustering algorithm
         self.__stateclusters = LinkedCluster(config.cluster_similarity_threshold, 
@@ -102,8 +108,8 @@ class ACAgent(threading.Thread, Agent):
     def __build_actor_critic(self):
         # NN Layers  
         input_layer = Input(shape=(self.__n_features,))
-        hidden_layer = Dense(512, activation='relu')(input_layer)
-        hidden_layer_2 = Dense(128, activation='relu')(hidden_layer)
+        hidden_layer = Dense(LAYER_1_NEURONS, activation='relu')(input_layer)
+        hidden_layer_2 = Dense(LAYER_2_NEURONS, activation='relu')(hidden_layer)
         value_layer = Dense(self.__value_size, activation='linear')(hidden_layer_2)
         output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer_2)
         
@@ -174,20 +180,19 @@ class ACAgent(threading.Thread, Agent):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
-                        cached_lifetime = 10 # This need to set
-                        # entity, attribute, est_c_lifetime, est_delay, action, observation
-                        post_event_with_params("subscribed_actions", (action[0], action[1], cached_lifetime, 0, 1, observation['features']))
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
                     else:
+                        # Even the random agent is evaluating not to cache the item
                         delay_time = 10 # This need to be set
-                        post_event_with_params("subscribed_actions", (action[0], action[1], 0, delay_time, 0, observation['features']))
+                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
-                        cached_lifetime = 10 # This need to set
-                        post_event_with_params("subscribed_actions", (action[0], action[1], cached_lifetime, 0, 1, observation['features']))
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
                     else:
+                        # Even the random agent is evaluating not to cache the item
                         delay_time = 10 # This need to be set
-                        post_event_with_params("subscribed_actions", (action[0], action[1], 0, delay_time, 0, observation['features']))
+                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
             else:
                 delay_time = 10 # This need to be set
                 post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
@@ -202,6 +207,8 @@ class ACAgent(threading.Thread, Agent):
         action = parameters[1]
         reward = parameters[2]
         next_state = parameters[3]
+
+        self.reward_history.push(reward)
 
         state = np.array(state['features'])[np.newaxis, :]
         next_state = np.array(next_state['features'])[np.newaxis, :]
@@ -232,7 +239,7 @@ class ACAgent(threading.Thread, Agent):
                 # current performance of the system. i.e., if MR is high, the increase epsilon (more exploration)
                 # and on the contrary, decrease epsilon if MR is less (more exploitation). 
                 if self.__epsilons_increment is not None:
-                    rho = np.mean(np.array(self.reward_history))
+                    rho = np.mean(np.array(self.reward_history.getlist()))
                     if rho >= self.__reward_threshold:
                         self.__epsilons -= self.__epsilons_decrement
                     else:

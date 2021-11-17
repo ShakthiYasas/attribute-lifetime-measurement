@@ -234,7 +234,6 @@ class Adaptive(Strategy):
                 reward, is_cached = self.__calculate_reward(action[0], action[1], values[0], diff)  
                 if(not self.__is_simple_agent):
                     self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward, curr_state))
-                    #self.selective_cache_agent.learn(values[0], 1 if is_cached else 0, reward, curr_state)
 
                 self.__decision_history_lock.acquire()
                 del self.__decision_history[action]
@@ -947,7 +946,7 @@ class Adaptive(Strategy):
                 total_gain += out*(price - penalty - retrieval)
             
             # This returns the gain or loss of caching an item per request
-            return total_gain/total_requests if total_requests>0 else -10, is_cached
+            return total_gain/total_requests if total_requests>0 else -30, is_cached
         else:
             # This item was not cached
             expected_vals = []
@@ -1006,7 +1005,7 @@ class Adaptive(Strategy):
             diff = sum([observed_vals[i] - expected_vals[i] for i in range(0,diff)])
             
             # This returns the regret of not caching the item
-            return diff/total_requests if total_requests>0 else 5, is_cached
+            return diff/total_requests if total_requests>0 else 10, is_cached
 
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:

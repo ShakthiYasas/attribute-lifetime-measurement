@@ -51,9 +51,9 @@ class ACConfiguration(Configuration):
     def __init__(self, config):
         defaults = config['DEFAULT']
         hyper_params = config['HYPER']
-
+        self.mid = int(defaults['MidWindow'])
         self.optimizer = defaults['Optimizer']
-
+        self.window = int(defaults['MovingWindow'])
         self.learning_rate = float(hyper_params['Alpha'])
         self.discount_rate = float(hyper_params['Gamma'])
         self.e_greedy_init = float(hyper_params['Epsilon'])
@@ -106,14 +106,16 @@ class DDPGConfiguration(Configuration):
     def __init__(self, config):
         defaults = config['DEFAULT']
         hyper_params = config['HYPER']
-
+        self.mid = int(defaults['MidWindow'])
         self.optimizer = defaults['Optimizer']
-
+        self.window = int(defaults['MovingWindow'])
         self.batch_size = int(defaults['MinibatchSize'])
         self.memory_size = int(defaults['MemoryListSize'])
         self.replace_target_iter = int(defaults['ParameterSync'])
         self.dynamic_e_greedy_iter = int(defaults['ExplorationEpoch'])
 
+        self.tau = float(hyper_params['Tau'])
+        self.gradient = float(hyper_params['Mu'])
         self.learning_rate = float(hyper_params['Alpha'])
         self.discount_rate = float(hyper_params['Gamma'])
         self.e_greedy_init = float(hyper_params['Epsilon'])
@@ -123,8 +125,9 @@ class DDPGConfiguration(Configuration):
         self.e_greedy_decrement = float(hyper_params['Delta_minus'])
 
         self.history_size = int(defaults['HistorySize'])
+        self.max_action_value = int(defaults['LongWindow'])
         self.reward_threshold = float(defaults['MaxReward'])
-
+        
         self.pair_similarity_maximum = float(defaults['MaxPairSimilarity'])
         self.cluster_similarity_threshold = float(defaults['ClusterSimilarityThreshold'])
         self.subcluster_similarity_threshold = float(defaults['SubClusterSimilarityThreshold'])
