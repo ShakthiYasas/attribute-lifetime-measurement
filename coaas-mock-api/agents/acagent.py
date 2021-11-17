@@ -77,7 +77,7 @@ class ACAgent(threading.Thread, Agent):
         self.__learn_step_counter = 0
 
         # History of rewards
-        self.reward_history = FIFOQueue_2()
+        self.reward_history = FIFOQueue_2(100)
 
         # Initializing state space clustering algorithm
         self.__stateclusters = LinkedCluster(config.cluster_similarity_threshold, 

@@ -12,8 +12,8 @@ class ReplayBuffer():
         # State, Action, Reward, New State buffer memories
         self.reward_memory = np.zeros(self.mem_size)
         self.action_memory = np.zeros((self.mem_size, n_actions))
-        self.state_memory = np.zeros((self.mem_size, *input_shape))
-        self.new_state_memory = np.zeros((self.mem_size, *input_shape))
+        self.state_memory = np.zeros((self.mem_size, input_shape))
+        self.new_state_memory = np.zeros((self.mem_size, input_shape))
 
     def store_transition(self, state, action, reward, new_state):
         # This acts like a FIFO Queue.

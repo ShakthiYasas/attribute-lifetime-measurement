@@ -4,8 +4,9 @@ import threading
 
 import numpy as np 
 import tensorflow as tf
-from tensorflow.initializers import random_uniform
+from tensorflow.keras.initializers import RandomUniform
 
+from keras import regularizers
 from agents.agent import Agent
 from lib.fifoqueue import FIFOQueue_2
 from lib.event import post_event_with_params
@@ -74,7 +75,7 @@ class DDPGACAgent(threading.Thread, Agent):
         self.__learn_step_counter = 0
 
         # History of rewards
-        self.reward_history = FIFOQueue_2()
+        self.reward_history = FIFOQueue_2(100)
 
     # Push a request to the queue to run a function of this class
     def onThread(self, function, *args, **kwargs):
@@ -83,7 +84,7 @@ class DDPGACAgent(threading.Thread, Agent):
     # Executing the thread
     def run(self):
         # Initializing Tensorflow Session
-        self.__session = tf.Session()
+        self.__session = tf.compat.v1.Session()
 
         # Actor-Critic Networks
         self.__critic = Critic(self.__critic_lr, 'Critic', self.__session)
@@ -106,7 +107,7 @@ class DDPGACAgent(threading.Thread, Agent):
             self.__update_actor.append(self.__target_actor.params[i].assign(
                     tf.multiply(self.__actor.params[i], self.__tau) + tf.multiply(self.__target_actor.params[i], 1 - self.__tau)))
 
-        self.__session.run(tf.global_variables_initializer())
+        self.__session.run(tf.compat.v1.global_variables_initializer())
         self.__update_network_params(True)
 
         while True:
@@ -131,8 +132,8 @@ class DDPGACAgent(threading.Thread, Agent):
 
     # Internal method for above
     def __update_networks(self):
-        self.__target_critic.__session.run(self.__update_critic)
-        self.__target_actor.__session.run(self.__update_actor)
+        self.__target_critic.get_session().run(self.__update_critic)
+        self.__target_actor.get_session().run(self.__update_actor)
 
     # Select the most suitable action given a state
     def choose_action(self, paramters):
@@ -245,80 +246,6 @@ class DDPGACAgent(threading.Thread, Agent):
         
         self.__critic.get_last_checkpoint()
         self.__target_critic.get_last_checkpoint()
-
-class Actor(object):
-    def __int__(self, learning_rate, name, session, action_bound, batch_size):
-        self.__name = name
-        self.__session = session
-        self.__batch_size = batch_size
-        self.__actor_lr = learning_rate
-        self.__action_bound = action_bound
-        
-        # Build the actor network
-        self.__build_network()
-
-        # Persisting the model parameters
-        self.params = tf.trainable_variables(scope=self.__name)
-        self.__saver = tf.train.Saver()
-        self.__checkpoint_file = CHECKPOINT_PATH + self.__name + '.ckpt'
-
-        # Initializing Policy Gradient
-        self.__init_policy_grad = tf.gradients(self.__mu, self.params, self.__action_gradient_ph)
-        self.__actor_gradients = list(map(lambda x: tf.div(x, self.__batch_size), self.__init_policy_grad))
-        self.__optimizer = tf.train.AdamOptimizer(self.__actor_lr).apply_gradients(zip(self.__actor_gradients, self.params))
-    
-    def __build_network(self):
-        with tf.variable_scope(self.__name):
-            self.__input_ph = tf.placeholder(tf.float32, shape=[None, N_FEATURES], name='inputs')
-            self.__action_gradient_ph = tf.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
-
-            # Input Layer
-            f1 = 1/np.sqrt(LAYER_1_NEURONS)
-            input_layer = tf.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
-                                kernel_initializer=random_uniform(-f1, f1),
-                                bias_initializer=random_uniform(-f1, f1))
-            batch_1 = tf.layers.batch_normalization(input_layer)
-            input_layer_activation = tf.nn.relu(batch_1)
-
-            # Hidden Layer
-            f2 = 1/np.sqrt(LAYER_2_NEURONS)
-            hidden_layer = tf.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
-                                kernel_initializer=random_uniform(-f2, f2),
-                                bias_initializer=random_uniform(-f2, f2))
-            batch_2 = tf.layers.batch_normalization(hidden_layer)
-            hidden_layer_activation = tf.nn.relu(batch_2)
-
-            # Output Layer
-            f3 = 0.003 # This an intial value
-            output_layer = tf.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
-                                activation='tanh',
-                                kernel_initializer=random_uniform(-f3, f3),
-                                bias_initializer=random_uniform(-f3, f3))
-            self.__mu = tf.multiply(output_layer, self.__action_bound)
-    
-    # Get the action
-    def predict(self, observation):
-        return self.__session.run(self.__mu, 
-                            feed_dict={
-                                self.__input_ph : observation['features']
-                            })
-
-    # Learing the model from experience
-    def learn(self, inputs, gradients):
-        self.__session.run(self.__optimizer, 
-                        feed_dict={
-                            self.__input_ph : inputs,
-                            self.__action_gradient_ph : gradients
-                        })
-
-    # Saving the current session in it's current state
-    def save_checkpoint(self):
-        self.__saver.save(self.__session, self.__checkpoint_file)
-    
-    # Restoring an existing session
-    def get_last_checkpoint(self):
-        self.__saver.restore(self.__session, self.__checkpoint_file)
-
     
 class Critic(object):
     def __init__(self, learning_rate, name, session):
@@ -330,44 +257,47 @@ class Critic(object):
         self.__build_network()
 
         # Persisting the model parameters
-        self.params = tf.trainable_variables(scope=self.__name)
-        self.__saver = tf.train.Saver()
+        self.params = tf.compat.v1.trainable_variables(scope=self.__name)
+        self.__saver = tf.compat.v1.train.Saver()
         self.__checkpoint_file = CHECKPOINT_PATH + self.__name + '.ckpt'
 
         self.__init_policy_grad = tf.gradients(self.__q_value, self.__action_ph)
-        self.__optimizer = tf.train.AdamOptimizer(self.__critic_lr).minimize(self.__loss)
+        self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__critic_lr).minimize(self.__loss)
+
+    def get_session(self):
+        return self.__session
 
     def __build_network(self):
-        with tf.variable_scope(self.__name):
-            self.__input_ph = tf.placeholder(tf.float32, shape=[None, N_FEATURES], name='inputs')
-            self.__action_ph = tf.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
-            self.__q_target = tf.placeholder(tf.float32, shape=[None, 1], name='targets')
+        with tf.compat.v1.variable_scope(self.__name):
+            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_FEATURES], name='inputs')
+            self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
+            self.__q_target = tf.compat.v1.placeholder(tf.float32, shape=[None, 1], name='targets')
 
             # Input Layer
             f1 = 1/np.sqrt(LAYER_1_NEURONS)
-            input_layer = tf.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
-                                kernel_initializer=random_uniform(-f1, f1),
-                                bias_initializer=random_uniform(-f1, f1))
-            batch_1 = tf.layers.batch_normalization(input_layer)
+            input_layer = tf.compat.v1.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
+                                kernel_initializer=RandomUniform(-f1, f1),
+                                bias_initializer=RandomUniform(-f1, f1))
+            batch_1 = tf.compat.v1.layers.batch_normalization(input_layer)
             input_layer_activation = tf.nn.relu(batch_1)
 
             # Hidden Layer
             f2 = 1/np.sqrt(LAYER_2_NEURONS)
-            hidden_layer = tf.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
-                                kernel_initializer=random_uniform(-f2, f2),
-                                bias_initializer=random_uniform(-f2, f2))
-            batch_2 = tf.layers.batch_normalization(hidden_layer)
+            hidden_layer = tf.compat.v1.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
+                                kernel_initializer=RandomUniform(-f2, f2),
+                                bias_initializer=RandomUniform(-f2, f2))
+            batch_2 = tf.compat.v1.layers.batch_normalization(hidden_layer)
 
-            action_in = tf.layers.dense(self.__actions, units=LAYER_2_NEURONS, activation='relu')
+            action_in = tf.compat.v1.layers.dense(self.__action_ph, units=LAYER_2_NEURONS, activation='relu')
             state_actions = tf.add(batch_2, action_in)
             state_actions = tf.nn.relu(state_actions)
 
             # Output Layer
             f3 = 0.003 # This an intial value
-            self.__q_value = tf.layers.dense(state_actions, units=1, 
-                                kernel_initializer=random_uniform(-f3, f3),
-                                bias_initializer=random_uniform(-f3, f3),
-                                kernel_regularizer=tf.keras.regularizer.l2(0.01))
+            self.__q_value = tf.compat.v1.layers.dense(state_actions, units=1, 
+                                kernel_initializer=RandomUniform(-f3, f3),
+                                bias_initializer=RandomUniform(-f3, f3),
+                                kernel_regularizer=regularizers.l2(0.01))
             self.__loss = tf.losses.mean_squared_error(self.__q_target, self.__q_value)
 
     # Get the action
@@ -393,6 +323,82 @@ class Critic(object):
                         feed_dict={
                             self.__input_ph : observations,
                             self.__action_ph : actions
+                        })
+
+    # Saving the current session in it's current state
+    def save_checkpoint(self):
+        self.__saver.save(self.__session, self.__checkpoint_file)
+    
+    # Restoring an existing session
+    def get_last_checkpoint(self):
+        self.__saver.restore(self.__session, self.__checkpoint_file)
+
+class Actor(object):
+    def __init__(self, learning_rate, name, session, action_bound, batch_size):
+        self.__name = name
+        self.__session = session
+        self.__batch_size = batch_size
+        self.__actor_lr = learning_rate
+        self.__action_bound = action_bound
+        
+        # Build the actor network
+        self.__build_network()
+
+        # Persisting the model parameters
+        self.params = tf.compat.v1.trainable_variables(scope=self.__name)
+        self.__saver = tf.compat.v1.train.Saver()
+        self.__checkpoint_file = CHECKPOINT_PATH + self.__name + '.ckpt'
+
+        # Initializing Policy Gradient
+        self.__init_policy_grad = tf.gradients(self.__mu, self.params, self.__action_gradient_ph)
+        self.__actor_gradients = list(map(lambda x: tf.divide(x, self.__batch_size), self.__init_policy_grad))
+        self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__actor_lr).apply_gradients(zip(self.__actor_gradients, self.params))
+    
+    def get_session(self):
+        return self.__session
+
+    def __build_network(self):
+        with tf.compat.v1.variable_scope(self.__name):
+            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_FEATURES], name='inputs')
+            self.__action_gradient_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
+
+            # Input Layer
+            f1 = 1/np.sqrt(LAYER_1_NEURONS)
+            input_layer = tf.compat.v1.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
+                                kernel_initializer=RandomUniform(-f1, f1),
+                                bias_initializer=RandomUniform(-f1, f1))
+            batch_1 = tf.compat.v1.layers.batch_normalization(input_layer)
+            input_layer_activation = tf.nn.relu(batch_1)
+
+            # Hidden Layer
+            f2 = 1/np.sqrt(LAYER_2_NEURONS)
+            hidden_layer = tf.compat.v1.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
+                                kernel_initializer=RandomUniform(-f2, f2),
+                                bias_initializer=RandomUniform(-f2, f2))
+            batch_2 = tf.compat.v1.layers.batch_normalization(hidden_layer)
+            hidden_layer_activation = tf.nn.relu(batch_2)
+
+            # Output Layer
+            f3 = 0.003 # This an intial value
+            output_layer = tf.compat.v1.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
+                                activation='tanh',
+                                kernel_initializer=RandomUniform(-f3, f3),
+                                bias_initializer=RandomUniform(-f3, f3))
+            self.__mu = tf.multiply(output_layer, self.__action_bound)
+    
+    # Get the action
+    def predict(self, observation):
+        return self.__session.run(self.__mu, 
+                            feed_dict={
+                                self.__input_ph : observation['features']
+                            })
+
+    # Learing the model from experience
+    def learn(self, inputs, gradients):
+        self.__session.run(self.__optimizer, 
+                        feed_dict={
+                            self.__input_ph : inputs,
+                            self.__action_gradient_ph : gradients
                         })
 
     # Saving the current session in it's current state
