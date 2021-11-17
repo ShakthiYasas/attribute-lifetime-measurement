@@ -3,8 +3,9 @@ from agents.acagent import ACAgent
 from agents.dqnagent import DQNAgent
 from agents.a3cagent import A3CAgent
 from agents.simpleagent import SimpleAgent
+from agents.ddpgacagent import DDPGACAgent
 
-from configurations.agentconfig import DQNConfiguration, A3CConfiguration, ACConfiguration, SimpleConfiguration
+from configurations.agentconfig import DQNConfiguration, A3CConfiguration, ACConfiguration, SimpleConfiguration, DDPGConfiguration
 
 # Instantiate a singleton agent instance according to configuration
 class AgentFactory:
@@ -24,6 +25,8 @@ class AgentFactory:
                 self.__configuration = A3CConfiguration(configuration)
             elif(type == 'dqn'):
                 self.__configuration = DQNConfiguration(configuration)
+            elif(type == 'ddpg'):
+                self.__configuration = DDPGConfiguration(configuration)
             else:
                 raise ValueError('Invalid RL agent type.')
 
@@ -42,6 +45,9 @@ class AgentFactory:
             elif(self.__configuration != None and isinstance(self.__configuration,A3CConfiguration)):
                 print('Initializing a Asynchronous-Advantage-Actor-Critic based RL agent for selective context caching.')
                 self.__agent = A3CAgent(self.__configuration, self.__caller)
+            elif(self.__configuration != None and isinstance(self.__configuration,DDPGConfiguration)):
+                print('Initializing a Deep-Detterministic-Policy-Gradient-Actor-Critic based RL agent for selective context caching.')
+                self.__agent = DDPGACAgent(self.__configuration, self.__caller)
             else:
                 raise ValueError('Invalid configuration.')
         

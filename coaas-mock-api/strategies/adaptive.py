@@ -558,7 +558,7 @@ class Adaptive(Strategy):
     
     # Check if the context attribute is observed to show a spike in demand
     def __is_spike(self,entity,attr):
-        if(self.__isobserved(entity, attr)):
+        if(self.__isobserved(entity, attr) and entity in self.__attribute_access_trend):
             att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
             if(len(att_trend)<2):
                 return False
@@ -1066,10 +1066,12 @@ class Adaptive(Strategy):
     # Get a snap shot of the cache memory statistics
     def get_cache_statistics(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
-        return {
-            'cached_attributes': [i for i in res.keys()] if res else {},
-            'discount_rate': self.selective_cache_agent.get_discount_rate()
-        }
+        output = {
+                'cached_attributes': [i for i in res.keys()] if res else {}
+            }
+        if(self.__is_simple_agent):
+            output['discount_rate'] = self.selective_cache_agent.get_discount_rate()
+        return output
 
     # Returns the current statistics from the profiler
     def get_current_profile(self):
@@ -1077,13 +1079,14 @@ class Adaptive(Strategy):
 
     # Returns the variation of average cost of context caching
     def get_cost_variation(self, session = None):
-        output = []
+        output = {}
         hit_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         
         if(session):
             stats = self.__db.read_all('returnofcaching', {'session': session})
             if(stats):
-                output = [(stat['window'],stat['return']) for stat in stats]
+                for stat in stats:
+                    output[stat['window']] = stat['return']
         else:
             if(self.__window_counter >= self.trend_ranges[1]):
                 hit_rate = self.cache_memory.get_hitrate_trend().get_last_range(10)
@@ -1097,9 +1100,9 @@ class Adaptive(Strategy):
                     hr = hit_rate[idx]
                     sla = slas[idx]
                     ret_cost = ret_costs[idx]
-                    output[idx] = (idx, request_rates[idx]*((hr*sla[1]) - ((1-hr)*sla[2]) - ((1-hr)*ret_cost)))
+                    output[idx] = request_rates[idx]*((hr*sla[1]) - ((1-hr)*sla[2]) - ((1-hr)*ret_cost))
                 except Exception:
-                    output[idx] = (idx, 0)
+                    output[idx] = 0
 
         return output
     

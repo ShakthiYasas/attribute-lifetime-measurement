@@ -1,6 +1,6 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join('..')))
-import numpy as np
+
 
 import _thread
 import secrets
@@ -8,10 +8,11 @@ import traceback
 import configparser
 from pathlib import Path
 from datetime import datetime
+
+import numpy as np
 import matplotlib.pyplot as plt
 from flask import Flask, request
 from flask_restful import Resource, Api
-
 from lib.mongoclient import MongoClient
 from lib.response import parse_response
 from lib.sqlliteclient import SQLLiteClient
@@ -140,7 +141,8 @@ class Statistics(Resource):
                 session = str(request.args.get('session'))
                 data = selected_algo.get_cost_variation(session)
                 return {
-                    'variation': data
+                    'variation': data,
+                    'schema': 'index : return (gain or loss)'
                 }, 200   
         else:
             return {'message': 'Invalid URL'}, 404   
