@@ -184,8 +184,8 @@ class DDPGACAgent(threading.Thread, Agent):
 
         self.reward_history.push(reward)
 
-        state = np.array(state['features'])[np.newaxis, :]
-        new_state = np.array(new_state['features'])[np.newaxis, :]
+        state = np.asarray(state['features'])[np.newaxis, :]
+        new_state = np.asarray(new_state['features'])[np.newaxis, :]
 
         self.__buffer.store_transition(state, action, reward, new_state)
 
