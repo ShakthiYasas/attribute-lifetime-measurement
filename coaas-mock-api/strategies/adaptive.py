@@ -561,8 +561,10 @@ class Adaptive(Strategy):
             att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
             if(len(att_trend)<2):
                 return False
-            if((att_trend[0]*2)>=att_trend[1]):
-                return True
+            if(att_trend[1] > 0):
+                growth = (att_trend[1] - att_trend[0])/att_trend[1]
+                if(growth >= 1):
+                    return True
             return False
         else: return False  
 
@@ -621,7 +623,8 @@ class Adaptive(Strategy):
             for att in attlist:
                 if(not self.__isstatic):
                     self.__profiler.reactive_push({entityid:[att]})    
-                del self.__attribute_access_trend[entityid][att]
+                if(entityid in self.__attribute_access_trend and att in self.__attribute_access_trend[entityid]):
+                    del self.__attribute_access_trend[entityid][att]
                 if(entityid in self.__observed and att in self.__observed[entityid]):
                     del self.__observed[entityid][att]
             

@@ -143,15 +143,15 @@ class DDPGACAgent(threading.Thread, Agent):
         obs = np.asarray(observation['features'])[np.newaxis, :]
         entityid = observation['entityid']
         attribute = observation['attribute']
-
+        
         mu = self.__actor.predict(obs)
         noise = self.__noise()
         mu_prime = mu + noise
-
         in_time = (mu_prime[0] * self.__window)/1000
+
         if(mu_prime>0):
             # Estimated a positive cached lifetime. So, is decided to be cached
-            post_event_with_params("subscribed_actions", (entityid, attribute, in_time, 0, 1, observation['features']))
+            post_event_with_params("subscribed_actions", (entityid, attribute, in_time[0], 0, 1, observation['features']))
         else:
             random_value = np.random.uniform()
             if(random_value < self.__epsilons and not skip_random):
@@ -161,18 +161,18 @@ class DDPGACAgent(threading.Thread, Agent):
                         post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
                     else:
                         # Even the random agent evaluates not to cache
-                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0], 0, observation['features']))
+                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
                         post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
                     else:
                         # Even the random agent evaluates not to cache
-                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0], 0, observation['features']))
+                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
             else:
                 # Estimated a negative cached lifetime.
                 # So, is not decided to be cached and the estimation is used to delay the next decision epoch.
-                post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0], 0, observation['features']))
+                post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
         
     # Modify and update the actor and critic networks
     # based on experience
@@ -293,7 +293,7 @@ class Critic(object):
             state_actions = tf.nn.relu(state_actions)
 
             # Output Layer
-            f3 = 0.003 # This an intial value
+            f3 = 0.5 # This an intial value
             self.__q_value = tf.compat.v1.layers.dense(state_actions, units=1, 
                                 kernel_initializer=RandomUniform(-f3, f3),
                                 bias_initializer=RandomUniform(-f3, f3),
@@ -379,7 +379,7 @@ class Actor(object):
             hidden_layer_activation = tf.nn.relu(batch_2)
 
             # Output Layer
-            f3 = 0.003 # This an intial value
+            f3 = 0.5 # This an intial value
             output_layer = tf.compat.v1.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
                                 activation='tanh',
                                 kernel_initializer=RandomUniform(-f3, f3),
@@ -390,7 +390,7 @@ class Actor(object):
     def predict(self, observation):
         return self.__session.run(self.__mu, 
                             feed_dict={
-                                self.__input_ph : observation['features']
+                                self.__input_ph : observation
                             })
 
     # Learing the model from experience
