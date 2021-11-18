@@ -1,6 +1,7 @@
 import time
 import queue
 import threading
+import statistics
 from datetime import datetime
 
 from agents.agent import Agent
@@ -171,35 +172,44 @@ class ACAgent(threading.Thread, Agent):
         attribute = observation['attribute']
 
         probabilities = self.policy.predict(obs, verbose=0)[0]
-        action = probabilities[1] if (probabilities[0] == probabilities[1]) else np.argmax(probabilities, axis=0)
+        action = 1
+        if(probabilities[0] > probabilities[1]):
+            action = 0
 
         if(action == 0):
             # Item is defenitly not to be cached
+            delay_time = self.__calculate_delay(probabilities[action])
+            post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
+
             random_value = np.random.uniform()
             if(random_value < self.__epsilons and not skip_random):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
                         post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
-                    else:
-                        # Even the random agent is evaluating not to cache the item
-                        delay_time = 10 # This need to be set
-                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
-                    else:
-                        # Even the random agent is evaluating not to cache the item
-                        delay_time = 10 # This need to be set
-                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
-            else:
-                delay_time = 10 # This need to be set
-                post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features'])) 
         else:
             # Decided to be cached
-            cached_lifetime = 10 # This need to set
+            cached_lifetime = self.__calculate_expected_cached_lifetime(entityid, attribute, probabilities[action])
             post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features']))
+
+    def __calculate_expected_cached_lifetime(self, entityid, attr, prob):
+        cached_lt_res = self.__caller.__db.read_all_with_limit('attribute-cached-lifetime',{
+                    'entity': entityid,
+                    'attribute': attr
+                },10)
+        if(cached_lt_res):
+            avg_lt = statistics.mean(list(map(lambda x: x['c_lifetime'], cached_lt_res)))
+            return (avg_lt/0.5)*(prob-0.5)
+        else:
+            return self.__midtime
+    
+    def __calculate_delay(self, prob):
+        return (self.__midtime/0.5)*(prob-0.5)
+
 
     # Learn the network
     def learn(self, parameters):

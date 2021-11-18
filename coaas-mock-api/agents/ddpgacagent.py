@@ -157,26 +157,21 @@ class DDPGACAgent(threading.Thread, Agent):
             # Estimated a positive cached lifetime. So, is decided to be cached
             post_event_with_params("subscribed_actions", (entityid, attribute, in_time[0], 0, 1, observation['features']))
         else:
+            # Estimated a negative cached lifetime.
+            # So, is not decided to be cached and the estimation is used to delay the next decision epoch.
+            post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
+
             random_value = np.random.uniform()
             if(random_value < self.__epsilons and not skip_random):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
                         post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
-                    else:
-                        # Even the random agent evaluates not to cache
-                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
                         post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
-                    else:
-                        # Even the random agent evaluates not to cache
-                        post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
-            else:
-                # Estimated a negative cached lifetime.
-                # So, is not decided to be cached and the estimation is used to delay the next decision epoch.
-                post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features']))
+                
         
     # Modify and update the actor and critic networks
     # based on experience
