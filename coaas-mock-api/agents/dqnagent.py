@@ -6,6 +6,14 @@ from agents.agent import Agent
 from lib.event import subscribe
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
+#################################################################################################
+# IMPORTANT
+# ---------
+# This DQN Agent is not suitable for adaptive context caching.
+# So, this agent is not fully implemented and not useful.
+# Ignore this file and don not use 'dqn' as an agent in config.
+#################################################################################################
+
 # Random seeding
 np.random.seed(1)
 tf.set_random_seed(1)

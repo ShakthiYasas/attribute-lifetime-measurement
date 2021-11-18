@@ -210,7 +210,7 @@ class ACAgent(threading.Thread, Agent):
 
         self.reward_history.push(reward)
 
-        state = np.array(state['features'])[np.newaxis, :]
+        state = np.array(state)[np.newaxis, :]
         next_state = np.array(next_state['features'])[np.newaxis, :]
 
         critic_value = self.critic.predict(state)
@@ -229,6 +229,8 @@ class ACAgent(threading.Thread, Agent):
         # Saving the model again as an update
         self.actor.save(ACTOR_MODEL_PATH)
         self.critic.save(CRITIC_MODEL_PATH)
+
+        self.__learn_step_counter+=1
 
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:
@@ -249,7 +251,9 @@ class ACAgent(threading.Thread, Agent):
                     self.__epsilons -= self.__epsilons_decrement
 
             # Enforce upper bound and lower bound
-            truncate = lambda x, lower, upper: min(max(x, lower), upper)
-            self.__epsilons = truncate(self.__epsilons, self.epsilons_min, self.__epsilons_max)
+            if(self.__epsilons < self.epsilons_min):
+                self.__epsilons = self.epsilons_min
+            elif(self.__epsilons > self.__epsilons_max):
+                self.__epsilons = self.__epsilons_max
 
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1

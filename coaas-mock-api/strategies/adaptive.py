@@ -149,38 +149,42 @@ class Adaptive(Strategy):
                 del self.__observed[key]
                 del self.__attribute_access_trend[key]
             else:
-                invalidtss = [num for num in value['req_ts'] if num < exp_time]
-                for i in invalidtss:
-                    value['req_ts'].pop(0)
+                self.__update_attribute_access_trend(exp_time, key, value, __reqs_in_window)
 
-                validtss = value['req_ts']
+    def __update_attribute_access_trend(self, exp_time, key, value, __reqs_in_window=None):
+        __reqs_in_window = self.__reqs_in_window if not __reqs_in_window else __reqs_in_window
+        invalidtss = [num for num in value['req_ts'] if num < exp_time]
+        for i in invalidtss:
+            value['req_ts'].pop(0)
+
+            validtss = value['req_ts']
+            access_freq = 0
+            if(__reqs_in_window>0):
+                access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
+            self.__entity_access_trend.push(access_freq)
+                
+            for curr_attr, access_list in value['attributes'].items():
+                invalidtss = [num for num in access_list if num < exp_time]
+                for i in invalidtss:
+                    value['attributes'][curr_attr].pop(0)
+
+                validtss = value['attributes'][curr_attr]
                 access_freq = 0
                 if(__reqs_in_window>0):
                     access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
-                self.__entity_access_trend.push(access_freq)
-                
-                for curr_attr, access_list in value['attributes'].items():
-                    invalidtss = [num for num in access_list if num < exp_time]
-                    for i in invalidtss:
-                        value['attributes'][curr_attr].pop(0)
-
-                    validtss = value['attributes'][curr_attr]
-                    access_freq = 0
-                    if(__reqs_in_window>0):
-                        access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
-                    if(key in self.__attribute_access_trend):
-                        if(curr_attr in self.__attribute_access_trend[key]):
-                            self.__attribute_access_trend[key][curr_attr].push(access_freq)
-                        else:
-                            que = FIFOQueue_2(1000)
-                            que.push(access_freq)
-                            self.__attribute_access_trend[key][curr_attr] = que
+                if(key in self.__attribute_access_trend):
+                    if(curr_attr in self.__attribute_access_trend[key]):
+                        self.__attribute_access_trend[key][curr_attr].push(access_freq)
                     else:
                         que = FIFOQueue_2(1000)
                         que.push(access_freq)
-                        self.__attribute_access_trend[key] = {
-                            curr_attr : que
-                        }
+                        self.__attribute_access_trend[key][curr_attr] = que
+                else:
+                    que = FIFOQueue_2(1000)
+                    que.push(access_freq)
+                    self.__attribute_access_trend[key] = {
+                        curr_attr : que
+                    }
 
     def __clear_cached(self):
         __reqs_in_window = self.__reqs_in_window
@@ -220,9 +224,10 @@ class Adaptive(Strategy):
                 self.__cached[key][curr_attr].clear()
 
     # Executes learning the agent (parameter synchornization)
-    def __learning_after_action(self):
-        for action, values in self.__decision_history.items():
-            if(values[2] == False and values[3] >= self.__window_counter+4):
+    def __learning_after_action(self):     
+        prev_decisions = self.__decision_history.copy().items()
+        for action, values in prev_decisions:
+            if((not values[2]) and values[3] <= self.__window_counter+4):
                 self.__decision_history_lock.acquire()
                 updated_val = list(values)
                 updated_val[2] = True
@@ -294,7 +299,8 @@ class Adaptive(Strategy):
 
                 output[entityid] = {}
                 # Refetch from the producer if atleast 1 of it's attributes are not available or not fresh
-                if(self.cache_memory.are_all_atts_cached(entityid, ent['attributes'])):
+                is_all_cached, uncached = self.cache_memory.are_all_atts_cached(entityid, ent['attributes'])
+                if(is_all_cached):
                     self.__learning_counter -= 1
                     # All of the attributes requested are in cache for the entity
                     for att_name in ent['attributes']:
@@ -340,6 +346,13 @@ class Adaptive(Strategy):
                     self.__learning_counter += 1
                     # Doesn't cache any item until atleast the mid range is reached
                     if(self.__window_counter >= self.trend_ranges[1]+1):
+                        # Update hit rate here for those which have already been cached
+                        for att_name in (set(ent['attributes']) - uncached):
+                            if(not (att_name in self.__cached[entityid])):
+                                self.__cached[entityid][att_name] = [ishit]
+                            else:
+                                self.__cached[entityid][att_name].append(ishit)
+
                         caching_attrs = self.__evalute_attributes_for_caching(entityid,
                                                 self.__get_attributes_not_cached(entityid, ent['attributes']))
                         if(caching_attrs):
@@ -347,7 +360,7 @@ class Adaptive(Strategy):
                         self.__evaluated.append(entityid)
                     else:
                         self.__update_observed(entityid, ent['attributes'])
-
+                    
                 threads = []
                 if(len(new_context)>0):
                     en_re_th = threading.Thread(target=self.__refresh_cache_for_entity(new_context))
@@ -361,7 +374,7 @@ class Adaptive(Strategy):
                 # Waiting for all refreshing to complete
                 for t in threads:
                     t.join()
-                
+
                 val = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
                 
                 for att_name,prod_values in val.items():
@@ -705,6 +718,10 @@ class Adaptive(Strategy):
         fea_vec = []
         if(isobserved):
             # Actual and Expected Access Rates 
+            if(not (att in self.__attribute_access_trend[entityid])):
+                exp_time = datetime.datetime.now()-datetime.timedelta(seconds=self.__moving_window/1000)
+                self.__update_attribute_access_trend(exp_time, entityid, self.__observed[entityid])
+
             attribute_trend = self.__attribute_access_trend[entityid][att]
             trend_size = attribute_trend.get_queue_size()
 
@@ -949,7 +966,7 @@ class Adaptive(Strategy):
                 total_gain += out*(price - penalty - retrieval)
             
             # This returns the gain or loss of caching an item per request
-            return total_gain/total_requests if total_requests>0 else -30, is_cached
+            return total_gain/total_requests if total_requests>0 else -10, is_cached
         else:
             # This item was not cached
             expected_vals = []
@@ -1073,6 +1090,8 @@ class Adaptive(Strategy):
             }
         if(self.__is_simple_agent):
             output['discount_rate'] = self.selective_cache_agent.get_discount_rate()
+        else:
+            output['epsilon'] = self.selective_cache_agent.get_current_epsilon()
         return output
 
     # Returns the current statistics from the profiler

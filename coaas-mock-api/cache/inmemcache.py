@@ -150,10 +150,14 @@ class InMemoryCache(CacheAgent):
 
     # Check if the all the attributes requested for the entity is cached
     def are_all_atts_cached(self,entityid,attributes):
+        uncached = set()
         for attribute in attributes:
             if(not(entityid in self.__entityhash and attribute in self.__entityhash[entityid])):
-                return False
-        return True
+                uncached.add(attribute)
+
+        if(uncached): 
+            return False, uncached
+        return True, []
 
     # Read from cache using key
     def get_value_by_key(self,entityid,attribute):

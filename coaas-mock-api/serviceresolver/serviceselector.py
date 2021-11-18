@@ -80,8 +80,8 @@ class ServiceSelector:
                     'context_producer': cp
                 },10)
                 if(res):
-                    for values in res.values():
-                        rtlist.append(statistics.mean([x for x in values['lifetimes'].values()]))
+                    for values in res:
+                        rtlist.append(values['avg_response_time'])
             else:
                 rtlist.append(rt)
 

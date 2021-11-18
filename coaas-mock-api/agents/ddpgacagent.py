@@ -31,8 +31,8 @@ class DDPGACAgent(threading.Thread, Agent):
         disable_eager_execution()
 
         # Thread
-        self.timeout = 1.0/60
-        self.q = queue.Queue()
+        self.__timeout = 1.0/60
+        self.__action_queue = queue.Queue()
         super(DDPGACAgent, self).__init__()
 
         # General Configuration
@@ -79,7 +79,7 @@ class DDPGACAgent(threading.Thread, Agent):
 
     # Push a request to the queue to run a function of this class
     def onThread(self, function, *args, **kwargs):
-        self.q.put((function, args, kwargs))
+        self.__action_queue.put((function, args, kwargs))
     
     # Executing the thread
     def run(self):
@@ -112,7 +112,7 @@ class DDPGACAgent(threading.Thread, Agent):
 
         while True:
             try:
-                function, args, kwargs = self.q.get(timeout=self.timeout)
+                function, args, kwargs = self.__action_queue.get(timeout=self.__timeout)
                 function(*args, **kwargs)
             except queue.Empty:
                 self.__idle()
@@ -134,6 +134,10 @@ class DDPGACAgent(threading.Thread, Agent):
     def __update_networks(self):
         self.__target_critic.get_session().run(self.__update_critic)
         self.__target_actor.get_session().run(self.__update_actor)
+
+    # Get the value of the epsilon value now
+    def get_current_epsilon(self):
+        return self.__epsilons
 
     # Select the most suitable action given a state
     def choose_action(self, paramters):
@@ -184,7 +188,7 @@ class DDPGACAgent(threading.Thread, Agent):
 
         self.reward_history.push(reward)
 
-        state = np.asarray(state['features'])[np.newaxis, :]
+        state = np.asarray(state)[np.newaxis, :]
         new_state = np.asarray(new_state['features'])[np.newaxis, :]
 
         self.__buffer.store_transition(state, action, reward, new_state)
@@ -207,6 +211,8 @@ class DDPGACAgent(threading.Thread, Agent):
 
         self.__update_network_params()
 
+        self.__learn_step_counter+=1
+
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:
             # If e-greedy
@@ -226,8 +232,10 @@ class DDPGACAgent(threading.Thread, Agent):
                     self.__epsilons -= self.__epsilons_decrement
 
             # Enforce upper bound and lower bound
-            truncate = lambda x, lower, upper: min(max(x, lower), upper)
-            self.__epsilons = truncate(self.__epsilons, self.epsilons_min, self.__epsilons_max)
+            if(self.__epsilons < self.epsilons_min):
+                self.__epsilons = self.epsilons_min
+            elif(self.__epsilons > self.__epsilons_max):
+                self.__epsilons = self.__epsilons_max
 
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
     
