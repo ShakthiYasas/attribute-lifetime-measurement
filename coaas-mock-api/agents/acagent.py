@@ -42,6 +42,7 @@ class ACAgent(threading.Thread, Agent):
         self.__value_size = 1
         self.__caller = caller
         self.__midtime =  (config.mid*config.window)/1000
+        self.__longtime = (config.long*config.window)/1000
         self.__reward_threshold = config.reward_threshold
 
         # Setting the hyper-parameters
@@ -208,8 +209,7 @@ class ACAgent(threading.Thread, Agent):
             return self.__midtime
     
     def __calculate_delay(self, prob):
-        return (self.__midtime/0.5)*(prob-0.5)
-
+        return (self.__longtime/0.5)*(prob-0.5)
 
     # Learn the network
     def learn(self, parameters):

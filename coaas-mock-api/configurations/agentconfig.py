@@ -51,7 +51,10 @@ class ACConfiguration(Configuration):
     def __init__(self, config):
         defaults = config['DEFAULT']
         hyper_params = config['HYPER']
+
         self.mid = int(defaults['MidWindow'])
+        self.long = int(defaults['LongWindow'])
+        
         self.optimizer = defaults['Optimizer']
         self.window = int(defaults['MovingWindow'])
         self.learning_rate = float(hyper_params['Alpha'])
