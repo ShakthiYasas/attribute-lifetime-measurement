@@ -335,7 +335,13 @@ class Adaptive(Strategy):
                                             ishit = 0
                                             refetching.append((entityid,ent['attributes'],prodid,lifetimes[prodid]['url']))
                                             break
-                        
+                            
+                            # Checking if there exist new providers that are already not cached
+                            new_providers = set(lifetimes.keys()) - set([info[0] for info in att_in_cache])
+                            if(len(new_providers)):
+                                # There are some new context providers from which data need to be retrieved
+                                print()
+                                            
                         if(not (att_name in self.__cached[entityid])):
                             self.__cached[entityid][att_name] = [ishit]
                         else:
@@ -346,8 +352,16 @@ class Adaptive(Strategy):
                     self.__learning_counter += 1
                     # Doesn't cache any item until atleast the mid range is reached
                     if(self.__window_counter >= self.trend_ranges[1]+1):
-                        # Update hit rate here for those which have already been cached
+                        # Update hit rate here for those which have already been cached of the entity
                         for att_name in (set(ent['attributes']) - uncached):
+                            ishit = 1
+                            lt = lifetimes[prodid]['lifetimes'][att_name]
+                            if(lt >= 0):
+                                extime = lt * (1 - fthresh[0])
+                                time_at_expire = lastret + datetime.timedelta(seconds=extime)
+                                if(now > time_at_expire):
+                                    ishit = 0
+
                             if(not (att_name in self.__cached[entityid])):
                                 self.__cached[entityid][att_name] = [ishit]
                             else:
@@ -700,12 +714,6 @@ class Adaptive(Strategy):
         # Average Retriveal Cost [14]
         avg_ret_cost = statistics.mean([values['cost'] for values in lifetimes.values()])
         fea_vec.append(avg_ret_cost)
-
-        # Whether cached or not [15]
-        #if(self.cache_memory.is_cached(entityid, att)):
-        #    fea_vec.append(1)
-        #else:
-        #    fea_vec.append(0)
 
         return {
             'entityid': entityid,
