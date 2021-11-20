@@ -167,6 +167,7 @@ class ACAgent(threading.Thread, Agent):
     def choose_action(self, paramters): 
         observation = paramters[0]
         skip_random = paramters[1]
+        ref_key = paramters[2]
 
         obs = np.asarray(observation['features'])[np.newaxis, :]
         entityid = observation['entityid']
@@ -180,22 +181,22 @@ class ACAgent(threading.Thread, Agent):
         if(action == 0):
             # Item is defenitly not to be cached
             delay_time = self.__calculate_delay(probabilities[action])
-            post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features']))
+            post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features'], ref_key))
 
             random_value = np.random.uniform()
             if(random_value < self.__epsilons and not skip_random):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features']))
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features'], ref_key))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features'])) 
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features'], ref_key)) 
         else:
             # Decided to be cached
             cached_lifetime = self.__calculate_expected_cached_lifetime(entityid, attribute, probabilities[action])
-            post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features']))
+            post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features'], ref_key))
 
     def __calculate_expected_cached_lifetime(self, entityid, attr, prob):
         cached_lt_res = self.__caller.__db.read_all_with_limit('attribute-cached-lifetime',{

@@ -17,7 +17,7 @@ class FIFOQueue():
 
 
 class FIFOQueue_2():
-    def __init__(self,size):
+    def __init__(self,size=99999):
         self.__size = size
         self.__queue = list()
 
@@ -49,3 +49,6 @@ class FIFOQueue_2():
 
     def get_queue_size(self):
         return len(self.__queue)
+
+    def pop(self):
+        return self.__queue.pop(0)

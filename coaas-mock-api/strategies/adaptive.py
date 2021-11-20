@@ -1,3 +1,4 @@
+import secrets
 import time
 import _thread
 import datetime
@@ -36,6 +37,7 @@ class Adaptive(Strategy):
     __attribute_access_trend = {}
     __cached_hit_access_trend = {}
     __cached_attribute_access_trend = {}
+    __temp_entity_att_provider_map = {}
 
     # Counters
     rr_trend_size = 0
@@ -44,13 +46,15 @@ class Adaptive(Strategy):
 
     # Status
     __already_modified = False
+    __last_item_to_recieve = None
 
     # Queues
     __sla_trend = FIFOQueue_2(10)
+    __waiting_to_retrive = FIFOQueue_2()
     __entity_access_trend = FIFOQueue_2(100)
     __request_rate_trend = FIFOQueue_2(1000)
     __retrieval_cost_trend = FIFOQueue_2(10)
-
+    
     __observedLock = threading.Lock()
     __decision_history_lock = threading.Lock()
 
@@ -296,6 +300,7 @@ class Adaptive(Strategy):
                 lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'])
 
             if(entityid in self.cache_memory.get_statistics_all()):
+                reference = None
                 # Entity is cached
                 # Atleast one of the attributes of the entity is already cached 
                 if(not (entityid in self.__cached)):
@@ -380,7 +385,10 @@ class Adaptive(Strategy):
                                     new_providers.add((entityid,att_name))
                                     attrs_need_providers += list(new_pros)
 
-                        caching_attrs = self.__evalute_attributes_for_caching(entityid, uncached)
+                        reference = secrets.token_hex(nbytes=8)
+                        self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
+
+                        caching_attrs = self.__evalute_attributes_for_caching(entityid, uncached, reference)
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
                         self.__evaluated.append(entityid)
@@ -422,6 +430,9 @@ class Adaptive(Strategy):
             else:
                 # Even the entity is not cached previously
                 # So, first retrieving the entity
+                reference = secrets.token_hex(nbytes=8)
+                self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
+
                 out = self.__retrieve_entity(ent['attributes'],lifetimes)
                 output[entityid] = {}
                 for att_name,prod_values in out.items():
@@ -431,7 +442,7 @@ class Adaptive(Strategy):
                 # Evaluate whether to cache               
                 # Doesn't cache any item until atleast the mid range is reached
                 #_thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread, (entityid, out))
-                self.__evaluate_and_updated_observed_in_thread(entityid, out)
+                self.__evaluate_and_updated_observed_in_thread(entityid, out, reference)
 
         if(self.__learning_counter % self.__learning_cycle == 0):
             if(isinstance(self.selective_cache_agent, DQNAgent)):
@@ -444,10 +455,10 @@ class Adaptive(Strategy):
 
         return output
 
-    def __evaluate_and_updated_observed_in_thread(self, entityid, out):
+    def __evaluate_and_updated_observed_in_thread(self, entityid, out, ref_key):
         if(self.__window_counter >= self.trend_ranges[1]+1):
             # Run this in the background
-            self.__evaluate_for_caching(entityid, out)
+            self.__evaluate_for_caching(entityid, out, ref_key)
             self.__evaluated.append(entityid)
         else:
             self.__observedLock.acquire()
@@ -461,7 +472,7 @@ class Adaptive(Strategy):
     ###################################################################################
 
     # Evaluate for caching
-    def __evalute_attributes_for_caching(self, entityid, attributes:list) -> list:
+    def __evalute_attributes_for_caching(self, entityid, attributes:list, ref_key) -> list:
         # Evaluate the attributes to cache or not
         actions = []
         now = datetime.datetime.now()
@@ -502,7 +513,7 @@ class Adaptive(Strategy):
                                 else:
                                     self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                     else:
-                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False))                    
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False,ref_key))                    
             except NewContextException:
                 if(entityid in self.__delay_dict):
                     self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -511,7 +522,7 @@ class Adaptive(Strategy):
 
         return actions         
 
-    def __evaluate_for_caching(self, entityid, attributes:dict):
+    def __evaluate_for_caching(self, entityid, attributes:dict, ref_key):
         # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
         random_one = []
@@ -543,7 +554,7 @@ class Adaptive(Strategy):
                                     else:
                                         self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                         else:
-                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False))  
+                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False,ref_key))  
                     except NewContextException:
                         if(entityid in self.__delay_dict):
                             self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -614,31 +625,59 @@ class Adaptive(Strategy):
     # Subcriber method to cache an item
     def sub_cache_item(self, parameters):
         entity = parameters[0]
-        attribute = parameters[1]
-        est_c_lifetime = parameters[2]
-        est_delay = parameters[3]
-        action = parameters[4]
-        observation = parameters[5]
-        providers = parameters[6]   # Make sure providers are in the return of AC and DDPG
+        ref_key = parameters[6] 
 
-        now = datetime.datetime.now()
-        if(action != 0):
-            # The item is to be cached
-            # Could be a random one or an item evulated to be cached
-            wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-            self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
-            self.__last_actions.append((entity, attribute))
-            self.__cache_entity_attribute_pairs([(entity, attribute)], providers=providers) 
+        if(self.__last_item_to_recieve == None):
+            self.__waiting_to_retrive.push(parameters)
+        elif(entity != self.__last_item_to_recieve[0] and ref_key == self.__last_item_to_recieve[6]):
+            # Different entity and reference 
+            last_observed = self.__last_item_to_recieve
+            providers = []
+            if(last_observed[6] in self.__temp_entity_att_provider_map):
+                providers =  self.__temp_entity_att_provider_map[last_observed[6]]
+
+            now = datetime.datetime.now()
+            ent_att_pairs = []
+            while True:
+                head = self.__waiting_to_retrive.get_head()
+                if(head[0] == last_observed[0] and head[6] == last_observed[6]):
+                    current_element = self.__waiting_to_retrive.pop()
+
+                    entity = current_element[0]
+                    attribute = current_element[1]
+                    est_c_lifetime = current_element[2]
+                    est_delay = current_element[3]
+                    action = current_element[4]
+                    observation = current_element[5]
+
+                    if(action != 0):
+                        # The item is to be cached
+                        # Could be a random one or an item evulated to be cached
+                        wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                        self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
+                        self.__last_actions.append((entity, attribute))
+                        ent_att_pairs.append((entity, attribute))
+                        
+                    else:
+                        self.__observedLock.acquire()
+                        if(entity in self.__delay_dict):
+                            self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+                        else:
+                            self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
+                        self.__update_observed(entity, attribute)
+                        self.__observedLock.release()     
+
+                    self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter)       
+                else:
+                    break
+                
+            self.__cache_entity_attribute_pairs(ent_att_pairs, providers=providers) 
+            del self.__temp_entity_att_provider_map[last_observed[6]]
         else:
-            self.__observedLock.acquire()
-            if(entity in self.__delay_dict):
-                self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
-            else:
-                self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
-            self.__update_observed(entity, attribute)
-            self.__observedLock.release()
+            # Same entity
+            self.__waiting_to_retrive.push(parameters)
 
-        self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter)
+        self.__last_item_to_recieve = parameters
 
     ###################################################################################
     # Section 04 - Caching

@@ -34,7 +34,7 @@ class SimpleAgent(Agent):
             self.__explore_mentor = RandomAgent()
 
     # Decide whether to cache or not cache for the observation
-    def choose_action(self, observation, skip_random=False): 
+    def choose_action(self, observation, skip_random=False, ref_key=None): 
         entityid = observation['entityid']
         attribute = observation['attribute']
         observation = observation['features']
