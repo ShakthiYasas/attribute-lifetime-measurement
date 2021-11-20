@@ -8,6 +8,7 @@ from lib.fifoqueue import FIFOQueue_2
 class ServiceSelector:
     __statistics = dict()
     __statsLock = threading.Lock()
+    __recent_history = FIFOQueue_2(100)
 
     def __init__(self, db):
         self.requester = Requester()
@@ -27,11 +28,16 @@ class ServiceSelector:
 
         return output
 
+    def get_current_retrival_latency(self):
+        lst = self.__recent_history.getlist()
+        return statistics.mean(lst) if len(lst)>0 else 0
+
     def __get_context(self, prodid, url, attributes, now, output):
         res = self.requester.get_response(url)
         if(res):
             aft_time = datetime.now()
             responetime = (aft_time-now).total_seconds()
+            self.__recent_history.push(responetime)
 
             if(not (prodid in self.__statistics)):
                 queue = FIFOQueue_2(100)

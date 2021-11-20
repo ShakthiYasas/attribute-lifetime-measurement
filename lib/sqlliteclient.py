@@ -72,8 +72,8 @@ class SQLLiteClient:
     def add_cached_life(self, entityid, attribute, lifetime):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         cursor=self.__conn.cursor()
-        statement = "INSERT INTO CachedLifetime (entityid, attribute, lifetime) VALUES\
-            ("+str(entityid)+",'"+str(attribute)+"','"+str(lifetime)+"')"
+        statement = "INSERT INTO CachedLifetime (entityid, attribute, lifetime, cached) VALUES\
+            ("+str(entityid)+",'"+str(attribute)+"','"+str(lifetime)+"', datetime('now'))"
         self.__conn.execute(statement)
         return cursor.lastrowid
 
@@ -92,7 +92,7 @@ class SQLLiteClient:
     def get_cached_life(self, entityid, attribute):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         res = self.__conn.execute(
-            "SELECT FROM CachedLifetime\
+            "SELECT lifetime, cached FROM CachedLifetime\
             WHERE entityid="+str(entityid)+" AND attribute='"+attribute+"'\
             ORDER BY Id DESC\
             LIMIT 1)").fetchone()
@@ -103,6 +103,20 @@ class SQLLiteClient:
         res = self.__conn.execute(
             "SELECT entityid, attribute FROM CachedLifetime\
             WHERE lifetime<=datetime('now')").fetchall()
+        return res[0]
+
+    # Current retrieval latency
+    def update_ret_latency(self, latency):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        self.__conn.execute(
+            "UPDATE CurrentRetrievalLatency SET latency="+str(latency)+"\
+            Id=1)")
+    
+    def get_ret_latency(self):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        res = self.__conn.execute(
+            "SELECT latency cached FROM CurrentRetrievalLatency\
+            LIMIT 1)").fetchone()
         return res[0]
 
 
@@ -189,6 +203,10 @@ class SQLLiteClient:
         self.__conn.execute(
             "INSERT INTO ContextServiceProducer VALUES\
                 (2,1),(2,3),(2,4),(1,6),(1,7)")
+        
+        self.__conn.execute(
+            "INSERT INTO CurrentRetrievalLatency VALUES\
+                (1,0)")
         
         self.__conn.commit()
 
@@ -277,7 +295,15 @@ class SQLLiteClient:
                 Id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 entityid INT NOT NULL,
                 attribute TEXT NOT NULL,
-                lifetime DATETIME NOT NULL
+                lifetime DATETIME NOT NULL,
+                cached DATETIME NOT NULL
+            );''')
+        
+        self.__conn.execute(
+            '''CREATE TABLE CurrentRetrievalLatency
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                latency REAL NOT NULL
             );''')
         
         self.__conn.commit()

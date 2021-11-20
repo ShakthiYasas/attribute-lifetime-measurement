@@ -111,6 +111,8 @@ class Adaptive(Strategy):
         # Multithread the following 3
         if(self.__window_counter > 3):
             self.__extrapolate_request_rate()
+        
+        _thread.start_new_thread(self.service_registry.update_ret_latency, (self.service_selector.get_current_retrival_latency()))
 
         if(self.__window_counter >= self.trend_ranges[1]): 
             exp_time = datetime.datetime.now()-datetime.timedelta(seconds=self.__moving_window/1000)

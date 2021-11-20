@@ -1,3 +1,4 @@
+import random
 import numpy as np
 
 from cache.eviction.evictor import Evictor
@@ -16,3 +17,8 @@ class RandomEvictor(Evictor):
         selected_att = attributes[np.random.randint(0,len(attributes)+1)]
 
         return [(selected_entity, selected_att)]
+
+    # Select a random entity to evict
+    def select_entity_to_evict(self, internal=False):
+        secure_random = random.SystemRandom()
+        return secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])
