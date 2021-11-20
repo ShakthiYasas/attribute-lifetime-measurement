@@ -36,6 +36,20 @@ class SQLLiteClient:
                 WHERE entityId="+str(entityid)+" AND isActive=1").fetchall()
         return list(map(lambda x: x[0], producers))
 
+    # Retrieve the URLs of the providers given ids
+    def get_context_producers_by_ids(self, providers) -> dict:
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        output = {}
+        producers = self.__conn.execute(
+                "SELECT id, url \
+                FROM ContextProducer \
+                WHERE isActive=1 AND id IN "+str(providers)).fetchall()
+        
+        for prod in producers:
+            output[prod[1]] = {'url':prod[1]}
+        
+        return output
+
     # Retrieve the URLs of the matching providers and lifetimes of the attributes
     def get_context_producers(self, entityid, attributes) -> dict:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
