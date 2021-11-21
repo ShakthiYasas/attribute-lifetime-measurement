@@ -166,14 +166,14 @@ class SQLLiteClient:
         
         self.__conn.execute(
             "INSERT INTO ContextProducer VALUES\
-                (1,2,1,'http://localhost:5000/bikes',0.6, 1),\
-                (3,1,1,'http://localhost:5000/cars?id=3',0.25, 0.5),\
-                (4,1,1,'http://localhost:5000/cars?id=4',0.4, 1),\
-                (5,1,1,'http://localhost:5000/cars?id=5',0.3, 0.2),\
-                (6,1,1,'http://localhost:5000/cars?id=6',0.2, 4),\
-                (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017),\
-                (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033),\
-                (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017)")
+                (1,2,1,'http://localhost:5000/bikes',0.6, 1, NULL, NULL, 'CX123'),\
+                (3,1,1,'http://localhost:5000/cars?id=3',0.25, 0.5, NULL, NULL, '1HR800'),\
+                (4,1,1,'http://localhost:5000/cars?id=4',0.4, 1, NULL, NULL, '1VC546'),\
+                (5,1,1,'http://localhost:5000/cars?id=5',0.3, 0.2, NULL, NULL, '1DH8906'),\
+                (6,1,1,'http://localhost:5000/cars?id=6',0.2, 4, NULL, NULL, '1KP1244'),\
+                (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017, '-37.84938300336436', '145.11336178206872', NULL),\
+                (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033, '-37.84586713387071', '145.1149120988647', NULL),\
+                (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017, '-37.84621449228698', '145.11596352479353', NULL)")
         
         self.__conn.execute(
             "INSERT INTO ContextAttribute VALUES\
@@ -250,6 +250,9 @@ class SQLLiteClient:
                 url TEXT NOT NULL,
                 price REAL NOT NULL,
                 samplingrate REAL NOT NULL,
+                latitude REAL NULL,
+                longitude REAL NULL,
+                regno TEXT NULL,
                 FOREIGN KEY (entityId) REFERENCES Entity(id)
             );''')
 
