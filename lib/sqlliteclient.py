@@ -3,6 +3,12 @@ import sqlite3
 class SQLLiteClient:
     def __init__(self, db_name):
         self.__dbname = db_name
+        self.__service_description = {
+            1: ['regno'],
+            2: ['regno'],
+            3: ['longitude', 'latitude'],
+            4: ['longitude', 'latitude']
+        }
 
     # Check the consumer and retrieve freshness
     def get_freshness_for_consumer(self, consumerid, slaid):
@@ -73,11 +79,15 @@ class SQLLiteClient:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         output = {}
         if(len(attributes)>0):
+            context_in_desc = self.__service_description[entityid] if entityid in self.__service_description else None          
             producers = self.__conn.execute(
                 "SELECT id, url, price, samplingrate \
                 FROM ContextProducer \
                 WHERE entityId="+str(entityid)+" AND isActive=1").fetchall()
             
+            if(context_in_desc):
+                attributes = set(attributes) - set(context_in_desc)
+
             if(len(producers)>0):
                 att_string = "name='"+attributes[0]+"'"
                 if(len(attributes)>1):
@@ -94,11 +104,16 @@ class SQLLiteClient:
                         lts = {}
                         for att in att_res:
                             lts[att[0]] = -1 if att[1] == -1 else max(sampling_interval,att[1])
+                        if(context_in_desc):
+                            for i in range(0,len(context_in_desc)):
+                                 lts[context_in_desc[i]] = -1
+                        
                         output[prod[0]] = {
                             'url': prod[1],
                             'lifetimes': lts,
                             'cost': prod[2]
                         }
+
         return output
     
     def add_cached_life(self, entityid, attribute, lifetime):
