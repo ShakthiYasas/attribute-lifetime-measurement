@@ -146,7 +146,7 @@ class SQLLiteClient:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "INSERT INTO Entity (id,name) VALUES\
-            (1,'Car'),(2,'Bike'),(3,'CarPark')")
+            (1,'Car'),(2,'Bike'),(3,'CarPark'), (4,'Weather')")
        
         self.__conn.execute(
             "INSERT INTO SLA (id,freshness,price,penalty,rtmax,isActive) VALUES\
@@ -162,7 +162,7 @@ class SQLLiteClient:
         
         self.__conn.execute(
             "INSERT INTO ContextService VALUES\
-            (1,'Carpark Tracker',1),(2,'Vehicle Tracker',1),(3,'Weather Monitor',0)")
+            (1,'Carpark Tracker',1),(2,'Vehicle Tracker',1),(3,'Weather Monitor',1)")
         
         self.__conn.execute(
             "INSERT INTO ContextProducer VALUES\
@@ -171,52 +171,45 @@ class SQLLiteClient:
                 (4,1,1,'http://localhost:5000/cars?id=4',0.4, 1, NULL, NULL, '1VC546'),\
                 (5,1,1,'http://localhost:5000/cars?id=5',0.3, 0.2, NULL, NULL, '1DH8906'),\
                 (6,1,1,'http://localhost:5000/cars?id=6',0.2, 4, NULL, NULL, '1KP1244'),\
-                (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017, '-37.84938300336436', '145.11336178206872', NULL),\
-                (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033, '-37.84586713387071', '145.1149120988647', NULL),\
-                (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017, '-37.84621449228698', '145.11596352479353', NULL)")
+                (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017, -37.84938300336436, 145.11336178206872, NULL),\
+                (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033, -37.84586713387071', 145.1149120988647, NULL),\
+                (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017, -37.84621449228698', 145.11596352479353, NULL),\
+                (11,4,1,'http://localhost:5000/weather?id=1',0.2, 0.017, -37.848027507269634, 145.1155451001933, NULL),")
         
         self.__conn.execute(
+            # Assume that each car park has a varying parking cost (i.e. peak and off-peak price)
             "INSERT INTO ContextAttribute VALUES\
-                (1,'speed',1,0,'kmph'),\
-                (2,'location',1,0,'cordinate'),\
-                (3,'regno',1,-1,'text'),"+             
-                "(4,'speed',3,0,'kmph'),\
-                (5,'location',3,0,'cordinate'),\
-                (6,'height',3,-1,'m'),\
-                (7,'capacity',3,-1,'number'),\
-                (8,'model',3,-1,'text'),\
-                (9,'regno',3,-1,'text'),\
-                (10,'speed',4,0,'kmph'),\
-                (11,'location',4,0,'cordinate'),\
-                (12,'height',4,-1,'m'),\
-                (13,'capacity',4,-1,'number'),\
-                (14,'regno',4,-1,'text'),\
-                (16,'speed',5,0,'kmph'),\
-                (17,'location',5,0,'cordinate'),\
-                (18,'height',5,-1,'m'),\
-                (19,'capacity',5,-1,'number'),\
-                (20,'model',5,-1,'text'),\
-                (21,'regno',5,-1,'text'),\
-                (23,'speed',6,0,'kmph'),\
-                (24,'location',6,0,'cordinate'),\
-                (25,'height',6,-1,'m'),\
-                (26,'regno',6,-1,'text'),"+              
-                "(28,'maxheight',8,-1,'m'),\
-                (29,'location',8,-1,'cordinate'),\
-                (30,'availability',8,30,'s'),\
-                (31,'price',8,-1,'/hr'),\
-                (33,'totalslots',8,-1,'number'),\
-                (35,'location',9,-1,'cordinate'),\
-                (36,'availability',9,60,'s'),\
-                (37,'price',9,-1,'/hr'),\
-                (39,'maxheight',10,-1,'m'),\
-                (40,'location',10,-1,'cordinate'),\
-                (41,'availability',10,150,'s'),\
-                (42,'price',10,-1,'/hr')")
+                (1,'speed',1,0,'kmph'),"+      
+                "(3,'speed',3,0,'kmph'),\
+                (4,'height',3,-1,'m'),\
+                (5,'capacity',3,-1,'number'),\
+                (6,'model',3,-1,'text'),\
+                (7,'speed',4,0,'kmph'),\
+                (8,'height',4,-1,'m'),\
+                (9,'capacity',4,-1,'number'),\
+                (10,'speed',5,0,'kmph'),\
+                (11,'height',5,-1,'m'),\
+                (12,'capacity',5,-1,'number'),\
+                (13,'model',5,-1,'text'),\
+                (14,'speed',6,0,'kmph'),\
+                (15,'height',6,-1,'m'),"+            
+                "(16,'maxheight',8,-1,'m'),\
+                (17,'availability',8,30,'s'),\
+                (18,'price',8,-1,'/hr'),\
+                (19,'totalslots',8,-1,'number'),\
+                (20,'availability',9,60,'s'),\
+                (21,'price',9,-1,'/hr'),\
+                (22,'maxheight',10,-1,'m'),\
+                (23,'availability',10,150,'s'),\
+                (24,'price',10,-1,'/hr'),\
+                (25,'temperature',11,1800,'C'),\
+                (26,'windspeed',10,10,'kmph'),\
+                (27,'winddiretion',10,10,'degrees'),\
+                (28,'humidity',10,900,'percentage')")
         
         self.__conn.execute(
             "INSERT INTO ContextServiceProducer VALUES\
-                (2,1),(2,3),(2,4),(1,6),(1,7)")
+                (2,1),(2,3),(2,4),(1,6),(1,7),(3,11)")
         
         self.__conn.execute(
             "INSERT INTO CurrentRetrievalLatency VALUES\
