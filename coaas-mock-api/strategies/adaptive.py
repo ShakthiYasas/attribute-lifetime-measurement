@@ -82,6 +82,7 @@ class Adaptive(Strategy):
     # Init_cache initializes the cache memory. 
     def init_cache(self):
         self.__learning_skip = max(5,self.trend_ranges[0])
+        setattr(self.service_selector, 'service_registry', self.service_registry)
 
         if(self.selective_cache_agent == None):
             self.selective_cache_agent = self.selective_agent_factory.get_agent()
