@@ -1,3 +1,5 @@
+import time
+import _thread
 import threading
 import statistics
 from datetime import datetime, timedelta
@@ -7,18 +9,28 @@ from lib.fifoqueue import FIFOQueue_2
 # Simple Context Service Resolution
 class ServiceSelector:
     __statistics = dict()
-    __statsLock = threading.Lock()
+    __stats_lock = threading.Lock()
     __recent_history = FIFOQueue_2(100)
+    
+    __provider_hash = {}
+    __hash_lock = threading.Lock()
 
-    def __init__(self, db):
+    def __init__(self, db, window = 5000):
         self.requester = Requester()
         self.__db = db
+        self.__window = window
+
+        # Initializing background thread to clear hash
+        thread = threading.Thread(target=self.__run, args=())
+        thread.daemon = True               
+        thread.start() 
 
     def get_response_for_entity(self, attributes:list, urllist:list):
         output = {}
         now = datetime.now()
         threads = []
         for prodid, url in urllist:
+            _thread.start_new_thread(self.__update_recency_bit, (prodid))
             t = threading.Thread(target=self.__get_context(prodid, url, attributes, now, output))
             t.start()
             threads.append(t)
@@ -28,6 +40,19 @@ class ServiceSelector:
 
         return output
 
+    def __run(self):
+        while True:
+            self.__reset_recency_bit()
+            time.sleep(self.__window/1000)
+
+    def __update_recency_bit(self, prodid):
+            self.__hash_lock.acquire()
+            self.__provider_hash[prodid] = True
+            self.__hash_lock.release()
+
+    def __reset_recency_bit(self):
+        self.__provider_hash = {rec[0]: False for rec in self.__provider_hash}
+        
     def get_current_retrival_latency(self):
         lst = self.__recent_history.getlist()
         return statistics.mean(lst) if len(lst)>0 else 0
@@ -45,10 +70,10 @@ class ServiceSelector:
                 queue.push(responetime)
                 self.__statistics[prodid]['queue'] = queue
             else:
-                self.__statsLock.acquire()
+                self.__stats_lock.acquire()
                 self.__statistics[prodid]['count'] += 1
                 self.__statistics[prodid]['queue'].push(responetime)
-                self.__statsLock.release()
+                self.__stats_lock.release()
 
             if(self.__statistics[prodid]['count'] % 5 == 0):
                 self.__db.insert_one('responsetimes',{
@@ -62,10 +87,10 @@ class ServiceSelector:
                     wait_time = now - timedelta(seconds=responetime)
                     output[att] = [(prodid,res[att],wait_time)]
                 elif(att in res):
-                    self.__statsLock.acquire()
+                    self.__stats_lock.acquire()
                     wait_time = now - timedelta(seconds=responetime)
                     output[att].append((prodid,res[att], wait_time))
-                    self.__statsLock.release()
+                    self.__stats_lock.release()
         else:
             # This producer is either invalid or currently having issues
             # Could be skipped for a few retrievals

@@ -1,10 +1,12 @@
 import time
+import _thread
 import threading
 from datetime import datetime
 
 from lib.fifoqueue import FIFOQueue_2
 from cache.cacheagent import CacheAgent
 from lib.exceptions import OutOfCacheMemory
+from lib.event import post_event_with_params
 from lib.limitedsizedict import LimitedSizeDict
 from cache.eviction.evictorfactory import EvictorFactory
 
@@ -14,6 +16,7 @@ class InMemoryCache(CacheAgent):
         # Data structure of the cache
         self.__cache_size = config.cache_size
         self.__entityhash = LimitedSizeDict(size_limit = self.__cache_size)
+        self.__cache_write_lock = threading.Lock()
 
         # Access to SQLite instance
         self.__registry = registry
@@ -53,7 +56,39 @@ class InMemoryCache(CacheAgent):
                             self.__evict(ent)
                 else:
                     self.__evict(items_to_evict)
+
+            _thread.start_new_thread(self.__reset_provider_recency, ())
+
             time.sleep(self.window/1000)
+    
+    def __reset_provider_recency(self):
+        threads = []
+        copy_of_hashtable_keys = self.__entityhash.keys()
+        for entityid in copy_of_hashtable_keys:
+            copy_of_attributes = self.__entityhash[entityid].keys()
+            for attr in copy_of_attributes:
+                en_re_th = threading.Thread(target=self.__update_cache_providers(entityid, attr))
+                en_re_th.start()
+                threads.append(en_re_th)
+            
+            for t in threads:
+                t.join()
+
+    # Removes all the recently not used provider's cached data
+    def __update_cache_providers(self, entityid, attr):
+        copy_of_cached_items = self.__entityhash[entityid][attr]
+        for cache_item in copy_of_cached_items:
+            if(not cache_item[3]):
+                self.__cache_write_lock.acquire()
+                self.__entityhash[entityid][attr].remove(cache_item)
+                self.__cache_write_lock.release()
+
+                if(not self.__entityhash[entityid][attr]):
+                    self.__evict_attribute(entityid, attr)
+
+        self.__cache_write_lock.acquire() 
+        self.__entityhash[entityid] = [(cache_item[0], cache_item[1], cache_item[2], False) for cache_item in self.__entityhash[entityid][attr]]
+        self.__cache_write_lock.release()
 
     def calculate_hitrate(self):
         local = self.__localstats.copy()
@@ -71,6 +106,7 @@ class InMemoryCache(CacheAgent):
 
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
+        recency_bit = True
         if(entityid in self.__entityhash):
             now = datetime.now()
             for att_name, values in cacheitems.items():
@@ -78,7 +114,7 @@ class InMemoryCache(CacheAgent):
                     que = FIFOQueue_2(100)
                     que.push(now)
                     self.__entityhash[entityid].freq_table[att_name] = (que,now)
-                self.__entityhash[entityid][att_name] = values
+                self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
         else:
             try:
                 self.__create_new_entity_cache(entityid, cacheitems)
@@ -95,6 +131,7 @@ class InMemoryCache(CacheAgent):
                 self.__create_new_entity_cache(entityid, cacheitems)       
 
     def __create_new_entity_cache(self, entityid, cacheitems):
+        recency_bit = True
         now = datetime.now()
         self.__entityhash[entityid] = LimitedSizeDict()
         que = FIFOQueue_2(100)
@@ -105,7 +142,7 @@ class InMemoryCache(CacheAgent):
             que_1 = FIFOQueue_2(100)
             que_1.push(now)
             self.__entityhash[entityid].freq_table[att_name] = (que_1,now)
-            self.__entityhash[entityid][att_name] = values
+            self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
 
     # Add to cached lifetime
     def addcachedlifetime(self, action, cachedlife):
@@ -140,6 +177,9 @@ class InMemoryCache(CacheAgent):
         del self.__entityhash[entityid]
         del self.__entityhash.freq_table[entityid]
 
+        # Publish this evition to stats in Adaptive
+        post_event_with_params("subscribed_evictions", (entityid, None))
+
     # Evicts an attribute of an entity from cache
     def __evict_attribute(self, entityid, attribute) -> None:
         now = datetime.now()
@@ -154,6 +194,9 @@ class InMemoryCache(CacheAgent):
         self.__registry.remove_cached_life(entityid, attribute)
         del self.__entityhash[entityid][attribute]
         del self.__entityhash[entityid].freq_table[attribute]
+
+        # Publish this evition to stats in Adaptive
+        post_event_with_params("subscribed_evictions", (entityid, attribute))
 
     # Get all attributes cached for an entity
     def get_attributes_of_entity(self,entityid) -> LimitedSizeDict:

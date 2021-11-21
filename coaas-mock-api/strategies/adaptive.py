@@ -72,11 +72,12 @@ class Adaptive(Strategy):
         self.__learning_cycle = learncycle
         self.__most_expensive_sla = (0.5,1.0,1.0)
 
-        self.service_selector = ServiceSelector(db)
+        self.service_selector = ServiceSelector(db, window)
         if(not self.__isstatic):
             self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())
 
         subscribe("subscribed_actions", self.sub_cache_item)
+        subscribe("subscribed_evictions", self.sub_evictor)
           
     # Init_cache initializes the cache memory. 
     def init_cache(self):
@@ -678,6 +679,20 @@ class Adaptive(Strategy):
             self.__waiting_to_retrive.push(parameters)
 
         self.__last_item_to_recieve = parameters
+
+    # Subcriber method to evict an item
+    def sub_evictor(self, parameters):
+        entity = parameters[0]
+        attribute = parameters[1] 
+
+        if(attribute == None):
+            del self.__cached[entity]
+            del self.__cached_hit_access_trend[entity]
+            del self.__cached_attribute_access_trend[entity]
+        else:
+            del self.__cached[entity][attribute]
+            del self.__cached_hit_access_trend[entity][attribute]
+            del self.__cached_attribute_access_trend[entity][attribute]
 
     ###################################################################################
     # Section 04 - Caching
