@@ -189,9 +189,8 @@ class DDPGACAgent(threading.Thread, Agent):
 
         self.__buffer.store_transition(state, action, reward, new_state)
 
-        if(not self.__buffer.is_valid):
-            return
-        state, action, reward, new_state = self.__buffer.sample_buffer(self.__batch_size)
+        state, action, reward, new_state = self.__buffer.sample_buffer(self.__batch_size) if self.__buffer.is_valid \
+                                                else self.__buffer.get_entire_buffer()
         new_critic_values = self.__target_critic.predict(new_state, self.__target_actor.predict(new_state))
         
         target = []

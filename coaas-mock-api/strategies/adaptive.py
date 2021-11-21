@@ -81,6 +81,8 @@ class Adaptive(Strategy):
           
     # Init_cache initializes the cache memory. 
     def init_cache(self):
+        self.__learning_skip = max(5,self.trend_ranges[0])
+
         if(self.selective_cache_agent == None):
             self.selective_cache_agent = self.selective_agent_factory.get_agent()
             self.selective_cache_agent.start()
@@ -234,7 +236,7 @@ class Adaptive(Strategy):
     def __learning_after_action(self):     
         prev_decisions = self.__decision_history.copy().items()
         for action, values in prev_decisions:
-            if((not values[2]) and values[3] <= self.__window_counter+4):
+            if((not values[2]) and values[3] <= self.__window_counter + self.__learning_skip):
                 self.__decision_history_lock.acquire()
                 updated_val = list(values)
                 updated_val[2] = True
@@ -243,9 +245,9 @@ class Adaptive(Strategy):
 
                 curr_state = self.__translate_to_state(action[0], action[1])
                 diff = self.__window_counter - values[3]
-                reward, is_cached = self.__calculate_reward(action[0], action[1], values[0], diff)  
+                reward = self.__calculate_reward(action[0], action[1], values[0], diff)  
                 if(not self.__is_simple_agent):
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward, curr_state))
+                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward[0], curr_state))
 
                 self.__decision_history_lock.acquire()
                 del self.__decision_history[action]

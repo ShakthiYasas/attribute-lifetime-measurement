@@ -38,3 +38,13 @@ class ReplayBuffer():
         new_states = self.new_state_memory[idx,:]
 
         return states, actions, rewards, new_states
+
+    def get_entire_buffer(self):
+        states = self.state_memory
+        actions = self.action_memory
+        rewards = self.reward_memory
+        new_states = self.new_state_memory
+
+        return states, actions, rewards, new_states
+    
+    
