@@ -35,18 +35,19 @@ class SQLLiteClient:
 
     # Check and retrieve any context data available in the provider SLA 
     def get_provider_meta(self, providerid, attributes):
-        retrievable = set(['latitude, longitude, regno']) - set(attributes)
-        if(retrievable):
-            self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
-            producer = self.__conn.execute(
-                    "SELECT latitude, longitude, regno \
-                    FROM ContextProducer \
-                    WHERE id="+str(providerid)+" AND isActive=1").fetchone()
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        producer = self.__conn.execute(
+                "SELECT entityId, latitude, longitude, regno \
+                FROM ContextProducer \
+                WHERE id="+str(providerid)+" AND isActive=1").fetchone()
 
+        retrievable = self.__service_description[producer[0][0]]
+        needed = set(retrievable) & set(attributes)
+        if(needed):
             return {
-                'latitude': producer[0][0],
-                'longitude': producer[0][1],
-                'regno': producer[0][2]
+                'latitude': producer[0][1],
+                'longitude': producer[0][2],
+                'regno': producer[0][3]
             }
         else:
             return None
