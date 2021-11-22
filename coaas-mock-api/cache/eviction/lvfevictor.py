@@ -24,7 +24,7 @@ class LVFEvictor(Evictor):
         for ent in selective:
             for att, stat in self.__cache.get_statistics_entity(ent).items():
                 # Popularity
-                att_access_ratio = (stat[0].get_queue_size()*(self.__cache.window/1000))/((stat[0].get_head()-stat[0].get_last()).total_seconds())
+                att_access_ratio = (stat[0].get_queue_size())/((stat[0].get_head()-stat[0].get_last()).total_seconds())
                 # Remaing Cached Lifetime
                 (remaining, cached) = self.__cache.get_cachedlifetime(ent, att)
                 relative_remaning = (now - remaining)/(remaining - cached)
@@ -38,10 +38,10 @@ class LVFEvictor(Evictor):
                     avg_delays.append(statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res))))
                 rel_ret_latency = 1
                 avg_att_latency = statistics.mean(avg_delays)
-                if(avg_att_latency <=  cur_ret_latency and cur_ret_latency != 0):
+                if(cur_ret_latency != 0):
                     rel_ret_latency = avg_att_latency/cur_ret_latency
                 else:
-                    rel_ret_latency = (avg_att_latency-cur_ret_latency)/cur_ret_latency
+                    rel_ret_latency = self.__threshold
 
                 value = att_access_ratio + relative_remaning + rel_ret_latency
                 if(value < self.__threshold):
@@ -82,8 +82,15 @@ class LVFEvictor(Evictor):
                 # This could be a negative value as well.
                 remaining_life = rem_l/avg_lts 
             else:
-                remaining_life = 0
-
+                # Get the cached expected cached lifetime of the entity attributes
+                try:
+                    exp_time, cached_time = self.__cache.get_longest_cache_lifetime_for_entity(entityid)
+                    rem_lf = (exp_time - datetime.now()).total_seconds()
+                    cache_lf = (exp_time - cached_time).total_seconds()
+                    remaining_life = rem_lf/cache_lf
+                except Exception:
+                    print("Error occured in fecthing longest lifetime for entity: " + str(entityid))
+                
             # Delay
             providers = self.__cache.get_providers_for_entity(entityid)
             delay_list = []

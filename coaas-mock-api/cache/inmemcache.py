@@ -273,3 +273,6 @@ class InMemoryCache(CacheAgent):
     
     def reevaluate_for_eviction(self, entity, attribute):
         return self.caller_strategy.reevaluate_for_eviction(entity, attribute)
+
+    def get_longest_cache_lifetime_for_entity(self, entityid):
+        return self.__registry.get_max_cached_lifetime(entityid)

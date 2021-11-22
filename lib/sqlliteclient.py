@@ -146,6 +146,15 @@ class SQLLiteClient:
             LIMIT 1)").fetchone()
         return res[0]
 
+    def get_longest_cache_lifetime_for_entity(self, entityid):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        res = self.__conn.execute(
+            "SELECT lifetime, cached FROM CachedLifetime\
+            WHERE lifetime = (SELECT MAX(lifetime)\
+                FROM CachedLifetime\
+                WHERE entityid="+str(entityid)+") AND entityid="+str(entityid)).fetchone()         
+        return res[0]
+
     def get_expired_cached_lifetimes(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         res = self.__conn.execute(

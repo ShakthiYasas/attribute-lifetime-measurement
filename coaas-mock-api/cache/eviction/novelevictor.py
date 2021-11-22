@@ -63,6 +63,13 @@ class NovelEvictor(Evictor):
                 remaining_life = rem_l/avg_lts 
             else:
                 remaining_life = 0
+                try:
+                    exp_time, cached_time = self.__cache.get_longest_cache_lifetime_for_entity(entityid)
+                    rem_lf = (exp_time - datetime.now()).total_seconds()
+                    cache_lf = (exp_time - cached_time).total_seconds()
+                    remaining_life = rem_lf/cache_lf
+                except Exception:
+                    print("Error occured in fecthing longest lifetime for entity: " + str(entityid))
 
             # Delay
             providers = self.__cache.get_providers_for_entity(entityid)
