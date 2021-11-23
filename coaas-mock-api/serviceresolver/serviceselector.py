@@ -32,7 +32,7 @@ class ServiceSelector:
         now = datetime.now()
         threads = []
         for prodid, url in urllist:
-            _thread.start_new_thread(self.__update_recency_bit, (prodid))
+            _thread.start_new_thread(self.__update_recency_bit, (prodid,))
             t = threading.Thread(target=self.__get_context(prodid, url, attributes, now, output))
             t.start()
             threads.append(t)
@@ -53,7 +53,7 @@ class ServiceSelector:
             self.__hash_lock.release()
 
     def __reset_recency_bit(self):
-        self.__provider_hash = {rec[0]: False for rec in self.__provider_hash}
+        self.__provider_hash = {rec[0]: False for rec in self.__provider_hash.items()}
         
     def get_current_retrival_latency(self):
         lst = self.__recent_history.getlist()

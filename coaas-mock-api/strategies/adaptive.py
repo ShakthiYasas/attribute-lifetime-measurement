@@ -157,8 +157,10 @@ class Adaptive(Strategy):
         for key,value in dup_obs.items():
             if(value['req_ts'][-1] < exp_time):
                 # The entire entity hasn't been accessed recently
-                del self.__observed[key]
-                del self.__attribute_access_trend[key]
+                if(key in self.__observed):
+                    del self.__observed[key]
+                if(key in self.__attribute_access_trend):
+                    del self.__attribute_access_trend[key]
             else:
                 self.__update_attribute_access_trend(exp_time, key, value, __reqs_in_window)
 
@@ -284,10 +286,12 @@ class Adaptive(Strategy):
                 if(fthresh[0]>self.__most_expensive_sla[0]):
                     self.__most_expensive_sla = fthresh
                 else:
+                    most_exp = list(self.__most_expensive_sla)
                     if(fthresh[2]>self.__most_expensive_sla[2]):
-                        self.__most_expensive_sla[2] = fthresh[2]
+                        most_exp[2] = fthresh[2]
                     if(fthresh[1]<self.__most_expensive_sla[1]):
-                        self.__most_expensive_sla[1] = fthresh[1]
+                        most_exp[1] = fthresh[1]
+                    self.__most_expensive_sla = tuple(most_exp)
 
         now = datetime.datetime.now()
 
