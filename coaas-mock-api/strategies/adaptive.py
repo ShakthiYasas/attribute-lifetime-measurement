@@ -299,9 +299,12 @@ class Adaptive(Strategy):
 
             # Check freshness of requested attributes
             entityid = ent['entityId']
+            conditions = []
+            if('conditions' in ent):
+                conditions = ent['conditions']
             lifetimes = None
             if(self.__isstatic):
-                lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'])
+                lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)
 
             if(entityid in self.cache_memory.get_statistics_all()):
                 reference = None

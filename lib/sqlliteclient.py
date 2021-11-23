@@ -6,8 +6,12 @@ class SQLLiteClient:
         self.__service_description = {
             1: ['regno'],
             2: ['regno'],
-            3: ['longitude', 'latitude'],
-            4: ['longitude', 'latitude']
+            3: ['longitude', 'latitude', 'address'],
+            4: ['longitude', 'latitude'],
+            5: ['longitude', 'latitude'],
+            6: ['longitude', 'latitude'],
+            7: ['longitude', 'latitude', 'address'],
+            8: ['longitude', 'latitude', 'address'],
         }
 
     # Check the consumer and retrieve freshness
@@ -37,9 +41,10 @@ class SQLLiteClient:
     def get_provider_meta(self, providerid, attributes):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         producer = self.__conn.execute(
-                "SELECT entityId, latitude, longitude, regno \
+                "SELECT entityId, latitude, longitude, regno, address\
                 FROM ContextProducer \
-                WHERE id="+str(providerid)+" AND isActive=1").fetchone()
+                WHERE id="+str(providerid)+" AND isActive=1\
+                LIMIT 1").fetchone()
 
         retrievable = self.__service_description[producer[0][0]]
         needed = set(retrievable) & set(attributes)
@@ -47,7 +52,8 @@ class SQLLiteClient:
             return {
                 'latitude': producer[0][1],
                 'longitude': producer[0][2],
-                'regno': producer[0][3]
+                'regno': producer[0][3],
+                'address': producer[0][4]
             }
         else:
             return None
@@ -76,15 +82,21 @@ class SQLLiteClient:
         return output
 
     # Retrieve the URLs of the matching providers and lifetimes of the attributes
-    def get_context_producers(self, entityid, attributes) -> dict:
+    def get_context_producers(self, entityid, attributes, conditions = []) -> dict:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         output = {}
         if(len(attributes)>0):
             context_in_desc = self.__service_description[entityid] if entityid in self.__service_description else None          
-            producers = self.__conn.execute(
-                "SELECT id, url, price, samplingrate \
+            query_string = "SELECT id, url, price, samplingrate \
                 FROM ContextProducer \
-                WHERE entityId="+str(entityid)+" AND isActive=1").fetchall()
+                WHERE entityId="+str(entityid)+" AND isActive=1"
+            
+            if(conditions):
+                for cond in conditions:
+                    add = ' AND '+cond
+                    query_string += add
+
+            producers = self.__conn.execute(query_string).fetchall()
             
             if(context_in_desc):
                 attributes = set(attributes) - set(context_in_desc)
@@ -189,70 +201,117 @@ class SQLLiteClient:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "INSERT INTO Entity (id,name) VALUES\
-            (1,'Car'),(2,'Bike'),(3,'CarPark'), (4,'Weather')")
+            (1,'Car'),(2,'Bike'),(3,'CarPark'),\
+            (4,'Weather'), (5,'BikePark'), (6,'Junction'),\
+            (7,'Building'), (8, 'Park')")
        
         self.__conn.execute(
             "INSERT INTO SLA (id,freshness,price,penalty,rtmax,isActive) VALUES\
-            (1,0.9,1.2,2.0,0.5,1),(2,0.8,1.0,2.0,0.6,1),(3,0.7,0.8,1.8,0.8,1),(4,0.6,0.75,1.25,1.0,0)")
+            (1,0.9,1.2,2.0,0.5,1),\
+            (2,0.8,1.0,2.0,0.6,1),\
+            (3,0.7,0.8,1.8,0.8,1),\
+            (4,0.6,0.75,1.25,1.0,0)\
+            (5,0.75,1.25,2.25,0.75,1),\
+            (6,0.5,0.5,1.25,1.0,1),\
+            (7,0.9,1.5,3.0,0.5,1),\
+            (8,0.65,1.0,1.5,0.8,1)\
+            (9,0.95,2.0,4.0,0.25,1),\
+            (10,0.4,0.25,0.5,1.0,1)")
        
         self.__conn.execute(
             "INSERT INTO ContextConsumer (id,name,isActive) VALUES\
-            (100, 'Shakthi', 1),(102, 'Alexey', 1),(104, 'Amin', 1),(106, 'Himadri', 0)")
+            (101, 'Shakthi', 1),\
+            (102, 'Alexey', 1),\
+            (103, 'Amin', 1),\
+            (104, 'Himadri', 0)\
+            (105, 'Ali', 1)\
+            (106, 'Ravindi', 1)\
+            (107, 'Seng', 1)\
+            (108, 'Arkady', 1)")
 
         self.__conn.execute(
             "INSERT INTO ConsumerSLA VALUES\
-            (100, 2),(100, 3),(102, 3),(104, 2),(106, 1)")
+            (101, 2), (101, 3),\
+            (102, 4), (102, 8),\
+            (103, 1),\
+            (104, 6), (104, 10)\
+            (105, 7),\
+            (106, 5),\
+            (107, 1), (107, 9)\
+            (108, 9)")
         
         self.__conn.execute(
             "INSERT INTO ContextService VALUES\
-            (1,'Carpark Tracker',1),(2,'Vehicle Tracker',1),(3,'Weather Monitor',1)")
-        
+            (1,'Vehicle Parking Service',1),\
+            (2,'Vehicle Monitor',1),\
+            (3,'Weather Service',1),\
+            (4,'Bike Park Service', 1),\
+            (5,'VicRoads',1),\
+            (6,'Building Registry',1),\
+            (7,'Recreation and Parks', 1)")
+
         self.__conn.execute(
-            "INSERT INTO ContextProducer VALUES\
-                (1,2,1,'http://localhost:5000/bikes',0.6, 1, NULL, NULL, 'CX123'),\
-                (3,1,1,'http://localhost:5000/cars?id=3',0.25, 0.5, NULL, NULL, '1HR800'),\
-                (4,1,1,'http://localhost:5000/cars?id=4',0.4, 1, NULL, NULL, '1VC546'),\
-                (5,1,1,'http://localhost:5000/cars?id=5',0.3, 0.2, NULL, NULL, '1DH8906'),\
-                (6,1,1,'http://localhost:5000/cars?id=6',0.2, 4, NULL, NULL, '1KP1244'),\
-                (8,3,1,'http://localhost:5000/carparks?id=8',0.4, 0.017, -37.84938300336436, 145.11336178206872, NULL),\
-                (9,3,1,'http://localhost:5000/carparks?id=9',0.75, 0.033, -37.84586713387071', 145.1149120988647, NULL),\
-                (10,3,1,'http://localhost:5000/carparks?id=10',0.3, 0.017, -37.84621449228698', 145.11596352479353, NULL),\
-                (11,4,1,'http://localhost:5000/weather?id=1',0.2, 0.017, -37.848027507269634, 145.1155451001933, NULL),")
+            "INSERT INTO ContextProducer(id, entityId, isActive, url, price, samplingrate, latitude, longitude, regno, address) VALUES\
+                (1,1,1,'http://localhost:5000/cars?id=1',0.25, 0.5, NULL, NULL, '1HR800', NULL),\
+                (2,1,1,'http://localhost:5000/cars?id=2',0.4, 1, NULL, NULL, '1VC546', NULL),\
+                (3,1,1,'http://localhost:5000/cars?id=3',0.3, 0.2, NULL, NULL, '1DH8906', NULL),\
+                (4,1,1,'http://localhost:5000/cars?id=4',0.2, 4, NULL, NULL, '1KP1244', NULL),\
+                (5,1,1,'http://localhost:5000/cars?id=5',0.2, 4, NULL, NULL, '1QD7788', NULL),\
+                (7,2,1,'http://localhost:5000/bikes?id=7',0.6, 0.5, NULL, NULL, 'CX123', NULL),\
+                (8,2,1,'http://localhost:5000/bikes?id=8',0.5, 1, NULL, NULL, 'ESCBR', NULL),\
+                (9,2,1,'http://localhost:5000/bikes?id=9',0.6, 0.5, NULL, NULL, 'UL146', NULL),\
+                (11,3,1,'http://localhost:5000/carparks?id=11',0.4, 0.017, -37.84938300336436, 145.11336178206872, NULL, 'Parking Lot Burwood Highway Burwood VIC 3125'),\
+                (12,3,1,'http://localhost:5000/carparks?id=12',0.75, 0.033, -37.84586713387071', 145.1149120988647, NULL, 'Building HH Burwood Highway Burwood VIC 3125'),\
+                (13,3,1,'http://localhost:5000/carparks?id=13',0.3, 0.017, -37.84621449228698', 145.11596352479353, NULL, 'Building HG Burwood Highway Burwood VIC 3125'),\
+                (15,4,1,'http://localhost:5000/weather?id=15',0.2, 0.017, -37.848027507269634, 145.1155451001933, NULL, NULL),\
+                (17,4,1,'http://localhost:5000/bikeparks?id=17',0.4, 0.5, -37.849121741619584, 145.11557006850464, NULL, NULL)")
         
         self.__conn.execute(
             # Assume that each car park has a varying parking cost (i.e. peak and off-peak price)
-            "INSERT INTO ContextAttribute VALUES\
-                (1,'speed',1,0,'kmph'),"+      
-                "(3,'speed',3,0,'kmph'),\
-                (4,'height',3,-1,'m'),\
-                (5,'capacity',3,-1,'number'),\
-                (6,'model',3,-1,'text'),\
-                (7,'speed',4,0,'kmph'),\
-                (8,'height',4,-1,'m'),\
-                (9,'capacity',4,-1,'number'),\
-                (10,'speed',5,0,'kmph'),\
-                (11,'height',5,-1,'m'),\
-                (12,'capacity',5,-1,'number'),\
+            "INSERT INTO ContextAttribute(id, name, producerId, lifetime, unit) VALUES\
+                (1,'speed',1,0,'kmph'),\
+                (2,'location',1,0,'cordinates'),\
+                (3,'height',2,-1,'m'),\
+                (4,'capacity',2,-1,'number'),\
+                (5,'model',2,-1,'text'),\
+                (6,'speed',2,0,'kmph'),\
+                (7,'location',3,0,'cordinates'),\
+                (8,'capacity',3,-1,'number'),\
+                (9,'type',3,-1,'text'),\
+                (10,'speed',4,0,'kmph'),\
+                (11,'location',4,0,'cordianates'),\
+                (12,'model',4,-1,'text'),\
                 (13,'model',5,-1,'text'),\
-                (14,'speed',6,0,'kmph'),\
-                (15,'height',6,-1,'m'),"+            
-                "(16,'maxheight',8,-1,'m'),\
-                (17,'availability',8,30,'s'),\
-                (18,'price',8,-1,'/hr'),\
-                (19,'totalslots',8,-1,'number'),\
-                (20,'availability',9,60,'s'),\
-                (21,'price',9,-1,'/hr'),\
-                (22,'maxheight',10,-1,'m'),\
-                (23,'availability',10,150,'s'),\
-                (24,'price',10,-1,'/hr'),\
-                (25,'temperature',11,1800,'C'),\
-                (26,'windspeed',10,10,'kmph'),\
-                (27,'winddiretion',10,10,'degrees'),\
-                (28,'humidity',10,900,'percentage')")
+                (14,'location',5,0,'cordinates'),\
+                (15,'speed',5,0,'kmph'),\
+                (16,'speed',7,0,'kmph'),\
+                (17,'location',7,0,'cordinates'),\
+                (18,'heading',7,0,'degrees'),\
+                (19,'location',8,0,'cordinates'),\
+                (20,'heading',8,0,'degrees'),\
+                (21,'speed',9,0,'kmph'),\
+                (22,'location',9,0,'cordinates'),\
+                (23,'price',11,43200,'dollars/hr'),\
+                (24,'totalSlots',11,-1,'number'),\
+                (25,'availability',11,150,'number'),\
+                (26,'availability',12,300,'number'),\
+                (27,'maxHeight',12,-1,'m'),\
+                (28,'owner',12,-1,'text'),\
+                (29,'availability',13,10,'number'),\
+                (30,'price',13,28800,'dollars/hr'),\
+                (31,'maxHeight',13,-1,'m'),\
+                (32,'temperature',15,1800,'C'),\
+                (33,'windspeed',15,10,'kmph'),\
+                (34,'winddiretion',15,10,'degrees'),\
+                (35,'humidity',15,900,'percentage'),\
+                (36,'availability',17,120,'number')")
         
         self.__conn.execute(
-            "INSERT INTO ContextServiceProducer VALUES\
-                (2,1),(2,3),(2,4),(1,6),(1,7),(3,11)")
+            "INSERT INTO ContextServiceProducer(serviceId, producerId) VALUES\
+                (1,11),(1,12),(3,13),\
+                (2,1),(2,2),(2,3),(2,4),(2,5),(2,7),(2,8),(2,9)\
+                (3,15),\
+                (4,17)")
         
         self.__conn.execute(
             "INSERT INTO CurrentRetrievalLatency VALUES\
@@ -289,6 +348,7 @@ class SQLLiteClient:
                 latitude REAL NULL,
                 longitude REAL NULL,
                 regno TEXT NULL,
+                address TEXT NULL,
                 FOREIGN KEY (entityId) REFERENCES Entity(id)
             );''')
 
