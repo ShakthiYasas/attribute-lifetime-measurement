@@ -178,8 +178,7 @@ class SQLLiteClient:
     def update_ret_latency(self, latency):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
-            "UPDATE CurrentRetrievalLatency SET latency="+str(latency)+"\
-            Id=1)")
+            "UPDATE CurrentRetrievalLatency SET latency="+str(latency)+" WHERE Id=1")
     
     def get_ret_latency(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
@@ -194,39 +193,36 @@ class SQLLiteClient:
         try:
             self.__create_tables()
             self.__seed_tables_with_data()
-        except(Exception):
+        except Exception as e:
             print('An error occured when seeding to database')
 
     def __seed_tables_with_data(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
-        self.__conn.execute(
-            "INSERT INTO Entity (id,name) VALUES\
-            (1,'Car'),(2,'Bike'),(3,'CarPark'),\
-            (4,'Weather'), (5,'BikePark'), (6,'Junction'),\
-            (7,'Building'), (8, 'Park')")
+        ent_str = "INSERT INTO Entity (id,name) VALUES (1,'Car'),(2,'Bike'),(3,'CarPark'),(4,'Weather'),(5,'BikePark'), (6,'Junction'),(7,'Building'),(8,'Park')"
+        self.__conn.execute(ent_str)
        
-        self.__conn.execute(
-            "INSERT INTO SLA (id,freshness,price,penalty,rtmax,isActive) VALUES\
-            (1,0.9,1.2,2.0,0.5,1),\
+        sla_str = "INSERT INTO SLA VALUES (1,0.9,1.2,2.0,0.5,1),\
             (2,0.8,1.0,2.0,0.6,1),\
             (3,0.7,0.8,1.8,0.8,1),\
-            (4,0.6,0.75,1.25,1.0,0)\
+            (4,0.6,0.75,1.25,1.0,0),\
             (5,0.75,1.25,2.25,0.75,1),\
             (6,0.5,0.5,1.25,1.0,1),\
             (7,0.9,1.5,3.0,0.5,1),\
-            (8,0.65,1.0,1.5,0.8,1)\
+            (8,0.65,1.0,1.5,0.8,1),\
             (9,0.95,2.0,4.0,0.25,1),\
-            (10,0.4,0.25,0.5,1.0,1)")
+            (10,0.4,0.25,0.5,1.0,1)"
+            
+        self.__conn.execute(sla_str)
        
         self.__conn.execute(
             "INSERT INTO ContextConsumer (id,name,isActive) VALUES\
             (101, 'Shakthi', 1),\
             (102, 'Alexey', 1),\
             (103, 'Amin', 1),\
-            (104, 'Himadri', 0)\
-            (105, 'Ali', 1)\
-            (106, 'Ravindi', 1)\
-            (107, 'Seng', 1)\
+            (104, 'Himadri', 0),\
+            (105, 'Ali', 1),\
+            (106, 'Ravindi', 1),\
+            (107, 'Seng', 1),\
             (108, 'Arkady', 1)")
 
         self.__conn.execute(
@@ -234,10 +230,10 @@ class SQLLiteClient:
             (101, 2), (101, 3),\
             (102, 4), (102, 8),\
             (103, 1),\
-            (104, 6), (104, 10)\
+            (104, 6), (104, 10),\
             (105, 7),\
             (106, 5),\
-            (107, 1), (107, 9)\
+            (107, 1), (107, 9),\
             (108, 9)")
         
         self.__conn.execute(
@@ -261,8 +257,8 @@ class SQLLiteClient:
                 (8,2,1,'http://localhost:5000/bikes?id=8',0.5, 1, NULL, NULL, 'ESCBR', NULL),\
                 (9,2,1,'http://localhost:5000/bikes?id=9',0.6, 0.5, NULL, NULL, 'UL146', NULL),\
                 (11,3,1,'http://localhost:5000/carparks?id=11',0.4, 0.017, -37.84938300336436, 145.11336178206872, NULL, 'Parking Lot Burwood Highway Burwood VIC 3125'),\
-                (12,3,1,'http://localhost:5000/carparks?id=12',0.75, 0.033, -37.84586713387071', 145.1149120988647, NULL, 'Building HH Burwood Highway Burwood VIC 3125'),\
-                (13,3,1,'http://localhost:5000/carparks?id=13',0.3, 0.017, -37.84621449228698', 145.11596352479353, NULL, 'Building HG Burwood Highway Burwood VIC 3125'),\
+                (12,3,1,'http://localhost:5000/carparks?id=12',0.75, 0.033, -37.84586713387071, 145.1149120988647, NULL, 'Building HH Burwood Highway Burwood VIC 3125'),\
+                (13,3,1,'http://localhost:5000/carparks?id=13',0.3, 0.017, -37.84621449228698, 145.11596352479353, NULL, 'Building HG Burwood Highway Burwood VIC 3125'),\
                 (15,4,1,'http://localhost:5000/weather?id=15',0.2, 0.017, -37.848027507269634, 145.1155451001933, NULL, NULL),\
                 (17,5,1,'http://localhost:5000/bikeparks?id=17',0.4, 0.5, -37.849121741619584, 145.11557006850464, NULL, NULL),\
                 (18,6,1,'http://localhost:5000/junctions?id=18',0.1, 2, -37.850488866096384, 145.11997157347662, NULL, NULL),\
@@ -317,13 +313,12 @@ class SQLLiteClient:
         self.__conn.execute(
             "INSERT INTO ContextServiceProducer(serviceId, producerId) VALUES\
                 (1,11),(1,12),(3,13),\
-                (2,1),(2,2),(2,3),(2,4),(2,5),(2,7),(2,8),(2,9)\
+                (2,1),(2,2),(2,3),(2,4),(2,5),(2,7),(2,8),(2,9),\
                 (3,15),\
                 (4,17)")
         
         self.__conn.execute(
-            "INSERT INTO CurrentRetrievalLatency VALUES\
-                (1,0)")
+            "INSERT INTO CurrentRetrievalLatency VALUES (1,0)")
         
         self.__conn.commit()
 

@@ -50,7 +50,8 @@ class PlatformMock(Resource):
     
     # Create an instance of the refreshing strategy
     __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']), 
-            True if default_config['IsStaticLife'] == 'True' else False, int(default_config['LearningCycle']))
+            True if default_config['IsStaticLife'] == 'True' else False, int(default_config['LearningCycle']), 
+            True if default_config['SkipExploration'] == 'True' else False)
     
     global selected_algo
     selected_algo = __strategy_factory.get_retrieval_strategy()

@@ -58,7 +58,7 @@ class Adaptive(Strategy):
     __observedLock = threading.Lock()
     __decision_history_lock = threading.Lock()
 
-    def __init__(self, db, window, isstatic=True, learncycle = 20): 
+    def __init__(self, db, window, isstatic=True, learncycle = 20, skip_random=False): 
         self.__db = db
         self.__cached = {}
         self.__observed = {}
@@ -68,6 +68,7 @@ class Adaptive(Strategy):
         self.__isstatic = isstatic
         self.__local_ret_costs = []
         self.__moving_window = window
+        self.__skiprandom = skip_random
         self.req_rate_extrapolation = None
         self.__learning_cycle = learncycle
         self.__most_expensive_sla = (0.5,1.0,1.0)
@@ -120,7 +121,7 @@ class Adaptive(Strategy):
         if(self.__window_counter > 3):
             self.__extrapolate_request_rate()
         
-        _thread.start_new_thread(self.service_registry.update_ret_latency, (self.service_selector.get_current_retrival_latency()))
+        _thread.start_new_thread(self.service_registry.update_ret_latency, (self.service_selector.get_current_retrival_latency(),))
 
         if(self.__window_counter >= self.trend_ranges[1]): 
             exp_time = datetime.datetime.now()-datetime.timedelta(seconds=self.__moving_window/1000)
@@ -491,7 +492,7 @@ class Adaptive(Strategy):
                     # Select the action for the state using the RL Agent
                     action, (est_c_lifetime, est_delay) = None, (None, None)
                     if(self.__is_simple_agent):
-                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)
                         if(action != (0,0)):
                             wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
                             self.cache_memory.addcachedlifetime(action, wait_time)
@@ -520,7 +521,7 @@ class Adaptive(Strategy):
                                 else:
                                     self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                     else:
-                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False,ref_key))                    
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,self.__skiprandom,ref_key))                   
             except NewContextException:
                 if(entityid in self.__delay_dict):
                     self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -545,7 +546,7 @@ class Adaptive(Strategy):
                         
                         action, (est_c_lifetime, est_delay) = None, (None, None)
                         if(self.__is_simple_agent):
-                            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation)
+                            action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)
                             
                             if(action != (0,0) and action[0] == entityid):
                                 updated_attr_dict.append(action[1])
@@ -561,7 +562,7 @@ class Adaptive(Strategy):
                                     else:
                                         self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                         else:
-                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,False,ref_key))  
+                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,self.__skiprandom,ref_key)) 
                     except NewContextException:
                         if(entityid in self.__delay_dict):
                             self.__delay_dict[entityid][att] = self.__window_counter + 1
