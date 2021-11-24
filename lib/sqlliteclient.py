@@ -88,11 +88,11 @@ class SQLLiteClient:
             context_in_desc = self.__service_description[entityid] if entityid in self.__service_description else None          
             if(context_in_desc):
                 attributes = list(set(attributes) - set(context_in_desc))
-            
+        
             query_string = "SELECT id, url, price, samplingrate \
                 FROM ContextProducer \
                 WHERE entityId="+str(entityid)+" AND isActive=1"
-            
+        
             if(conditions):
                 for cond in conditions:
                     add = ' AND '+cond
@@ -106,14 +106,17 @@ class SQLLiteClient:
                     att_string = "name='"+attributes[0]+"'"
                     if(len(attributes)>1):
                         for idx in range(1,len(attributes)):
-                            att_string = att_string+" AND name='"+attributes[idx]+"'"
+                            att_string = att_string+" OR name='"+attributes[idx]+"'"
 
                     for prod in  producers:
                         sampling_interval = 1/prod[3]
-                        att_res = self.__conn.execute(
-                            "SELECT name, lifetime \
-                            FROM ContextAttribute \
-                            WHERE producerId="+str(prod[0])+" AND ("+att_string+")").fetchall()
+
+                        query_string_2 = "SELECT name, lifetime\
+                            FROM ContextAttribute\
+                            WHERE producerId="+str(prod[0])+" AND ("+att_string+")"
+
+                        att_res = self.__conn.execute(query_string_2).fetchall()
+
                         if(len(att_res)==len(attributes)):
                             lts = {}
                             for att in att_res:

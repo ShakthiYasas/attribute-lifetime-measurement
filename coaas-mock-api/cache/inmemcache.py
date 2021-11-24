@@ -87,7 +87,7 @@ class InMemoryCache(CacheAgent):
                     self.__evict_attribute(entityid, attr)
 
         self.__cache_write_lock.acquire() 
-        self.__entityhash[entityid] = [(cache_item[0], cache_item[1], cache_item[2], False) for cache_item in self.__entityhash[entityid][attr]]
+        self.__entityhash[entityid][attr] = [(cache_item[0], cache_item[1], cache_item[2], False) for cache_item in self.__entityhash[entityid][attr]]
         self.__cache_write_lock.release()
 
     def calculate_hitrate(self):

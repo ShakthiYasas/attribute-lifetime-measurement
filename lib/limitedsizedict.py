@@ -6,7 +6,7 @@ class LimitedSizeDict(OrderedDict):
     def __init__(self, enable_eviction=True, *args, **kwds,):
         # Frequency of access counter (count,[list of timestamps])
         self.freq_table = {}
-        self.enable_auto_eviction = enable_eviction
+        self.__enable_auto_eviction = enable_eviction
 
         self.size_limit = kwds.pop("size_limit", None)
         OrderedDict.__init__(self, *args, **kwds)
@@ -14,7 +14,7 @@ class LimitedSizeDict(OrderedDict):
 
     def __setitem__(self, key, value):
         OrderedDict.__setitem__(self, key, value)
-        if(self.enable_eviction):
+        if(self.__enable_auto_eviction):
             self._check_size_limit()
         else:
             raise OutOfCacheMemory

@@ -155,7 +155,7 @@ class Adaptive(Strategy):
         dup_obs = self.__observed.copy()
         __reqs_in_window = self.__reqs_in_window
         for key,value in dup_obs.items():
-            if(value['req_ts'][-1] < exp_time):
+            if(value['req_ts'][-1] <= exp_time):
                 # The entire entity hasn't been accessed recently
                 if(key in self.__observed):
                     del self.__observed[key]
@@ -167,37 +167,37 @@ class Adaptive(Strategy):
     def __update_attribute_access_trend(self, exp_time, key, value, __reqs_in_window=None):
         __reqs_in_window = self.__reqs_in_window if not __reqs_in_window else __reqs_in_window
         invalidtss = [num for num in value['req_ts'] if num < exp_time]
-        for i in invalidtss:
+        for i in range(0,invalidtss):
             value['req_ts'].pop(0)
 
-            validtss = value['req_ts']
+        validtss = value['req_ts']
+        access_freq = 0
+        if(__reqs_in_window>0):
+            access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
+        self.__entity_access_trend.push(access_freq)
+                
+        for curr_attr, access_list in value['attributes'].items():
+            invalidtss = [num for num in access_list if num <= exp_time]
+            for i in range(0,len(invalidtss)):
+                value['attributes'][curr_attr].pop(0)
+
+            validtss = value['attributes'][curr_attr]
             access_freq = 0
             if(__reqs_in_window>0):
                 access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
-            self.__entity_access_trend.push(access_freq)
-                
-            for curr_attr, access_list in value['attributes'].items():
-                invalidtss = [num for num in access_list if num < exp_time]
-                for i in invalidtss:
-                    value['attributes'][curr_attr].pop(0)
-
-                validtss = value['attributes'][curr_attr]
-                access_freq = 0
-                if(__reqs_in_window>0):
-                    access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
-                if(key in self.__attribute_access_trend):
-                    if(curr_attr in self.__attribute_access_trend[key]):
-                        self.__attribute_access_trend[key][curr_attr].push(access_freq)
-                    else:
-                        que = FIFOQueue_2(1000)
-                        que.push(access_freq)
-                        self.__attribute_access_trend[key][curr_attr] = que
+            if(key in self.__attribute_access_trend):
+                if(curr_attr in self.__attribute_access_trend[key]):
+                    self.__attribute_access_trend[key][curr_attr].push(access_freq)
                 else:
                     que = FIFOQueue_2(1000)
                     que.push(access_freq)
-                    self.__attribute_access_trend[key] = {
-                        curr_attr : que
-                    }
+                    self.__attribute_access_trend[key][curr_attr] = que
+            else:
+                que = FIFOQueue_2(1000)
+                que.push(access_freq)
+                self.__attribute_access_trend[key] = {
+                    curr_attr : que
+                }
 
     def __clear_cached(self):
         __reqs_in_window = self.__reqs_in_window
@@ -342,7 +342,7 @@ class Adaptive(Strategy):
                                     break
                         else:
                             # Checking if any of the attributes are not fresh
-                            for prodid,val,lastret in att_in_cache:
+                            for prodid,val,lastret,rec_bit in att_in_cache:
                                 if(prodid in lifetimes):
                                     lt = lifetimes[prodid]['lifetimes'][att_name]
                                     if(lt<0):
@@ -585,8 +585,10 @@ class Adaptive(Strategy):
                 self.__profiler.reactive_push({entityid:updated_attr_dict})  
             
             for att in updated_attr_dict:
-                del self.__attribute_access_trend[entityid][att]
-                del self.__observed[entityid][att]
+                if(att in self.__attribute_access_trend[entityid]):
+                    del self.__attribute_access_trend[entityid][att]
+                if(att in self.__observed[entityid]):
+                    del self.__observed[entityid][att]
             if(self.__observed[entityid]):
                 del self.__observed[entityid]
             # Update the observed list for uncached entities and attributes 
