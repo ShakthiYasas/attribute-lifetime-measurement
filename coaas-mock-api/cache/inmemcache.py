@@ -239,6 +239,7 @@ class InMemoryCache(CacheAgent):
             ent_stat[0].push(datetime.now())
             self.__entityhash.freq_table[entityid] = tuple(ent_stat)
 
+            self.__entityhash[entityid][attribute] = [(data[0], data[1], data[2], True) for data in self.__entityhash[entityid][attribute]]
             return self.__entityhash[entityid][attribute]
         else:
             return None

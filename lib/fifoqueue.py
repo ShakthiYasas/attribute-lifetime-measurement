@@ -30,7 +30,10 @@ class FIFOQueue_2():
         return self.__queue[-1]
     
     def get_head(self):
-        return self.__queue[0]
+        if(len(self.__queue)>0):
+            return self.__queue[0]
+        else:
+            return None
 
     def get_last_range(self, length):
         if(len(self.__queue) <= length):

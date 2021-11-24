@@ -62,7 +62,7 @@ class Adaptive(Strategy):
         self.__db = db
         self.__cached = {}
         self.__observed = {}
-        self.__evaluated = []
+        self.__evaluated = set()
         self.__last_actions = []
         self.__reqs_in_window = 0
         self.__isstatic = isstatic
@@ -381,12 +381,13 @@ class Adaptive(Strategy):
                             ishit = 1
                             pro_att = self.cache_memory.get_value_by_key(entityid, att_name)
                             for prodid,val,lastret,rec_bit in pro_att:
-                                lt = lifetimes[prodid]['lifetimes'][att_name]
-                                if(lt >= 0):
-                                    extime = lt * (1 - fthresh[0])
-                                    time_at_expire = lastret + datetime.timedelta(seconds=extime)
-                                    if(now > time_at_expire):
-                                        ishit = 0
+                                if(prodid in lifetimes):
+                                    lt = lifetimes[prodid]['lifetimes'][att_name]
+                                    if(lt >= 0):
+                                        extime = lt * (1 - fthresh[0])
+                                        time_at_expire = lastret + datetime.timedelta(seconds=extime)
+                                        if(now > time_at_expire):
+                                            ishit = 0
 
                             if(not (att_name in self.__cached[entityid])):
                                 self.__cached[entityid][att_name] = [ishit]
@@ -402,11 +403,10 @@ class Adaptive(Strategy):
 
                         reference = secrets.token_hex(nbytes=8)
                         self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
-
                         caching_attrs = self.__evalute_attributes_for_caching(entityid, uncached, reference)
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
-                        self.__evaluated.append(entityid)
+                        self.__evaluated.add(entityid)
                     else:
                         self.__update_observed(entityid, ent['attributes'])
                     
@@ -447,7 +447,6 @@ class Adaptive(Strategy):
                 # So, first retrieving the entity
                 reference = secrets.token_hex(nbytes=8)
                 self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
-
                 out = self.__retrieve_entity(ent['attributes'],lifetimes)
                 output[entityid] = {}
                 for att_name,prod_values in out.items():
@@ -474,7 +473,7 @@ class Adaptive(Strategy):
         if(self.__window_counter >= self.trend_ranges[1]+1):
             # Run this in the background
             self.__evaluate_for_caching(entityid, out, ref_key)
-            self.__evaluated.append(entityid)
+            self.__evaluated.add(entityid)
         else:
             self.__observedLock.acquire()
             self.__update_observed(entityid, out.keys())
@@ -499,7 +498,7 @@ class Adaptive(Strategy):
                     # Select the action for the state using the RL Agent
                     action, (est_c_lifetime, est_delay) = None, (None, None)
                     if(self.__is_simple_agent):
-                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)
+                        action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)                
                         if(action != (0,0)):
                             wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
                             self.cache_memory.addcachedlifetime(action, wait_time)
@@ -550,11 +549,10 @@ class Adaptive(Strategy):
                 if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
                     try:
                         observation = self.__translate_to_state(entityid,att)
-                        
                         action, (est_c_lifetime, est_delay) = None, (None, None)
                         if(self.__is_simple_agent):
                             action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)
-                            
+
                             if(action != (0,0) and action[0] == entityid):
                                 updated_attr_dict.append(action[1])
                                 wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
@@ -647,7 +645,7 @@ class Adaptive(Strategy):
 
         if(self.__last_item_to_recieve == None):
             self.__waiting_to_retrive.push(parameters)
-        elif(entity != self.__last_item_to_recieve[0] and ref_key == self.__last_item_to_recieve[6]):
+        elif(entity != self.__last_item_to_recieve[0] or ref_key != self.__last_item_to_recieve[6]):
             # Different entity and reference 
             last_observed = self.__last_item_to_recieve
             providers = []
@@ -657,39 +655,68 @@ class Adaptive(Strategy):
             now = datetime.datetime.now()
             ent_att_pairs = []
             while True:
-                head = self.__waiting_to_retrive.get_head()
-                if(head[0] == last_observed[0] and head[6] == last_observed[6]):
-                    current_element = self.__waiting_to_retrive.pop()
+                head = self.__waiting_to_retrive.get_head()     
+                if(head != None):
+                    if(head[0] == last_observed[0] and head[6] == last_observed[6]):
+                        current_element = self.__waiting_to_retrive.pop()
 
-                    entity = current_element[0]
-                    attribute = current_element[1]
-                    est_c_lifetime = current_element[2]
-                    est_delay = current_element[3]
-                    action = current_element[4]
-                    observation = current_element[5]
+                        entity = current_element[0]
+                        attribute = current_element[1]
+                        est_c_lifetime = current_element[2]
+                        est_delay = current_element[3]
+                        action = current_element[4]
+                        observation = current_element[5]
 
-                    if(action != 0):
-                        # The item is to be cached
-                        # Could be a random one or an item evulated to be cached
-                        wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                        self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
-                        self.__last_actions.append((entity, attribute))
-                        ent_att_pairs.append((entity, attribute))
-                        
-                    else:
-                        self.__observedLock.acquire()
-                        if(entity in self.__delay_dict):
-                            self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+                        if(action != 0):
+                            # The item is to be cached
+                            # Could be a random one or an item evulated to be cached
+                            wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                            self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
+                            self.__last_actions.append((entity, attribute))
+                            ent_att_pairs.append((entity, attribute))
                         else:
-                            self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
-                        self.__update_observed(entity, attribute)
-                        self.__observedLock.release()     
+                            self.__observedLock.acquire()
+                            if(entity in self.__delay_dict):
+                                self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+                            else:
+                                self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
+                            self.__update_observed(entity, attribute)
+                            self.__observedLock.release()     
 
-                    self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter)       
+                        self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter)
+                        break       
+                    else:
+                        current_element = self.__waiting_to_retrive.pop()
+
+                        entity = current_element[0]
+                        attribute = current_element[1]
+                        est_c_lifetime = current_element[2]
+                        est_delay = current_element[3]
+                        action = current_element[4]
+                        observation = current_element[5]
+
+                        if(action != 0):
+                            # The item is to be cached
+                            # Could be a random one or an item evulated to be cached
+                            wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                            self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
+                            self.__last_actions.append((entity, attribute))
+                            ent_att_pairs.append((entity, attribute))
+                        else:
+                            self.__observedLock.acquire()
+                            if(entity in self.__delay_dict):
+                                self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+                            else:
+                                self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
+                            self.__update_observed(entity, attribute)
+                            self.__observedLock.release()     
+
+                        self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter) 
                 else:
                     break
-                
-            self.__cache_entity_attribute_pairs(ent_att_pairs, providers=providers) 
+
+            if(ent_att_pairs):
+                self.__cache_entity_attribute_pairs(ent_att_pairs, providers=list(providers)) 
             del self.__temp_entity_att_provider_map[last_observed[6]]
         else:
             # Same entity
@@ -703,13 +730,19 @@ class Adaptive(Strategy):
         attribute = parameters[1] 
 
         if(attribute == None):
-            del self.__cached[entity]
-            del self.__cached_hit_access_trend[entity]
-            del self.__cached_attribute_access_trend[entity]
+            if(entity in self.__cached):
+                del self.__cached[entity]
+            if(entity in self.__cached_hit_access_trend):
+                del self.__cached_hit_access_trend[entity]
+            if(entity in self.__cached_attribute_access_trend):
+                del self.__cached_attribute_access_trend[entity]
         else:
-            del self.__cached[entity][attribute]
-            del self.__cached_hit_access_trend[entity][attribute]
-            del self.__cached_attribute_access_trend[entity][attribute]
+            if(entity in self.__cached and attribute in self.__cached[entity]):
+                del self.__cached[entity][attribute]
+            if(entity in self.__cached_hit_access_trend and attribute in self.__cached_hit_access_trend[entity]):
+                del self.__cached_hit_access_trend[entity][attribute]
+            if(entity in self.__cached_attribute_access_trend and attribute in self.__cached_attribute_access_trend[entity]):
+                del self.__cached_attribute_access_trend[entity][attribute]
 
     ###################################################################################
     # Section 04 - Caching
@@ -736,10 +769,17 @@ class Adaptive(Strategy):
                 lifetimes = self.service_registry.get_context_producers(entityid,attlist)
             li = [(prodid,value['url']) for prodid, value in lifetimes.items()]
             response = self.service_selector.get_response_for_entity(attlist,li)
+            print('Finally Caching! Entity='+str(entityid))
+            print(response)
+            print()
             self.cache_memory.save(entityid, response)
-            # Push to profiler
-
+            
             for att in attlist:
+                if(entityid in self.__cached):
+                    self.__cached[entityid][att] = [False]
+                else:
+                    self.__cached[entityid] = {att:[False]}
+                # Push to profiler
                 if(not self.__isstatic):
                     self.__profiler.reactive_push({entityid:[att]})    
                 if(entityid in self.__attribute_access_trend and att in self.__attribute_access_trend[entityid]):
@@ -1077,7 +1117,7 @@ class Adaptive(Strategy):
             long_inc = (previous_state[5] - previous_state[3])/(self.trend_ranges[2] - self.trend_ranges[1])
             
             curr_ar = previous_state[1]
-            for i in range(0,self.self.trend_ranges[2]):
+            for i in range(0,self.trend_ranges[2]):
                 if(i < self.trend_ranges[0]):
                     curr_ar += short_inc
                 elif(self.trend_ranges[0] <= i < self.trend_ranges[1]):

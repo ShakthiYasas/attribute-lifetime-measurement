@@ -70,6 +70,8 @@ class SQLLiteClient:
     def get_context_producers_by_ids(self, providers) -> dict:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         output = {}
+        if(not isinstance(providers,list)):
+            providers = list(providers)
         provider_str = str(providers[0])
         for i in range(1,len(providers)):
             provider_str = provider_str + "," + str(providers[i])
@@ -103,7 +105,6 @@ class SQLLiteClient:
                     query_string += add
 
             producers = self.__conn.execute(query_string).fetchall()
-
             if(len(producers)>0):
                 if(attributes):
                     # Some or all of the attributes need to be fetched from the response
@@ -118,7 +119,7 @@ class SQLLiteClient:
                         query_string_2 = "SELECT name, lifetime\
                             FROM ContextAttribute\
                             WHERE producerId="+str(prod[0])+" AND ("+att_string+")"
-
+                        
                         att_res = self.__conn.execute(query_string_2).fetchall()
 
                         if(len(att_res)==len(attributes)):
