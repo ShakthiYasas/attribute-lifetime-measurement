@@ -199,7 +199,7 @@ class ACAgent(threading.Thread, Agent):
             post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features'], ref_key))
 
     def __calculate_expected_cached_lifetime(self, entityid, attr, prob):
-        cached_lt_res = self.__caller.__db.read_all_with_limit('attribute-cached-lifetime',{
+        cached_lt_res = self.__caller.get_access_to_db().read_all_with_limit('attribute-cached-lifetime',{
                     'entity': entityid,
                     'attribute': attr
                 },10)
@@ -268,3 +268,7 @@ class ACAgent(threading.Thread, Agent):
                 self.__epsilons = self.__epsilons_max
 
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
+    
+    # Get the value of the epsilon value now
+    def get_current_epsilon(self):
+        return self.__epsilons

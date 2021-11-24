@@ -167,7 +167,7 @@ class Adaptive(Strategy):
     def __update_attribute_access_trend(self, exp_time, key, value, __reqs_in_window=None):
         __reqs_in_window = self.__reqs_in_window if not __reqs_in_window else __reqs_in_window
         invalidtss = [num for num in value['req_ts'] if num < exp_time]
-        for i in range(0,invalidtss):
+        for i in range(0,len(invalidtss)):
             value['req_ts'].pop(0)
 
         validtss = value['req_ts']
@@ -376,14 +376,17 @@ class Adaptive(Strategy):
                     if(self.__window_counter >= self.trend_ranges[1]+1):
                         # Update hit rate here for those which have already been cached of the entity
                         att_in_cache = set(ent['attributes']) - uncached
+                        
                         for att_name in att_in_cache:
                             ishit = 1
-                            lt = lifetimes[prodid]['lifetimes'][att_name]
-                            if(lt >= 0):
-                                extime = lt * (1 - fthresh[0])
-                                time_at_expire = lastret + datetime.timedelta(seconds=extime)
-                                if(now > time_at_expire):
-                                    ishit = 0
+                            pro_att = self.cache_memory.get_value_by_key(entityid, att_name)
+                            for prodid,val,lastret,rec_bit in pro_att:
+                                lt = lifetimes[prodid]['lifetimes'][att_name]
+                                if(lt >= 0):
+                                    extime = lt * (1 - fthresh[0])
+                                    time_at_expire = lastret + datetime.timedelta(seconds=extime)
+                                    if(now > time_at_expire):
+                                        ishit = 0
 
                             if(not (att_name in self.__cached[entityid])):
                                 self.__cached[entityid][att_name] = [ishit]
@@ -625,7 +628,8 @@ class Adaptive(Strategy):
     
     # Check if the context attribute is observed to show a spike in demand
     def __is_spike(self,entity,attr):
-        if(self.__isobserved(entity, attr) and entity in self.__attribute_access_trend):
+        if(self.__isobserved(entity, attr) and entity in self.__attribute_access_trend
+                and attr in self.__attribute_access_trend[entity]):
             att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
             if(len(att_trend)<2):
                 return False
@@ -1234,6 +1238,9 @@ class Adaptive(Strategy):
         ret_cost = self.__retrieval_cost_trend.get_last()
         
         return request_rate*((hit_rate*sla[1]) - ((1-hit_rate)*sla[2]) - ((1-hit_rate)*ret_cost))
+
+    def get_access_to_db(self):
+        return self.__db
 
 class LearningThread (threading.Thread):
     def __init__(self):

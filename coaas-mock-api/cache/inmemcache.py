@@ -63,9 +63,9 @@ class InMemoryCache(CacheAgent):
     
     def __reset_provider_recency(self):
         threads = []
-        copy_of_hashtable_keys = self.__entityhash.keys()
-        for entityid in copy_of_hashtable_keys:
-            copy_of_attributes = self.__entityhash[entityid].keys()
+        copy_of_hashtable = self.__entityhash.copy()
+        for entityid in copy_of_hashtable.keys():
+            copy_of_attributes = copy_of_hashtable[entityid].copy().keys()
             for attr in copy_of_attributes:
                 en_re_th = threading.Thread(target=self.__update_cache_providers(entityid, attr))
                 en_re_th.start()
@@ -76,7 +76,8 @@ class InMemoryCache(CacheAgent):
 
     # Removes all the recently not used provider's cached data
     def __update_cache_providers(self, entityid, attr):
-        copy_of_cached_items = self.__entityhash[entityid][attr]
+        is_att_evicted = False
+        copy_of_cached_items = self.__entityhash[entityid][attr].copy()
         for cache_item in copy_of_cached_items:
             if(not cache_item[3]):
                 self.__cache_write_lock.acquire()
@@ -85,10 +86,12 @@ class InMemoryCache(CacheAgent):
 
                 if(not self.__entityhash[entityid][attr]):
                     self.__evict_attribute(entityid, attr)
+                    is_att_evicted = True
 
-        self.__cache_write_lock.acquire() 
-        self.__entityhash[entityid][attr] = [(cache_item[0], cache_item[1], cache_item[2], False) for cache_item in self.__entityhash[entityid][attr]]
-        self.__cache_write_lock.release()
+        if(not is_att_evicted):
+            self.__cache_write_lock.acquire() 
+            self.__entityhash[entityid][attr] = [(cache_item[0], cache_item[1], cache_item[2], False) for cache_item in self.__entityhash[entityid][attr]]
+            self.__cache_write_lock.release()
 
     def calculate_hitrate(self):
         local = self.__localstats.copy()
@@ -188,7 +191,7 @@ class InMemoryCache(CacheAgent):
         self.__db.insert_one('attribute-cached-lifetime',{
                 'entityid': entityid,
                 'attribute': attribute,
-                'c_lifetime': (now - att_meta[2]).total_seconds()
+                'c_lifetime': (now - att_meta[1]).total_seconds()
             })
 
         self.__registry.remove_cached_life(entityid, attribute)

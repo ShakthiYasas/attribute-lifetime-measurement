@@ -30,6 +30,7 @@ class ServiceSelector:
     def get_response_for_entity(self, attributes:list, urllist:list):
         output = {}
         now = datetime.now()
+
         for prodid, url in urllist:
             _thread.start_new_thread(self.__update_recency_bit, (prodid,))
             self.__get_context(prodid, url, attributes, now, output)

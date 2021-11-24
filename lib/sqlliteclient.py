@@ -40,12 +40,12 @@ class SQLLiteClient:
     # Check and retrieve any context data available in the provider SLA 
     def get_provider_meta(self, providerid, attributes):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
-        producer = self.__conn.execute(
-                "SELECT entityId, location, regno, address\
+        query_string = "SELECT entityId, location, regno, address\
                 FROM ContextProducer \
                 WHERE id="+str(providerid)+" AND isActive=1\
-                LIMIT 1").fetchone()
+                LIMIT 1"
 
+        producer = self.__conn.execute(query_string).fetchone()
         retrievable = self.__service_description[producer[0]]
         needed = set(retrievable) & set(attributes)
         if(needed):
@@ -70,13 +70,17 @@ class SQLLiteClient:
     def get_context_producers_by_ids(self, providers) -> dict:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         output = {}
-        producers = self.__conn.execute(
-                "SELECT id, url \
+        provider_str = str(providers[0])
+        for i in range(1,len(providers)):
+            provider_str = provider_str + "," + str(providers[i])
+
+        query_string = "SELECT id, url \
                 FROM ContextProducer \
-                WHERE isActive=1 AND id IN "+str(providers)).fetchall()
+                WHERE isActive=1 AND id IN ("+provider_str+")"
+        producers = self.__conn.execute(query_string).fetchall()
         
         for prod in producers:
-            output[prod[1]] = {'url':prod[1]}
+            output[prod[0]] = {'url':prod[1]}
         
         return output
 
@@ -163,7 +167,7 @@ class SQLLiteClient:
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "DELETE FROM CachedLifetime WHERE\
-            entityid="+str(entityid)+" AND attribute='"+attribute+"')")
+            entityid="+str(entityid)+" AND attribute='"+attribute+"'")
     
     def get_cached_life(self, entityid, attribute):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)

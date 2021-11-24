@@ -7,7 +7,7 @@ from cache.eviction.ranodmevictor import RandomEvictor
 class EvictorFactory:
     __evictor = None
     def __init__(self, evictalgo, cache):
-        if self.__evictor is None and evictalgo != 'none':
+        if self.__evictor is None or evictalgo != 'none':
             if(evictalgo == 'lfu'):
                 print('Initializing Least-Frequently-Used eviction for the cache memory.')
                 self.__evictor = LFUEvictor(cache)
