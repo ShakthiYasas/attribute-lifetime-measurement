@@ -847,18 +847,18 @@ class Adaptive(Strategy):
             if(not self.__is_simple_agent):
                 # The following calculation makes the avergae cache lifetime propotional to the long range
                 avg_lts = statistics.mean(avg_lts)/(self.trend_ranges[2]*(self.__moving_window/1000))
-                fea_vec.append(avg_lts)
+                fea_vec.append(round(avg_lts,3))
             else:
-                fea_vec.append(statistics.mean(avg_lts))
+                fea_vec.append(round(statistics.mean(avg_lts),3))
         else:
             fea_vec.append(0)
 
         # Latency [13]
-        fea_vec.append(avg_latency)
+        fea_vec.append(round(avg_latency,3))
 
         # Average Retriveal Cost [14]
-        avg_ret_cost = statistics.mean([values['cost'] for values in lifetimes.values()])
-        fea_vec.append(avg_ret_cost)
+        avg_ret_cost = statistics.mean([values['cost'] for values in lifetimes.values()]) if(lifetimes) else 9999
+        fea_vec.append(round(avg_ret_cost,3))
 
         return {
             'entityid': entityid,
@@ -891,13 +891,13 @@ class Adaptive(Strategy):
             extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
             for ran in self.trend_ranges:
-                fea_vec.append(attribute_trend.get_last_position(ran))
+                fea_vec.append(round(attribute_trend.get_last_position(ran),3))
                 exp_ar = extrapolation[trend_size-2+ran]
                 if(exp_ar < 0):
                     exp_ar = 0
                 elif(exp_ar > 1):
                     exp_ar = 1
-                fea_vec.append(exp_ar)
+                fea_vec.append(round(exp_ar,3))
 
         elif(entityid in self.__cached_attribute_access_trend 
             and att in self.__cached_attribute_access_trend[entityid]):
@@ -918,13 +918,13 @@ class Adaptive(Strategy):
             extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
             for ran in self.trend_ranges:
-                fea_vec.append(attribute_trend.get_last_position(ran))
+                fea_vec.append(round(attribute_trend.get_last_position(ran),3))
                 exp_ar = extrapolation[trend_size-2+ran]
                 if(exp_ar < 0):
                     exp_ar = 0
                 elif(exp_ar > 1):
                     exp_ar = 1
-                fea_vec.append(exp_ar)
+                fea_vec.append(round(exp_ar,0))
                 
         else:
             # Actual and Expected Access Rates 
@@ -936,7 +936,7 @@ class Adaptive(Strategy):
     # Calculates the hit rates for the given observation
     def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
         fea_vec = []
-        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items())))
+        avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items()))) if lifetimes else 9999
 
         if(isobserved):
             # No current hit rates to report 
@@ -961,13 +961,13 @@ class Adaptive(Strategy):
                 extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
 
                 for ran in self.trend_ranges:
-                    fea_vec.append(hit_trend.get_last_position(ran))
+                    fea_vec.append(round(hit_trend.get_last_position(ran),3))
                     exp_hr = extrapolation[trend_size-2+ran]
                     if(exp_hr < 0):
                         exp_hr = 0
                     elif(exp_hr > 1):
                         exp_hr = 1
-                    fea_vec.append(exp_hr)
+                    fea_vec.append(round(exp_hr,3))
             else:
                 # The item is not in cache or not observed either.
                 # This means the item is very new. So, delay it by 1 window.
@@ -1073,7 +1073,7 @@ class Adaptive(Strategy):
                         # It is effective to cache
                         # because multiple requests can be served
                         exp_hr = (delta*req_at_point)/((delta*req_at_point)+1)
-                        fea_vec.append(exp_hr)
+                        fea_vec.append(round(exp_hr,3))
                     else:
                         # It is not effective to cache
                         # because no more that 1 request could be served
@@ -1122,7 +1122,9 @@ class Adaptive(Strategy):
                 total_gain += out*(price - penalty - retrieval)
             
             # This returns the gain or loss of caching an item per request
-            return total_gain/total_requests if total_requests>0 else -10, is_cached
+            reward = total_gain/total_requests if total_requests>0 else -10
+
+            return reward, is_cached
         else:
             # This item was not cached
             expected_vals = []
@@ -1158,7 +1160,7 @@ class Adaptive(Strategy):
                 expected_hr.append(curr_hr)
             
             # Expected Values
-            for idx in range(1,len(diff)):
+            for idx in range(1,diff):
                 price = expected_hr[idx]*past_sla[idx][1]  
                 penalty = (1-expected_hr[idx])*past_sla[idx][2]
                 retrieval = (1-expected_hr[idx])*past_ret_costs[idx]
@@ -1178,10 +1180,12 @@ class Adaptive(Strategy):
                 total_requests += out
                 observed_vals.append(out*(0 - penalty - retrieval))
 
+            diff = min(len(observed_vals), len(expected_vals), diff)
             diff = sum([observed_vals[i] - expected_vals[i] for i in range(0,diff)])
+            reward = diff/total_requests if total_requests>0 else 10
             
             # This returns the regret of not caching the item
-            return diff/total_requests if total_requests>0 else 10, is_cached
+            return reward, is_cached
 
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:

@@ -15,6 +15,7 @@ class InMemoryCache(CacheAgent):
     def __init__(self, config, db, registry):      
         # Data structure of the cache
         self.__cache_size = config.cache_size
+        self.is_auto_evicting = config.isevict
         self.__entityhash = LimitedSizeDict(size_limit = self.__cache_size)
         self.__cache_write_lock = threading.Lock()
 
@@ -79,7 +80,7 @@ class InMemoryCache(CacheAgent):
         is_att_evicted = False
         copy_of_cached_items = self.__entityhash[entityid][attr].copy()
         for cache_item in copy_of_cached_items:
-            if(not cache_item[3]):
+            if(not cache_item[3] and self.is_auto_evicting):
                 self.__cache_write_lock.acquire()
                 self.__entityhash[entityid][attr].remove(cache_item)
                 self.__cache_write_lock.release()

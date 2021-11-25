@@ -129,4 +129,4 @@ class ServiceSelector:
         if(rtlist):
             return statistics.mean(rtlist)
         else:
-            return None
+            return 9999

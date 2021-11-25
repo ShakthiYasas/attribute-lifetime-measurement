@@ -11,6 +11,6 @@ class CacheConfiguration(Configuration):
         self.type = config['CacheType']
         self.window_size = int(config['MovingWindow'])
         self.eviction_algo = config['EvictionAlgo']
+        self.isevict = True if config['IsAutoEvicting'] == 'True' else False
         self.cache_size = int(config['CacheBlocksPerUnit'])*int(config['CacheSize'])
-
         

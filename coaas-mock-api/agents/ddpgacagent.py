@@ -24,7 +24,7 @@ ACTOR_MODEL_PATH = 'agents/saved-models/ddpg/actor-model'
 CRITIC_MODEL_PATH = 'agents/saved-models/ddpg/critic-model'
 
 N_ACTIONS = 1 # Becuase, it's continous
-N_FEATURES = 15
+N_FEATURES = (15,)
 
 class DDPGACAgent(threading.Thread, Agent):
     def __init__(self, config, caller):
@@ -189,8 +189,10 @@ class DDPGACAgent(threading.Thread, Agent):
 
         self.__buffer.store_transition(state, action, reward, new_state)
 
-        state, action, reward, new_state = self.__buffer.sample_buffer(self.__batch_size) if self.__buffer.is_valid \
-                                                else self.__buffer.get_entire_buffer()
+        # Saving the new transition completed
+    
+        state, action, reward, new_state = self.__buffer.sample_buffer()
+
         new_critic_values = self.__target_critic.predict(new_state, self.__target_actor.predict(new_state))
         
         target = []
@@ -198,7 +200,7 @@ class DDPGACAgent(threading.Thread, Agent):
             target.append(reward[j] + self.__gamma*new_critic_values[j])
         target = np.reshape(target, (self.__batch_size,1))
 
-        self.__critic.learn(state, action, target)
+        _= self.__critic.learn(state, action, target)
 
         predicted_action = self.__actor.predict(state)
         gradients = self.__critic.get_action_gradients(state, predicted_action)
@@ -272,7 +274,7 @@ class Critic(object):
 
     def __build_network(self):
         with tf.compat.v1.variable_scope(self.__name):
-            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_FEATURES], name='inputs')
+            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
             self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
             self.__q_target = tf.compat.v1.placeholder(tf.float32, shape=[None, 1], name='targets')
 
@@ -301,7 +303,7 @@ class Critic(object):
                                 kernel_initializer=RandomUniform(-f3, f3),
                                 bias_initializer=RandomUniform(-f3, f3),
                                 kernel_regularizer=regularizers.l2(0.01))
-            self.__loss = tf.losses.mean_squared_error(self.__q_target, self.__q_value)
+            self.__loss = tf.compat.v1.losses.mean_squared_error(self.__q_target, self.__q_value)
 
     # Get the action
     def predict(self, observations, actions):
@@ -353,7 +355,7 @@ class Actor(object):
         self.__checkpoint_file = CHECKPOINT_PATH + self.__name + '.ckpt'
 
         # Initializing Policy Gradient
-        self.__init_policy_grad = tf.gradients(self.__mu, self.params, self.__action_gradient_ph)
+        self.__init_policy_grad = tf.gradients(self.__mu, self.params, -self.__action_gradient_ph)
         self.__actor_gradients = list(map(lambda x: tf.divide(x, self.__batch_size), self.__init_policy_grad))
         self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__actor_lr).apply_gradients(zip(self.__actor_gradients, self.params))
     
@@ -362,7 +364,7 @@ class Actor(object):
 
     def __build_network(self):
         with tf.compat.v1.variable_scope(self.__name):
-            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_FEATURES], name='inputs')
+            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
             self.__action_gradient_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
 
             # Input Layer

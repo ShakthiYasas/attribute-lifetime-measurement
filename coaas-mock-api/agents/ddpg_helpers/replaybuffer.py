@@ -12,8 +12,8 @@ class ReplayBuffer():
         # State, Action, Reward, New State buffer memories
         self.reward_memory = np.zeros(self.mem_size)
         self.action_memory = np.zeros((self.mem_size, n_actions))
-        self.state_memory = np.zeros((self.mem_size, input_shape))
-        self.new_state_memory = np.zeros((self.mem_size, input_shape))
+        self.state_memory = np.zeros((self.mem_size, *input_shape))
+        self.new_state_memory = np.zeros((self.mem_size, *input_shape))
 
     def store_transition(self, state, action, reward, new_state):
         # This acts like a FIFO Queue.
@@ -28,14 +28,19 @@ class ReplayBuffer():
         if(self.mem_cntr >= self.batch_size):
             self.is_valid = True
 
-    def sample_buffer(self, batch_size):
-        max_mem = self.mem_cntr if not self.is_valid else self.mem_size
-        idx = np.random.randint(max_mem, size=batch_size)
+    def sample_buffer(self):
+        max_mem = 0 
+        if(self.mem_cntr < self.mem_size):
+            max_mem = self.mem_cntr
+        else:
+            max_mem = self.mem_size
 
-        states = self.state_memory[idx,:]
-        actions = self.action_memory[idx,:]
-        rewards = self.reward_memory[idx,:]
-        new_states = self.new_state_memory[idx,:]
+        idx = np.random.randint(max_mem, size=self.batch_size)
+
+        states = self.state_memory[idx]
+        actions = self.action_memory[idx]
+        rewards = self.reward_memory[idx]
+        new_states = self.new_state_memory[idx]
 
         return states, actions, rewards, new_states
 
