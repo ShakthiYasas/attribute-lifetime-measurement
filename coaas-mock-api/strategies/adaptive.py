@@ -731,7 +731,8 @@ class Adaptive(Strategy):
 
             if(ent_att_pairs):
                 self.__cache_entity_attribute_pairs(ent_att_pairs, providers=list(providers)) 
-            del self.__temp_entity_att_provider_map[last_observed[6]]
+            if(last_observed[6] in self.__temp_entity_att_provider_map[last_observed[6]]):
+                del self.__temp_entity_att_provider_map[last_observed[6]]
         else:
             # Same entity
             self.__waiting_to_retrive.push(parameters)
@@ -870,7 +871,7 @@ class Adaptive(Strategy):
         fea_vec = []
         if(isobserved):
             # Actual and Expected Access Rates 
-            if(not (att in self.__attribute_access_trend[entityid])):
+            if(not (entityid in self.__attribute_access_trend) or not (att in self.__attribute_access_trend[entityid])):
                 exp_time = datetime.datetime.now()-datetime.timedelta(seconds=self.__moving_window/1000)
                 self.__update_attribute_access_trend(exp_time, entityid, self.__observed[entityid])
 
@@ -1147,7 +1148,7 @@ class Adaptive(Strategy):
             long_inc = (previous_state[11] - previous_state[9])/(self.trend_ranges[2] - self.trend_ranges[1])
 
             curr_hr = previous_state[1]
-            for i in range(0,self.self.trend_ranges[2]):
+            for i in range(0,self.trend_ranges[2]):
                 if(i < self.trend_ranges[0]):
                     curr_hr += short_inc
                 elif(self.trend_ranges[0] <= i < self.trend_ranges[1]):
