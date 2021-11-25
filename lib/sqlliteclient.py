@@ -272,8 +272,8 @@ class SQLLiteClient:
                 (1,1,1,'http://localhost:5000/cars?id=1',0.25, 0.5, NULL, '1HR800', NULL),\
                 (2,1,1,'http://localhost:5000/cars?id=2',0.4, 1, NULL, '1VC546', NULL),\
                 (3,1,1,'http://localhost:5000/cars?id=3',0.3, 0.2, NULL, '1DH8906', NULL),\
-                (4,1,1,'http://localhost:5000/cars?id=4',0.2, 4, NULL, '1KP1244', NULL),\
-                (5,1,1,'http://localhost:5000/cars?id=5',0.2, 4, NULL, '1QD7788', NULL),\
+                (4,1,1,'http://localhost:5000/cars?id=4',0.2, 0.4, NULL, '1KP1244', NULL),\
+                (5,1,1,'http://localhost:5000/cars?id=5',0.2, 0.4, NULL, '1QD7788', NULL),\
                 (7,2,1,'http://localhost:5000/bikes?id=7',0.6, 0.5, NULL, 'CX123', NULL),\
                 (8,2,1,'http://localhost:5000/bikes?id=8',0.5, 1, NULL, 'ESCBR', NULL),\
                 (9,2,1,'http://localhost:5000/bikes?id=9',0.6, 0.5, NULL, 'UL146', NULL),\

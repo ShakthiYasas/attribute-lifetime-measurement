@@ -113,11 +113,18 @@ class InMemoryCache(CacheAgent):
         if(entityid in self.__entityhash):
             now = datetime.now()
             for att_name, values in cacheitems.items():
-                if(att_name not in self.__entityhash[entityid].freq_table):
+                if(att_name in self.__entityhash[entityid].freq_table):
+                    for prodid, res, ret_time in values:
+                        current = [item for item in self.__entityhash[entityid][att_name] if item[0] == prodid]
+                        new_record = (prodid, res, ret_time, recency_bit)
+                        if(current):
+                            self.__entityhash[entityid][att_name].remove(current[0])
+                        self.__entityhash[entityid][att_name].append(new_record)
+                else:
                     que = FIFOQueue_2(100)
                     que.push(now)
                     self.__entityhash[entityid].freq_table[att_name] = (que,now)
-                self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
+                    self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]   
         else:
             try:
                 self.__create_new_entity_cache(entityid, cacheitems)
@@ -221,7 +228,7 @@ class InMemoryCache(CacheAgent):
             if(not(entityid in self.__entityhash and attribute in self.__entityhash[entityid])):
                 uncached.add(attribute)
 
-        if(uncached): 
+        if(len(uncached)>0): 
             return False, uncached
         return True, []
 

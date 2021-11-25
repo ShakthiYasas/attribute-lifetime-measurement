@@ -65,6 +65,8 @@ class SimpleAgent(Agent):
             disearning_sequence += self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
 
         npv = sum(disearning_sequence) - cost_of_caching
+        #print('Entity = '+str(entityid)+' and attribute = '+ attribute)
+        #print('NPV Value = '+ str(npv))
 
         if(npv<=0):
             random_value = np.random.uniform()

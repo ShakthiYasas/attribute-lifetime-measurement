@@ -329,7 +329,7 @@ class Adaptive(Strategy):
                         att_in_cache = self.cache_memory.get_value_by_key(entityid, att_name)
                         ishit = 1
                         if(not self.__isstatic):
-                            for prodid,val,lastret in att_in_cache:
+                            for prodid,val,lastret, rec_bit in att_in_cache:
                                 # Estimated lifetime of the attribute
                                 mean_for_att = self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att_name)  
                                 extime = mean_for_att * (1 - fthresh[0])
@@ -342,14 +342,20 @@ class Adaptive(Strategy):
                                     break
                         else:
                             # Checking if any of the attributes are not fresh
+                            #print('Entity = '+ str(entityid) + ' and attribute = '+ att_name)
                             for prodid,val,lastret,rec_bit in att_in_cache:
                                 if(prodid in lifetimes):
                                     lt = lifetimes[prodid]['lifetimes'][att_name]
+                                    #print('Lifetime: '+str(lt))
                                     if(lt<0):
                                         continue
                                     else:
                                         extime = lt * (1 - fthresh[0])
+                                        #print('Freshness = '+ str(fthresh[0]))
+                                        #print('Extime = '+ str(extime))
                                         time_at_expire = lastret + datetime.timedelta(seconds=extime)
+                                        #print(now)
+                                        #print(time_at_expire)
                                         if(now > time_at_expire):
                                             # If the attribute doesn't meet the freshness level (Cache miss) from the producer
                                             # add the entity and producer to the need to refresh list.
@@ -358,7 +364,10 @@ class Adaptive(Strategy):
                                             break
                             
                             # Checking if there exist new providers that are already not cached
-                            new_pros = set(lifetimes.keys()) - set([info[0] for info in att_in_cache])
+                            l1 = lifetimes.keys()
+                            l2 = [info[0] for info in att_in_cache]
+                            # print()
+                            new_pros = set(l1) - set(l2)
                             if(len(new_pros)):
                                 # There are some new context providers from which data need to be retrieved
                                 new_providers.add((entityid,att_name))
@@ -580,6 +589,7 @@ class Adaptive(Strategy):
             updated_dict = {}
             for att in updated_attr_dict:
                 updated_dict[att] = attributes[att]
+            # print('From Evlauting for cache!')
             self.cache_memory.save(entityid,updated_dict)
             # Push to profiler
             if(not self.__isstatic):
@@ -633,7 +643,7 @@ class Adaptive(Strategy):
                 return False
             if(att_trend[1] > 0):
                 growth = (att_trend[1] - att_trend[0])/att_trend[1]
-                if(growth >= 1):
+                if(growth >= 10):
                     return True
             return False
         else: return False  
@@ -769,9 +779,7 @@ class Adaptive(Strategy):
                 lifetimes = self.service_registry.get_context_producers(entityid,attlist)
             li = [(prodid,value['url']) for prodid, value in lifetimes.items()]
             response = self.service_selector.get_response_for_entity(attlist,li)
-            print('Finally Caching! Entity='+str(entityid))
-            print(response)
-            print()
+            # print('From Caching entity attribute pair')
             self.cache_memory.save(entityid, response)
             
             for att in attlist:
@@ -972,6 +980,7 @@ class Adaptive(Strategy):
             response = self.service_selector.get_response_for_entity(attribute_list, 
                         list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
             # Save items in cache
+            #print('From refreshing entity')
             self.cache_memory.save(entityid,response)
             # Push to profiler
             if(not self.__isstatic):
@@ -983,6 +992,7 @@ class Adaptive(Strategy):
         for entityid,attribute_list,prodid,url in refresh_context:
             response = self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
             # Save items in cache
+            # print('From Refreshing context provider')
             self.cache_memory.save(entityid,response)
             # Push to profiler
             if(not self.__isstatic):
@@ -1053,7 +1063,8 @@ class Adaptive(Strategy):
                 req_at_point = self.req_rate_extrapolation[rr_trend_size-2+ran]*ar_extrapolation[trend_size-2+ran]
 
                 if(fthr<frt and req_at_point > 0): 
-                    if(delta >= (1/req_at_point)):
+                    time_between_2_requests = 1/req_at_point
+                    if(delta >= (time_between_2_requests*2)):
                         # It is effective to cache
                         # because multiple requests can be served
                         exp_hr = (delta*req_at_point)/((delta*req_at_point)+1)
