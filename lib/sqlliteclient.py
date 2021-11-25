@@ -269,19 +269,19 @@ class SQLLiteClient:
 
         self.__conn.execute(
             "INSERT INTO ContextProducer(id, entityId, isActive, url, price, samplingrate, location, regno, address) VALUES\
-                (1,1,1,'http://localhost:5000/cars?id=1',0.25, 0.5, NULL, '1HR800', NULL),\
-                (2,1,1,'http://localhost:5000/cars?id=2',0.4, 1, NULL, '1VC546', NULL),\
+                (1,1,1,'http://localhost:5000/cars?id=1',0.25, 0.033, NULL, '1HR800', NULL),\
+                (2,1,1,'http://localhost:5000/cars?id=2',0.4, 0.1, NULL, '1VC546', NULL),\
                 (3,1,1,'http://localhost:5000/cars?id=3',0.3, 0.2, NULL, '1DH8906', NULL),\
-                (4,1,1,'http://localhost:5000/cars?id=4',0.2, 0.4, NULL, '1KP1244', NULL),\
-                (5,1,1,'http://localhost:5000/cars?id=5',0.2, 0.4, NULL, '1QD7788', NULL),\
-                (7,2,1,'http://localhost:5000/bikes?id=7',0.6, 0.5, NULL, 'CX123', NULL),\
-                (8,2,1,'http://localhost:5000/bikes?id=8',0.5, 1, NULL, 'ESCBR', NULL),\
-                (9,2,1,'http://localhost:5000/bikes?id=9',0.6, 0.5, NULL, 'UL146', NULL),\
+                (4,1,1,'http://localhost:5000/cars?id=4',0.2, 0.017, NULL, '1KP1244', NULL),\
+                (5,1,1,'http://localhost:5000/cars?id=5',0.2, 0.1, NULL, '1QD7788', NULL),\
+                (7,2,1,'http://localhost:5000/bikes?id=7',0.6, 0.2, NULL, 'CX123', NULL),\
+                (8,2,1,'http://localhost:5000/bikes?id=8',0.5, 0.1, NULL, 'ESCBR', NULL),\
+                (9,2,1,'http://localhost:5000/bikes?id=9',0.6, 0.2, NULL, 'UL146', NULL),\
                 (11,3,1,'http://localhost:5000/carparks?id=11',0.4, 0.017, '-37.84938300336436, 145.11336178206872', NULL, 'Parking Lot Burwood Highway Burwood VIC 3125'),\
                 (12,3,1,'http://localhost:5000/carparks?id=12',0.75, 0.033, '-37.84586713387071, 145.1149120988647', NULL, 'Building HH Burwood Highway Burwood VIC 3125'),\
                 (13,3,1,'http://localhost:5000/carparks?id=13',0.3, 0.017, '-37.84621449228698, 145.11596352479353', NULL, 'Building HG Burwood Highway Burwood VIC 3125'),\
                 (15,4,1,'http://localhost:5000/weather?id=15',0.2, 0.017, '-37.848027507269634, 145.1155451001933', NULL, NULL),\
-                (17,5,1,'http://localhost:5000/bikeparks?id=17',0.4, 0.5, '-37.849121741619584, 145.11557006850464', NULL, NULL),\
+                (17,5,1,'http://localhost:5000/bikeparks?id=17',0.4, 0.0033, '-37.849121741619584, 145.11557006850464', NULL, NULL),\
                 (18,6,1,'http://localhost:5000/junctions?id=18',0.1, 2, '-37.850488866096384, 145.11997157347662', NULL, NULL),\
                 (19,6,1,'http://localhost:5000/junctions?id=19',0.1, 2, '-37.84987043337564, 145.11519724149585', NULL, NULL),\
                 (20,6,1,'http://localhost:5000/junctions?id=20',0.1, 2, '-37.84957392269724, 145.11298710129802', NULL, NULL),\
@@ -289,7 +289,7 @@ class SQLLiteClient:
                 (22,7,1,'http://localhost:5000/buildings?id=22',0.2, 0.00028, '-37.8495569791939, 145.11465007086437', NULL, 'Deakin Coperate Center'),\
                 (23,7,1,'http://localhost:5000/buildings?id=23',0.2, 0.00028, '-37.84696457731187, 145.11455351134117', NULL, 'Deakin Library'),\
                 (24,7,1,'http://localhost:5000/buildings?id=24',0.2, 0.00028, '-37.848004514177646, 145.11557275075276', NULL, 'Deakin Building G'),\
-                (25,7,1,'http://localhost:5000/parks?id=25',0.4, 0.00056, '-37.84834762657227, 145.1110612751735', NULL, 'Gardiners Creek')")
+                (25,8,1,'http://localhost:5000/parks?id=25',0.4, 0.00056, '-37.84834762657227, 145.1110612751735', NULL, 'Gardiners Creek')")
         
         self.__conn.execute(
             # Assume that each car park has a varying parking cost (i.e. peak and off-peak price)

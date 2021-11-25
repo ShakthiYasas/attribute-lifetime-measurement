@@ -415,6 +415,8 @@ class Adaptive(Strategy):
                         caching_attrs = self.__evalute_attributes_for_caching(entityid, uncached, reference)
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
+                            uncached = set(uncached) - set(caching_attrs)
+
                         self.__evaluated.add(entityid)
                     else:
                         self.__update_observed(entityid, ent['attributes'])
@@ -444,28 +446,30 @@ class Adaptive(Strategy):
                         output[entityid][att_name] = [res[1] for res in prod_values]
                     else:
                         # This is when the entity is not even evaluated to be cached
-                        res = self.service_selector.get_response_for_entity([att_name], 
-                            list(map(lambda k: (k[0],k[1]['url']), lifetimes.items())))   
-                        output[entityid][att_name] = [x[1] for x in res[att_name]]
-                        # Update observed
-                        self.__observedLock.acquire()
-                        self.__update_observed(entityid, [att_name])
-                        self.__observedLock.release()
+                        if(lifetimes):
+                            url_list = list(map(lambda k: (k[0],k[1]['url']), lifetimes.items()))
+                            res = self.service_selector.get_response_for_entity([att_name], url_list)  
+                            output[entityid][att_name] = [x[1] for x in res[att_name]]
+                            # Update observed
+                            self.__observedLock.acquire()
+                            self.__update_observed(entityid, [att_name])
+                            self.__observedLock.release()
             else:
                 # Even the entity is not cached previously
                 # So, first retrieving the entity
-                reference = secrets.token_hex(nbytes=8)
-                self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
-                out = self.__retrieve_entity(ent['attributes'],lifetimes)
-                output[entityid] = {}
-                for att_name,prod_values in out.items():
-                    output[entityid][att_name] = [res[1] for res in prod_values]
-                    
-                self.__learning_counter += 1
-                # Evaluate whether to cache               
-                # Doesn't cache any item until atleast the mid range is reached
-                #_thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread, (entityid, out))
-                self.__evaluate_and_updated_observed_in_thread(entityid, out, reference)
+                if(lifetimes):
+                    reference = secrets.token_hex(nbytes=8)
+                    self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
+                    out = self.__retrieve_entity(ent['attributes'],lifetimes)
+                    output[entityid] = {}
+                    for att_name,prod_values in out.items():
+                        output[entityid][att_name] = [res[1] for res in prod_values]
+                        
+                    self.__learning_counter += 1
+                    # Evaluate whether to cache               
+                    # Doesn't cache any item until atleast the mid range is reached
+                    #_thread.start_new_thread(self.__evaluate_and_updated_observed_in_thread, (entityid, out))
+                    self.__evaluate_and_updated_observed_in_thread(entityid, out, reference)
 
         if(self.__learning_counter % self.__learning_cycle == 0):
             if(isinstance(self.selective_cache_agent, DQNAgent)):
@@ -596,11 +600,11 @@ class Adaptive(Strategy):
                 self.__profiler.reactive_push({entityid:updated_attr_dict})  
             
             for att in updated_attr_dict:
-                if(att in self.__attribute_access_trend[entityid]):
+                if(entityid in self.__attribute_access_trend and att in self.__attribute_access_trend[entityid]):
                     del self.__attribute_access_trend[entityid][att]
-                if(att in self.__observed[entityid]):
+                if(entityid in self.__observed and att in self.__observed[entityid]):
                     del self.__observed[entityid][att]
-            if(self.__observed[entityid]):
+            if(entityid in self.__observed and self.__observed[entityid]):
                 del self.__observed[entityid]
             # Update the observed list for uncached entities and attributes 
             self.__observedLock.acquire()
@@ -763,14 +767,14 @@ class Adaptive(Strategy):
     def __cache_entity_attribute_pairs(self, entityttpairs, is_random=False, providers = []):
         ent_att = {}
         lifetimes = {}
-        for entity,att in entityttpairs:
-            if(entity in ent_att):
-                if(att in ent_att[entity]):
-                    ent_att[entity].append(att)
+        for pair in entityttpairs:
+            if(pair[0] in ent_att):
+                if(pair[1] in ent_att[pair[0]]):
+                    ent_att[pair[0]].append(pair[1])
                 else:
-                    ent_att[entity] = [att]
+                    ent_att[pair[0]] = [pair[1]]
             else:
-                ent_att[entity] = [att]
+                ent_att[pair[0]] = [pair[1]]
 
         for entityid, attlist in ent_att.items():
             if(providers):
