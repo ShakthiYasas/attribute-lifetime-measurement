@@ -1,9 +1,11 @@
-from math import trunc
-from dateutil import parser
-from datetime import datetime
-from profilers.profiler import Profiler
+import time
+import _thread
+import threading
+import statistics
 
+from lib.fifoqueue import FIFOQueue_2
 from strategies.strategy import Strategy
+from profilers.adaptiveprofiler import AdaptiveProfiler
 from serviceresolver.serviceselector import ServiceSelector
 
 # Reactive retrieval strategy
@@ -13,47 +15,147 @@ from serviceresolver.serviceselector import ServiceSelector
 # However, expecting the lowest response time.
 
 class Reactive(Strategy):
-    def __init__(self, attributes, url, db, window, isstatic=True):
-        self.url = url
-        self.meta = None 
-        self.moving_window = window
+    # Counters
+    __window_counter = 0
+
+    # Queues
+    __sla_trend = FIFOQueue_2(10)
+    __request_rate_trend = FIFOQueue_2(1000)
+    __retrieval_cost_trend = FIFOQueue_2(10)
+    
+    def __init__(self, db, window, isstatic=True, learncycle = 20, skip_random=False):
+        self.__db = db
+        self.__reqs_in_window = 0
+        self.__isstatic = isstatic 
+        self.__local_ret_costs = []
+        self.__moving_window = window
+        self.__most_expensive_sla = (0.5,1.0,1.0)
 
         self.service_selector = ServiceSelector(db)
-        self.profiler = Profiler(attributes, db, self.moving_window, self.__class__.__name__.lower())     
+        if(not self.__isstatic):
+            self.__profiler = AdaptiveProfiler(db, self.__moving_window, self.__class__.__name__.lower())  
+ 
+    # Init_cache initializes the cache memory. 
+    def init_cache(self):
+        setattr(self.service_selector, 'service_registry', self.service_registry)
 
-    async def get_result(self, json = None, fthresh = 0, session = None):   
         # Set current session to profiler if not set
-        if(self.profiler.session == None):
-            self.profiler.session = self.session
+        if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
+            self.__profiler.session = self.session
+
+        # Initializing background thread clear observations.
+        thread = threading.Thread(target=self.run, args=())
+        thread.daemon = True               
+        thread.start() 
+    
+    def run(self):
+        while True:
+            self.clear_expired()
+            _thread.start_new_thread(self.__save_current_cost, ())
+            self.__window_counter+=1
+            time.sleep(self.__moving_window/1000) 
+
+    # Clear function that run on the background
+    def clear_expired(self) -> None:        
+        _thread.start_new_thread(self.service_registry.update_ret_latency, (self.service_selector.get_current_retrival_latency(),))
+        self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
+        self.__retrieval_cost_trend.push(statistics.mean(self.__local_ret_costs) if self.__local_ret_costs else 0)
+        self.__local_ret_costs.clear()
+        self.__reqs_in_window = 0
+        
+        curr_his = self.__sla_trend.getlist()
+        new_most_exp_sla = (0.5,1.0,1.0)
+        if(len(curr_his)>0):
+            avg_freshness = statistics.mean([x[0] for x in curr_his])
+            avg_price = statistics.mean([x[1] for x in curr_his])
+            avg_pen = statistics.mean([x[2] for x in curr_his])
+            new_most_exp_sla = (avg_freshness,avg_price,avg_pen)
+
+        self.__sla_trend.push(self.__most_expensive_sla)
+        self.__most_expensive_sla = new_most_exp_sla
+
+    # Save cost variation
+    def __save_current_cost(self):
+        self.__db.insert_one('returnofcaching', {
+            'session':self.session,
+            'window': self.__window_counter - 1,
+            'return': self.get_current_cost()
+        })
+    
+    def get_current_cost(self):
+        # Hit rate is always 0 because there is not cache
+        sla = self.__sla_trend.get_last()
+        request_rate = self.__request_rate_trend.get_last()
+        ret_cost = self.__retrieval_cost_trend.get_last()
+        return -request_rate*(sla[2] + ret_cost)
+
+    def get_result(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None):   
+        # Set current session to profiler if not set
+        if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
+            self.__profiler.session = self.session
         
         # Retrieve context data directly from provider 
-        # Fix this here
-        response = ''
-        if(url == None): 
-            response = self.service_selector.get_response_for_entity()
+        self.__reqs_in_window+=1
+        if(self.__most_expensive_sla == None):
+            self.__most_expensive_sla = fthresh
         else:
-            response = self.service_selector.get_response_for_entity()
+            if(fthresh != self.__most_expensive_sla):
+                if(fthresh[0]>self.__most_expensive_sla[0]):
+                    self.__most_expensive_sla = fthresh
+                else:
+                    most_exp = list(self.__most_expensive_sla)
+                    if(fthresh[2]>self.__most_expensive_sla[2]):
+                        most_exp[2] = fthresh[2]
+                    if(fthresh[1]<self.__most_expensive_sla[1]):
+                        most_exp[1] = fthresh[1]
+                    self.__most_expensive_sla = tuple(most_exp)
 
-        # Calculating the current time step in-relation to the context provider to test data accuracy
-        if(self.meta == None):
-            self.meta = response['meta']
-            self.meta['start_time'] = parser.parse(self.meta['start_time'])
-        del response['meta']
-        time_diff = (datetime.now() - self.meta['start_time']).total_seconds()*1000
+        output = {}
+        for ent in json:
+            entityid = ent['entityId']
+            conditions = []
+            if('conditions' in ent):
+                conditions = ent['conditions']
+            lifetimes = None
+            if(self.__isstatic):
+                lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)
 
-        if(len(json) != 0):
-            modified_response = {
-                'step': trunc(time_diff/self.meta['sampling_rate'])
-            }
-            for item in json:
-                if(item['attribute'] in response):
-                    modified_response[item['attribute']] = response[item['attribute']]
-            response = modified_response
-
-        # Push to profiler
-        self.profiler.reactive_push(response)
-        return response
+            if(lifetimes):
+                    out = self.__retrieve_entity(ent['attributes'],lifetimes)
+                    output[entityid] = {}
+                    for att_name,prod_values in out.items():
+                        output[entityid][att_name] = [res[1] for res in prod_values]
+                        
+    # Retrieving context for an entity
+    def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
+        # Retrive raw context from provider according to the entity
+        return self.service_selector.get_response_for_entity(attribute_list, 
+                    list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
 
     # Returns the current statistics from the profiler
     def get_current_profile(self):
-        self.profiler.get_details()
+        self.__profiler.get_details()
+
+    # Returns the variation of average cost of context caching
+    def get_cost_variation(self, session = None):
+        output = {}      
+        if(session):
+            stats = self.__db.read_all('returnofcaching', {'session': session})
+            if(stats):
+                for stat in stats:
+                    output[stat['window']] = stat['return']
+        else:
+            slas = self.__sla_trend.getlist()
+            request_rates = self.__request_rate_trend.get_last_range(10)
+            ret_costs = self.__retrieval_cost_trend.get_last_range(10)
+            for i in range(0,10):
+                idx = -1-i
+                try:
+                    sla = slas[idx]
+                    ret_cost = ret_costs[idx]
+                    output[idx] = request_rates[idx]*(sla[2]+ret_cost)*(-1)
+                except Exception:
+                    output[idx] = 0
+
+        return output
+    

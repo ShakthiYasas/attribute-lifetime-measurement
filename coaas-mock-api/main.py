@@ -35,11 +35,13 @@ default_config = config['DEFAULT']
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 # Selected Strategy
+strategy = None
 selected_algo = None
 
 class PlatformMock(Resource):
     # Initialize this session
     __token = secrets.token_hex(nbytes=16)
+    global strategy
     strategy = default_config['Strategy'].lower()
     db.insert_one('sessions', 
         {
@@ -126,8 +128,11 @@ class Statistics(Resource):
     # GET /statistics endpoint.
     # Retrives the details (metadata & statistics) of the current session in progress. 
     def get(self, name):
+        global strategy
         global selected_algo
         if(name == 'caches'):
+            if(strategy == 'reactive'):
+                return 404
             ent_id = int(request.args.get('id'))
             data = selected_algo.get_cache_statistics(ent_id)
             return data, 200   
