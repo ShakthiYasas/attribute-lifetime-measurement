@@ -89,6 +89,34 @@ class Reactive(Strategy):
         ret_cost = self.__retrieval_cost_trend.get_last()
         return -request_rate*(sla[2] + ret_cost)
 
+    # Returns the current statistics from the profiler
+    def get_current_profile(self):
+        self.__profiler.get_details()
+
+    # Returns the variation of average cost of context caching
+    def get_cost_variation(self, session = None):
+        output = {}      
+        if(session):
+            stats = self.__db.read_all('returnofcaching', {'session': session})
+            if(stats):
+                for stat in stats:
+                    output[stat['window']] = stat['return']
+        else:
+            slas = self.__sla_trend.getlist()
+            request_rates = self.__request_rate_trend.get_last_range(10)
+            ret_costs = self.__retrieval_cost_trend.get_last_range(10)
+            for i in range(0,10):
+                idx = -1-i
+                try:
+                    sla = slas[idx]
+                    ret_cost = ret_costs[idx]
+                    output[idx] = request_rates[idx]*(sla[2]+ret_cost)*(-1)
+                except Exception:
+                    output[idx] = 0
+
+        return output
+    
+    # Get the low-level context requested in the query
     def get_result(self, json = None, fthresh = (0.5,1.0,1.0), req_id = None):   
         # Set current session to profiler if not set
         if((not self.__isstatic) and self.__profiler and self.__profiler.session == None):
@@ -125,37 +153,12 @@ class Reactive(Strategy):
                     output[entityid] = {}
                     for att_name,prod_values in out.items():
                         output[entityid][att_name] = [res[1] for res in prod_values]
+
+        return output
                         
     # Retrieving context for an entity
     def __retrieve_entity(self, attribute_list: list, metadata: dict) ->  dict:
         # Retrive raw context from provider according to the entity
         return self.service_selector.get_response_for_entity(attribute_list, 
                     list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
-
-    # Returns the current statistics from the profiler
-    def get_current_profile(self):
-        self.__profiler.get_details()
-
-    # Returns the variation of average cost of context caching
-    def get_cost_variation(self, session = None):
-        output = {}      
-        if(session):
-            stats = self.__db.read_all('returnofcaching', {'session': session})
-            if(stats):
-                for stat in stats:
-                    output[stat['window']] = stat['return']
-        else:
-            slas = self.__sla_trend.getlist()
-            request_rates = self.__request_rate_trend.get_last_range(10)
-            ret_costs = self.__retrieval_cost_trend.get_last_range(10)
-            for i in range(0,10):
-                idx = -1-i
-                try:
-                    sla = slas[idx]
-                    ret_cost = ret_costs[idx]
-                    output[idx] = request_rates[idx]*(sla[2]+ret_cost)*(-1)
-                except Exception:
-                    output[idx] = 0
-
-        return output
     
