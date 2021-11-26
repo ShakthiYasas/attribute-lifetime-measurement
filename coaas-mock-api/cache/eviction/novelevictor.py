@@ -30,7 +30,7 @@ class NovelEvictor(Evictor):
 
         return eviction_list
     
-    def select_entity_to_evict(self, internal=False):
+    def select_entity_to_evict(self, internal=False, is_limited=False):
         # Value = Delay + Popularity + Remaining Cache Life
         # The item with the least delay, least popularity and the least remaining time cache will be evicetd.
         entities = self.__cache.get_statistics_all().items()
@@ -105,5 +105,8 @@ class NovelEvictor(Evictor):
             
             return mandatory, selective
         else:
-            return [entity for entity, value in sorted(calculated_value.items(), 
-                        key=lambda item: item[1]) if value < self.__threshold]
+            sorted_entities = [ent_val_pair for ent_val_pair in sorted(calculated_value.items(), key=lambda item: item[1])]
+            if(is_limited):
+                return [sorted_entities[0][0]]
+            
+            return [entity for entity, value in sorted_entities if value < self.__threshold]

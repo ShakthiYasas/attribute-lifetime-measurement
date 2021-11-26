@@ -19,6 +19,6 @@ class RandomEvictor(Evictor):
         return [(selected_entity, selected_att)]
 
     # Select a random entity to evict
-    def select_entity_to_evict(self, internal=False):
+    def select_entity_to_evict(self, internal=False, is_limited=False):
         secure_random = random.SystemRandom()
         return secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])

@@ -27,7 +27,7 @@ class LFUEvictor(Evictor):
         return eviction_list
 
     # Select the entitites suitable for eviction
-    def select_entity_to_evict(self, internal=False):
+    def select_entity_to_evict(self, internal=False, is_limited=False):
         cached_access_ratio = list(map(lambda entityid,stat: 
             (entityid, stat[0].get_queue_size()/(stat[0].get_head()-stat[0].get_last()).total_seconds()), 
             self.__cache.get_statistics_all().items()))
@@ -45,5 +45,8 @@ class LFUEvictor(Evictor):
             
             return mandatory, selective
         else:
-            return [entity for entity, 
-                access in sorted(cached_access_ratio, key=lambda tup: tup[1]) if access < self.__threshold]
+            sorted_entities = [entity_access_pair for entity_access_pair in sorted(cached_access_ratio, key=lambda tup: tup[1])]
+            if(is_limited):
+                return [sorted_entities[0][0]]
+                        
+            return [entity for entity, access in sorted_entities if access < self.__threshold]

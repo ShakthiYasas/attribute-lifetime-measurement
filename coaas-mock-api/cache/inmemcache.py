@@ -16,6 +16,7 @@ class InMemoryCache(CacheAgent):
         # Data structure of the cache
         self.__cache_size = config.cache_size
         self.is_auto_evicting = config.isevict
+        self.is_limited_cache = config.limited_cache
         self.__entityhash = LimitedSizeDict(size_limit = self.__cache_size)
         self.__cache_write_lock = threading.Lock()
 
@@ -131,7 +132,7 @@ class InMemoryCache(CacheAgent):
                 self.__create_new_entity_cache(entityid, cacheitems)
             except OutOfCacheMemory:
                 # Check if any entities can be removed from cache
-                entity_ids = self.__evictor.select_entity_to_evict()
+                entity_ids = self.__evictor.select_entity_to_evict(is_limited=self.is_limited_cache)
                 if(entity_ids):
                     # If there can be, then remove them and replace by the new ones 
                     for ent_id in entity_ids:
