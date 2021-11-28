@@ -246,7 +246,9 @@ class Adaptive(Strategy):
             entityid = action[0]
             att = action[1]
             if((not values[2]) and ((values[1] == 0 and values[3] <= self.__window_counter + self.__learning_skip) 
-                    or (values[1]>0 and self.__cached_hit_access_trend[entityid][att].isfull()))):
+                    or (values[1]>0 and entityid in self.__cached_hit_access_trend and 
+                        att in self.__cached_hit_access_trend[entityid] and 
+                        self.__cached_hit_access_trend[entityid][att].isfull()))):
                 self.__decision_history_lock.acquire()
                 updated_val = list(values)
                 updated_val[2] = True
@@ -464,7 +466,7 @@ class Adaptive(Strategy):
                                     attrs_need_providers += list(new_pros)
 
                         reference = secrets.token_hex(nbytes=8)
-                        self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
+                        self.__temp_entity_att_provider_map[reference] = list(lifetimes.keys())
                         caching_attrs = self.__evalute_attributes_for_caching(entityid, uncached, reference)
                         if(caching_attrs):
                             new_context.append((entityid,caching_attrs,lifetimes))
@@ -512,7 +514,7 @@ class Adaptive(Strategy):
                 # So, first retrieving the entity
                 if(lifetimes):
                     reference = secrets.token_hex(nbytes=8)
-                    self.__temp_entity_att_provider_map[reference] = lifetimes.keys()
+                    self.__temp_entity_att_provider_map[reference] = list(lifetimes.keys())
                     out = self.__retrieve_entity(ent['attributes'],lifetimes)
                     output[entityid] = {}
                     for att_name,prod_values in out.items():
@@ -532,7 +534,7 @@ class Adaptive(Strategy):
                 # Modify the discount rate
                 self.__already_modified = True
                 _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, ())
-                _thread.start_new_thread(self.selective_cache_agent.modify_epsilon, (self.__learning_counter))
+                _thread.start_new_thread(self.selective_cache_agent.modify_epsilon, (self.__learning_counter,))
 
         return output
 
@@ -543,7 +545,7 @@ class Adaptive(Strategy):
             self.__evaluated.add(entityid)
         else:
             self.__observedLock.acquire()
-            self.__update_observed(entityid, out.keys())
+            self.__update_observed(entityid, list(out.keys()))
             self.__observedLock.release()
 
     ###################################################################################
@@ -892,6 +894,9 @@ class Adaptive(Strategy):
     # Section 05 - Transformation (Feature Vector Generation)
     # This section creates feature vectors for observations.
     ###################################################################################
+
+    def get_feature_vector(self, entityid, att):
+        return self.__translate_to_state(entityid, att)
 
     # Translating an observation to a state
     def __translate_to_state(self, entityid, att):

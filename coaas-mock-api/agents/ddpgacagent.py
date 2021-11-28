@@ -172,11 +172,13 @@ class DDPGACAgent(threading.Thread, Agent):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features'], ref_key))
+                        observation = self.__caller.get_feature_vector(action[0], action[1])
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation, ref_key))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation['features'], ref_key))
+                        observation = self.__caller.get_feature_vector(action[0], action[1])
+                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation, ref_key))
                 
         
     # Modify and update the actor and critic networks

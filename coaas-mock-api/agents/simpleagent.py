@@ -85,7 +85,8 @@ class SimpleAgent(Agent):
                     # Should the cached lifetime of these random items be calculated
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_learner", (entityid, attribute, (self.__mid*self.__window)/1000, 0, 1, observation['features'], ref_key))
+                        observation = self.__caller.get_feature_vector(action[0], action[1])
+                        post_event_with_params("subscribed_learner", (entityid, attribute, (self.__mid*self.__window)/1000, 0, 1, observation, ref_key))
                         return (action,((self.__mid*self.__window)/1000,0))
                     else:
                         caching_delay = 0
@@ -99,26 +100,26 @@ class SimpleAgent(Agent):
                         elif(disearning_sequence[-1] > 0):
                             caching_delay = (t_for_discounting*self.__window)/1000
                         
-                        post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation['features'], ref_key))
+                        post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation, ref_key))
                         return ((0,0),(0,caching_delay))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
-                        post_event_with_params("subscribed_learner", (entityid, attribute, (self.__mid*self.__window)/1000, 0, 1, observation['features'], ref_key))
+                        observation = self.__caller.get_feature_vector(action[0], action[1])
+                        post_event_with_params("subscribed_learner", (entityid, attribute, (self.__mid*self.__window)/1000, 0, 1, observation, ref_key))
                         return (action,((self.__mid*self.__window)/1000,0))   
                     else:
-                        caching_delay = 0
+                        caching_delay = -1
                         if(disearning_sequence[0] < disearning_sequence[-1]):
-                            es_long = (t_for_discounting*self.__window)/1000
                             es_zero = 1
-                            if(disearning_sequence[-1]<0):
+                            if(disearning_sequence[-1]>0):
                                 es_zero = self.get_delay_time(disearning_sequence)
-                                caching_delay = min(es_long, es_zero)
+                                caching_delay = min(t_for_discounting, es_zero)
                             
                         elif(disearning_sequence[-1] > 0):
-                            caching_delay = (t_for_discounting*self.__window)/1000
+                            caching_delay = t_for_discounting
                         
-                        post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation['features'], ref_key))
+                        post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation, ref_key))
                         return ((0,0),(0,caching_delay))   
             
             caching_delay = -1
@@ -130,7 +131,7 @@ class SimpleAgent(Agent):
                     elif(disearning_sequence[i]>=0):
                         caching_delay = i-1
 
-            post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation['features'], ref_key))
+            post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation, ref_key))
             return ((0,0),(0,caching_delay))
         else:
             # Here the action is a (entityid,attribute) to cache
@@ -148,7 +149,7 @@ class SimpleAgent(Agent):
             elif(disearning_sequence[-1] > 0):
                 estimated_lifetime = (t_for_discounting*self.__window)/1000
 
-            post_event_with_params("subscribed_learner", (entityid, attribute, estimated_lifetime, 0, 1, observation['features'], ref_key))
+            post_event_with_params("subscribed_learner", (entityid, attribute, estimated_lifetime, 0, 1, observation, ref_key))
             return ((entityid, attribute), (estimated_lifetime, 0))
 
     # Calculate the expected cached lifetime for the when the discounted value reaches 0.
@@ -165,7 +166,7 @@ class SimpleAgent(Agent):
             if(i == 0):
                 continue
             elif(disearning_sequence[i]>=0):
-                return ((i-1)*self.__window)/1000
+                return i-1
 
     # Calculate the expected lifetime of caching considering the convergence of the variation
     def cached_life_when_delta(self, disearning_sequence):
