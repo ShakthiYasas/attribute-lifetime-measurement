@@ -164,7 +164,8 @@ class DDPGACAgent(threading.Thread, Agent):
         else:
             # Estimated a negative cached lifetime.
             # So, is not decided to be cached and the estimation is used to delay the next decision epoch.
-            post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features'], ref_key))
+            delay_time = -mu_prime[0][0]/self.__window
+            post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features'], ref_key))
 
             random_value = np.random.uniform()
             if(random_value <= self.__epsilons and not skip_random):
@@ -185,13 +186,14 @@ class DDPGACAgent(threading.Thread, Agent):
         action = parameters[1]
         reward = parameters[2]
         new_state = parameters[3]
+        time_value = parameters[4]
 
         self.reward_history.push(reward)
 
         state = np.asarray(state)[np.newaxis, :]
         new_state = np.asarray(new_state['features'])[np.newaxis, :]
 
-        self.__buffer.store_transition(state, action, reward, new_state)
+        self.__buffer.store_transition(state, time_value if action > 0 else -time_value*self.__window , reward, new_state)
 
         # Saving the new transition completed
     

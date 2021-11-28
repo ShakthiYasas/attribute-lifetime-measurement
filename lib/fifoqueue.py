@@ -55,3 +55,6 @@ class FIFOQueue_2():
 
     def pop(self):
         return self.__queue.pop(0)
+    
+    def isfull(self):
+        return self.__size == len(self.__queue)
