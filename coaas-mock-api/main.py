@@ -97,7 +97,7 @@ class PlatformMock(Resource):
 
             # Simple Authenticator
             consumer = json_obj['requester']
-            fthr = self.__service_registry.get_freshness_for_consumer(consumer['id'],consumer['sla'])
+            fthr, rtmax = self.__service_registry.get_freshness_for_consumer(consumer['id'],consumer['sla'])
             if(fthr == None):
                 # Return message and 401 Error code
                 return parse_response({'message':'Unauthorized'}), 401  
@@ -105,7 +105,7 @@ class PlatformMock(Resource):
             # Start to process the request
             data = selected_algo.get_result(json_obj['query'], fthr, req_id)
             response = parse_response(data, self.__token)
-            _thread.start_new_thread(self.__save_rp_stats, (self.__token,response,start))
+            _thread.start_new_thread(self.__save_rp_stats, (self.__token, response, start, rtmax, fthr[1], fthr[2]))
                 
             # Return data and 200 OK code
             return response, 200    
@@ -115,13 +115,17 @@ class PlatformMock(Resource):
             # Return message and 400 Error code
             return parse_response({'message':'An error occured'}), 400 
 
-    def __save_rp_stats(self, token,response,start):
+    def __save_rp_stats(self, token,response,start, rtmax, price, penalty):
         # Statistics
+        res_time = (datetime.now() - start).total_seconds()
         db.insert_one('responses-history', 
             {
-                'session': token, 
+                'session': token,
                 'data': str(response), 
-                'response_time': (datetime.now() - start).total_seconds()
+                'response_time': res_time,
+                'is_delayed': bool(res_time > rtmax) if rtmax < 0 else False,
+                'price': price,
+                'penalty': penalty
             })
 
 class Statistics(Resource):

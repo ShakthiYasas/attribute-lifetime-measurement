@@ -23,16 +23,16 @@ class SQLLiteClient:
             WHERE isActive=1 AND id="+str(consumerid)).fetchall()
         if(len(res)):
             freshness = self.__conn.execute(
-                "SELECT freshness, price, penalty\
+                "SELECT freshness, price, penalty, rtmax\
                 FROM SLA\
                 WHERE isActive=1 AND id="+str(slaid)+"\
                 LIMIT 1").fetchone()
             if(freshness == None or len(freshness)==0):
                 # No SLA set at the moment. So, assuming no freshness requirement. 
-                return (0.5,1.0,1.0)
+                return (0.5,1.0,1.0), -1
             else:
                 # (fthr, price, penalty)
-                return (freshness[0],freshness[1],freshness[2])
+                return (freshness[0],freshness[1],freshness[2]), freshness[3]
         else:
             # No Consumer Found.
             return None
