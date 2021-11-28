@@ -138,6 +138,10 @@ class DDPGACAgent(threading.Thread, Agent):
     # Get the value of the epsilon value now
     def get_current_epsilon(self):
         return self.__epsilons
+    
+    # Get current discunt rate
+    def get_discount_rate(self):
+        return self.__gamma
 
     # Select the most suitable action given a state
     def choose_action(self, paramters):
@@ -163,7 +167,7 @@ class DDPGACAgent(threading.Thread, Agent):
             post_event_with_params("subscribed_actions", (entityid, attribute, 0, -mu_prime[0][0], 0, observation['features'], ref_key))
 
             random_value = np.random.uniform()
-            if(random_value < self.__epsilons and not skip_random):
+            if(random_value <= self.__epsilons and not skip_random):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
@@ -413,3 +417,5 @@ class Actor(object):
     # Restoring an existing session
     def get_last_checkpoint(self):
         self.__saver.restore(self.__session, self.__checkpoint_file)
+    
+   

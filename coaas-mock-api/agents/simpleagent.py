@@ -1,6 +1,8 @@
 import numpy as np
 
 from agents.agent import Agent
+from lib.fifoqueue import FIFOQueue_2
+from lib.event import post_event_with_params
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
 class SimpleAgent(Agent):
@@ -15,10 +17,20 @@ class SimpleAgent(Agent):
         self.__mid = config.mid
         self.__long = config.long
 
+        # History of rewards
+        self.reward_history = FIFOQueue_2(100)
+        self.__reward_threshold = config.reward_threshold
+
         # e-Greedy Exploration
         self.__epsilons = config.e_greedy_init
+        self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
         if (config.e_greedy_init is None) or (config.e_greedy_decrement is None):
             self.__epsilons = self.epsilons_min
+        
+        self.__gamma = config.discount_rate
+        self.__epsilons_max = config.e_greedy_max
+        self.__epsilons_increment = config.e_greedy_increment
+        self.__epsilons_decrement = config.e_greedy_decrement
 
         self.discount_max = config.e_greedy_max
         self.discount_increment = config.e_greedy_increment
@@ -65,16 +77,15 @@ class SimpleAgent(Agent):
             disearning_sequence += self.caclulcate_for_range('long', observation, cur_sla, cur_rr_exp, cur_rr_size)
 
         npv = sum(disearning_sequence) - cost_of_caching
-        #print('Entity = '+str(entityid)+' and attribute = '+ attribute)
-        #print('NPV Value = '+ str(npv))
 
         if(npv<=0):
             random_value = np.random.uniform()
-            if((random_value < self.__epsilons) and not skip_random):
+            if((random_value <= self.__epsilons) and not skip_random):
                 if(isinstance(self.__explore_mentor,MFUAgent)):
                     # Should the cached lifetime of these random items be calculated
                     action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
                     if(action != (0,0)):
+                        post_event_with_params("subscribed_learner", (entityid, attribute, (self.__mid*self.__window)/1000, 0, 1, observation['features'], ref_key))
                         return (action,((self.__mid*self.__window)/1000,0))
                     else:
                         caching_delay = 0
@@ -88,10 +99,12 @@ class SimpleAgent(Agent):
                         elif(disearning_sequence[-1] > 0):
                             caching_delay = (t_for_discounting*self.__window)/1000
                         
+                        post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation['features'], ref_key))
                         return ((0,0),(0,caching_delay))
                 else:
                     action = self.__explore_mentor.choose_action(self.__caller.get_observed())
                     if(action != (0,0)):
+                        post_event_with_params("subscribed_learner", (entityid, attribute, (self.__mid*self.__window)/1000, 0, 1, observation['features'], ref_key))
                         return (action,((self.__mid*self.__window)/1000,0))   
                     else:
                         caching_delay = 0
@@ -105,6 +118,7 @@ class SimpleAgent(Agent):
                         elif(disearning_sequence[-1] > 0):
                             caching_delay = (t_for_discounting*self.__window)/1000
                         
+                        post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation['features'], ref_key))
                         return ((0,0),(0,caching_delay))   
             
             caching_delay = -1
@@ -116,6 +130,7 @@ class SimpleAgent(Agent):
                     elif(disearning_sequence[i]>=0):
                         caching_delay = i-1
 
+            post_event_with_params("subscribed_learner", (entityid, attribute, 0, caching_delay, 0, observation['features'], ref_key))
             return ((0,0),(0,caching_delay))
         else:
             # Here the action is a (entityid,attribute) to cache
@@ -133,6 +148,7 @@ class SimpleAgent(Agent):
             elif(disearning_sequence[-1] > 0):
                 estimated_lifetime = (t_for_discounting*self.__window)/1000
 
+            post_event_with_params("subscribed_learner", (entityid, attribute, estimated_lifetime, 0, 1, observation['features'], ref_key))
             return ((entityid, attribute), (estimated_lifetime, 0))
 
     # Calculate the expected cached lifetime for the when the discounted value reaches 0.
@@ -234,6 +250,41 @@ class SimpleAgent(Agent):
         else:
             self.__gamma = self.epsilons_min if self.__gamma - self.discount_decrement < self.epsilons_min else self.__gamma - self.discount_increment
 
+    # Recieve the reward for performing an action
+    def set_to_reward_history(self, parameters):
+        reward = parameters[0]
+        self.reward_history.push(reward)
+
+    # Modify epsilon for exploration
+    def modify_epsilon(self, learning_counter):
+        # Increasing or Decreasing epsilons
+        if learning_counter % self.__dynamic_e_greedy_iter == 0:
+            # If e-greedy
+            if self.__epsilons_decrement is not None:
+                # Dynamic bidirectional e-greedy 
+                # That allows the netowrk to be self adaptive between exploration and exploitation depending on the
+                # current performance of the system. i.e., if MR is high, the increase epsilon (more exploration)
+                # and on the contrary, decrease epsilon if MR is less (more exploitation). 
+                if self.__epsilons_increment is not None:
+                    rho = np.mean(np.array(self.reward_history.getlist()))
+                    if rho >= self.__reward_threshold:
+                        self.__epsilons -= self.__epsilons_decrement
+                    else:
+                        self.__epsilons += self.__epsilons_increment              
+                # Traditional e-greedy
+                else:
+                    self.__epsilons -= self.__epsilons_decrement
+
+            # Enforce upper bound and lower bound
+            if(self.__epsilons < self.epsilons_min):
+                self.__epsilons = self.epsilons_min
+            elif(self.__epsilons > self.__epsilons_max):
+                self.__epsilons = self.__epsilons_max
+
     # Get current discunt rate
     def get_discount_rate(self):
         return self.__gamma
+
+    # Get the value of the epsilon value now
+    def get_current_epsilon(self):
+        return self.__epsilons

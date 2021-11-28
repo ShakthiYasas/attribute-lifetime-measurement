@@ -6,6 +6,9 @@ import threading
 import statistics
 from typing import Tuple
 
+import numpy as np
+from scipy.interpolate import InterpolatedUnivariateSpline
+
 from lib.event import post_event
 from lib.event import subscribe
 from agents.dqnagent import DQNAgent
@@ -15,10 +18,6 @@ from lib.exceptions import NewContextException
 
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
-
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.interpolate import InterpolatedUnivariateSpline
 
 from profilers.adaptiveprofiler import AdaptiveProfiler
 
@@ -71,6 +70,7 @@ class Adaptive(Strategy):
         self.__skiprandom = skip_random
         self.req_rate_extrapolation = None
         self.__learning_cycle = learncycle
+        self.__current_delay_probability = 0.5
         self.__most_expensive_sla = (0.5,1.0,1.0)
 
         self.service_selector = ServiceSelector(db, window)
@@ -79,6 +79,7 @@ class Adaptive(Strategy):
 
         subscribe("subscribed_actions", self.sub_cache_item)
         subscribe("subscribed_evictions", self.sub_evictor)
+        subscribe("subscribed_learner", self.sub_decisioned_item)
           
     # Init_cache initializes the cache memory. 
     def init_cache(self):
@@ -129,6 +130,7 @@ class Adaptive(Strategy):
             self.__clear_cached()
             if(not self.__already_modified and self.__is_simple_agent):
                 _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, (False,))
+                _thread.start_new_thread(self.selective_cache_agent.modify_epsilon, (self.__learning_counter,))
             else:
                 self.__already_modified = False
             if(self.__decision_history):
@@ -252,6 +254,8 @@ class Adaptive(Strategy):
                 reward = self.__calculate_reward(action[0], action[1], values[0], diff)  
                 if(not self.__is_simple_agent):
                     self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward[0], curr_state))
+                else:
+                    self.selective_cache_agent.onThread(self.selective_cache_agent.set_to_reward_history, (reward[0],))
 
                 self.__decision_history_lock.acquire()
                 del self.__decision_history[action]
@@ -351,11 +355,7 @@ class Adaptive(Strategy):
                                         continue
                                     else:
                                         extime = lt * (1 - fthresh[0])
-                                        #print('Freshness = '+ str(fthresh[0]))
-                                        #print('Extime = '+ str(extime))
                                         time_at_expire = lastret + datetime.timedelta(seconds=extime)
-                                        #print(now)
-                                        #print(time_at_expire)
                                         if(now > time_at_expire):
                                             # If the attribute doesn't meet the freshness level (Cache miss) from the producer
                                             # add the entity and producer to the need to refresh list.
@@ -479,6 +479,7 @@ class Adaptive(Strategy):
                 # Modify the discount rate
                 self.__already_modified = True
                 _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, ())
+                _thread.start_new_thread(self.selective_cache_agent.modify_epsilon, (self.__learning_counter))
 
         return output
 
@@ -651,6 +652,16 @@ class Adaptive(Strategy):
                     return True
             return False
         else: return False  
+
+    def sub_decisioned_item(self, parameters):
+        entity = parameters[0]
+        attribute = parameters[1]
+        observation = parameters[5]
+        action = parameters[4]
+
+        self.__decision_history_lock.acquire()
+        self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter)
+        self.__decision_history_lock.release()
 
     # Subcriber method to cache an item
     def sub_cache_item(self, parameters):
@@ -1114,7 +1125,7 @@ class Adaptive(Strategy):
 
             for idx in range(0,len(past_ar)):
                 price = past_hr[idx]*past_sla[idx][1]
-                penalty = (1-past_hr[idx])*past_sla[idx][2]
+                penalty = (1-past_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
                 out = (1/past_request_rate[idx])*past_ar[idx]
                 retrieval = (1-past_hr[idx])*past_ret_costs[idx]
 
@@ -1122,7 +1133,7 @@ class Adaptive(Strategy):
                 total_gain += out*(price - penalty - retrieval)
             
             # This returns the gain or loss of caching an item per request
-            reward = total_gain/total_requests if total_requests>0 else -10
+            reward = round(total_gain/total_requests,3) if total_requests>0 else -10
 
             return reward, is_cached
         else:
@@ -1162,7 +1173,7 @@ class Adaptive(Strategy):
             # Expected Values
             for idx in range(1,diff):
                 price = expected_hr[idx]*past_sla[idx][1]  
-                penalty = (1-expected_hr[idx])*past_sla[idx][2]
+                penalty = (1-expected_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
                 retrieval = (1-expected_hr[idx])*past_ret_costs[idx]
                 out = (1/past_request_rate[idx])*expected_ar[idx]
 
@@ -1173,7 +1184,7 @@ class Adaptive(Strategy):
             observed_vals = []
             past_ar = self.__attribute_access_trend[entityid][att].get_last_range(diff)
             for idx in range(0,len(past_ar)):            
-                penalty = past_sla[idx][2]
+                penalty = past_sla[idx][2]*self.__current_delay_probability
                 retrieval = past_ret_costs[idx]
                 out = (1/past_request_rate[idx])*past_ar[idx]
 
@@ -1182,7 +1193,7 @@ class Adaptive(Strategy):
 
             diff = min(len(observed_vals), len(expected_vals), diff)
             diff = sum([observed_vals[i] - expected_vals[i] for i in range(0,diff)])
-            reward = diff/total_requests if total_requests>0 else 10
+            reward = round(diff/total_requests,3) if total_requests>0 else 10
             
             # This returns the regret of not caching the item
             return reward, is_cached
@@ -1246,12 +1257,11 @@ class Adaptive(Strategy):
     def get_cache_statistics(self, entityid):
         res = self.cache_memory.get_statistics_entity(entityid)
         output = {
-                'cached_attributes': [i for i in res.keys()] if res else {}
+                'cached_attributes': [i for i in res.keys()] if res else {},
+                'epsilon' : self.selective_cache_agent.get_current_epsilon(),
+                'discount_rate' : self.selective_cache_agent.get_discount_rate()
             }
-        if(self.__is_simple_agent):
-            output['discount_rate'] = self.selective_cache_agent.get_discount_rate()
-        else:
-            output['epsilon'] = self.selective_cache_agent.get_current_epsilon()
+
         return output
 
     # Returns the current statistics from the profiler

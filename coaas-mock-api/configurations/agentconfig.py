@@ -6,17 +6,20 @@ class SimpleConfiguration(Configuration):
         defaults = config['DEFAULT']
         hyper_params = config['HYPER']
 
-        self.window = int(defaults['MovingWindow'])
-        self.discount_rate = float(hyper_params['Gamma'])
-        self.short = int(defaults['ShortWindow'])
         self.mid = int(defaults['MidWindow'])
         self.long = int(defaults['LongWindow'])
+        self.short = int(defaults['ShortWindow'])
+        self.window = int(defaults['MovingWindow'])
+        self.discount_rate = float(hyper_params['Gamma'])
 
-        self.explore_mentor = defaults['ExplorationAlgorithm']
         self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.explore_mentor = defaults['ExplorationAlgorithm']
         self.e_greedy_max = float(hyper_params['Epsilon_max'])
         self.e_greedy_increment = float(hyper_params['Delta_plus'])
         self.e_greedy_decrement = float(hyper_params['Delta_minus'])
+        self.dynamic_e_greedy_iter = int(defaults['ExplorationEpoch'])
+
+        self.reward_threshold = float(defaults['MaxReward'])
 
 # Configuration for the DQN Agent
 class DQNConfiguration(Configuration):
