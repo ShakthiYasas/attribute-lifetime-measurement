@@ -261,7 +261,7 @@ class Adaptive(Strategy):
                 if(not self.__is_simple_agent):
                     self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward[0], curr_state, values[4]))
                 else:
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.set_to_reward_history, (reward[0],))
+                    self.selective_cache_agent.set_to_reward_history(reward[0])
 
                 self.__decision_history_lock.acquire()
                 del self.__decision_history[action]
@@ -279,7 +279,7 @@ class Adaptive(Strategy):
                 if(not self.__is_simple_agent):
                     self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
                 else:
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.set_to_reward_history, (reward[0],))
+                    self.selective_cache_agent.set_to_reward_history(reward[0])
             else:
                 past_sla = self.__sla_trend.get_last_range(diff)
                 past_ret_costs = self.__retrieval_cost_trend.get_last_range(diff)
@@ -308,7 +308,7 @@ class Adaptive(Strategy):
                     if(not self.__is_simple_agent):
                         self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
                     else:
-                        self.selective_cache_agent.onThread(self.selective_cache_agent.set_to_reward_history, (reward[0],))
+                        self.selective_cache_agent.set_to_reward_history(reward[0])
 
             if(action in self.__decision_history):
                 self.__decision_history_lock.acquire()

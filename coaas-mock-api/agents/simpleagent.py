@@ -252,8 +252,7 @@ class SimpleAgent(Agent):
             self.__gamma = self.epsilons_min if self.__gamma - self.discount_decrement < self.epsilons_min else self.__gamma - self.discount_increment
 
     # Recieve the reward for performing an action
-    def set_to_reward_history(self, parameters):
-        reward = parameters[0]
+    def set_to_reward_history(self, reward):
         self.reward_history.push(reward)
 
     # Modify epsilon for exploration

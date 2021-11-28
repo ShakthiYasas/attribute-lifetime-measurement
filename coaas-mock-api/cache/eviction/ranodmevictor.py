@@ -11,10 +11,10 @@ class RandomEvictor(Evictor):
 
     def select_for_evict(self):
         entityids = list(self.__cache.get_statistics_all().keys())
-        selected_entity = entityids[np.random.randint(0,len(entityids)+1)]
+        selected_entity = entityids[np.random.randint(0,len(entityids))]
 
         attributes = list(self.__cache.get_statistics_entity(selected_entity).keys())
-        selected_att = attributes[np.random.randint(0,len(attributes)+1)]
+        selected_att = attributes[np.random.randint(0,len(attributes))]
 
         return [(selected_entity, selected_att)]
 
