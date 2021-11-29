@@ -8,6 +8,7 @@ from lib.fifoqueue import FIFOQueue_2
 
 # Simple Context Service Resolution
 class ServiceSelector:
+    session = ''
     service_registry = None
 
     __statistics = dict()
@@ -89,7 +90,8 @@ class ServiceSelector:
                     self.__db.insert_one('responsetimes',{
                         'context_producer': prodid,
                         'avg_response_time': statistics.mean(self.__statistics[prodid]['queue'].getlist()),
-                        'timestamp': aft_time
+                        'timestamp': aft_time,
+                        'session':self.session
                     })
 
                 for att in attributes:

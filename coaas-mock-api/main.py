@@ -123,7 +123,7 @@ class PlatformMock(Resource):
                 'session': token,
                 'data': str(response), 
                 'response_time': res_time,
-                'is_delayed': bool(res_time >= rtmax) if rtmax < 0 else False,
+                'is_delayed': bool(res_time >= rtmax) if rtmax > 0 else False,
                 'price': price,
                 'penalty': penalty
             })

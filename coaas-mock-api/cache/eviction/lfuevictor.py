@@ -12,7 +12,7 @@ class LFUEvictor(Evictor):
         
         if(mandatory):
             for entityid in mandatory:
-                eviction_list += [(entityid, att) for att in self.parent_cache.__entityhash[entityid].keys()]
+                eviction_list += [(entityid, att) for att in self.__cache.get_statistics_entity(entityid).keys()]
         
         if(len(sorted_c_ar)>0):
             for ent in sorted_c_ar:
@@ -28,10 +28,14 @@ class LFUEvictor(Evictor):
 
     # Select the entitites suitable for eviction
     def select_entity_to_evict(self, internal=False, is_limited=False):
-        cached_access_ratio = list(map(lambda entityid,stat: 
-            (entityid, stat[0].get_queue_size()/(stat[0].get_head()-stat[0].get_last()).total_seconds()), 
-            self.__cache.get_statistics_all().items()))
-        
+        cached_access_ratio = []
+        for stat in self.__cache.get_statistics_all().items():
+            time_diff = (stat[1][0].get_head()-stat[1][0].get_last()).total_seconds()
+            if(time_diff > 0):
+                cached_access_ratio.append((stat[0], stat[1][0].get_queue_size()/time_diff))
+            else:
+                cached_access_ratio.append((stat[0],0))
+
         if(internal):
             mandatory = []
             selective = []

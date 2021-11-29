@@ -169,22 +169,23 @@ class InMemoryCache(CacheAgent):
         now = datetime.now()
         attribute_lifetimes = []
         
-        for key,value in self.__entityhash[entityid].freq_table.items():
-            attribute_lifetimes.append({
-                'entityid': entityid,
-                'attribute': key,
-                'c_lifetime': (now - value[2]).total_seconds()
-            })
-            self.__registry.remove_cached_life(entityid, key)
+        if(self.__entityhash[entityid].freq_table.items()):
+            for key,value in self.__entityhash[entityid].freq_table.items():
+                attribute_lifetimes.append({
+                    'entityid': entityid,
+                    'attribute': key,
+                    'c_lifetime': (now - value[2]).total_seconds()
+                })
+                self.__registry.remove_cached_life(entityid, key)
+            
+            # Push cached lifetimes of all the attributes to Statistical DB
+            self.__db.insert_many('attribute-cached-lifetime', attribute_lifetimes)
 
         # Push cached lifetime entity to Statistical DB
         self.__db.insert_one('entity-cached-lifetime',{
             'entityid': entityid,
-            'c_lifetime': (now - self.__entityhash.freq_table[entityid][2]).total_seconds()
+            'c_lifetime': (now - self.__entityhash.freq_table[entityid][1]).total_seconds()
         })
-
-        # Push cached lifetimes of all the attributes to Statistical DB
-        self.__db.insert_many('attribute-cached-lifetime', attribute_lifetimes)
 
         del self.__entityhash[entityid]
         del self.__entityhash.freq_table[entityid]

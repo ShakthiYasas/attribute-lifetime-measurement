@@ -86,6 +86,7 @@ class Adaptive(Strategy):
         self.__learning_skip = max(5,self.trend_ranges[0])
         self.__longtime = (self.trend_ranges[2]*self.__moving_window)/1000
         setattr(self.service_selector, 'service_registry', self.service_registry)
+        setattr(self.service_selector, 'session', self.session)
 
         if(self.selective_cache_agent == None):
             self.selective_cache_agent = self.selective_agent_factory.get_agent()
@@ -272,43 +273,50 @@ class Adaptive(Strategy):
         if(action in self.__decision_history):
             decision = self.__decision_history[action]
             diff = self.__window_counter - decision[3]
-            curr_state = self.__translate_to_state(action[0], action[1])
-            
-            if(self.__window_counter >= decision[3]+3):
-                reward = self.__calculate_reward(action[0], action[1], decision[0], diff)  
-                if(not self.__is_simple_agent):
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
-                else:
-                    self.selective_cache_agent.set_to_reward_history(reward[0])
-            else:
-                past_sla = self.__sla_trend.get_last_range(diff)
-                past_ret_costs = self.__retrieval_cost_trend.get_last_range(diff)
-                past_request_rate = self.__request_rate_trend.get_last_range(diff)
+            try:
+                curr_state = self.__translate_to_state(action[0], action[1])
                 
-                total_gain = 0
-                total_requests = 0
-
-                if(entity in self.__cached_attribute_access_trend and 
-                        attribute in self.__cached_attribute_access_trend[entity]):
-                    # This item has been cached in the last decision epoch 
-                    past_hr = self.__cached_hit_access_trend[entity][attribute].get_last_range(diff)
-                    past_ar = self.__cached_attribute_access_trend[entity][attribute].get_last_range(diff)
-
-                    for idx in range(0,len(past_ar)):
-                        price = past_hr[idx]*past_sla[idx][1]
-                        penalty = (1-past_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
-                        out = (1/past_request_rate[idx])*past_ar[idx]
-                        retrieval = (1-past_hr[idx])*past_ret_costs[idx]
-
-                        total_requests += out
-                        total_gain += out*(price - penalty - retrieval)
-                    
-                    # This returns the gain or loss of caching an item per request
-                    reward = round(total_gain/total_requests,3) if total_requests>0 else -10
+                if(self.__window_counter >= decision[3]+3):
+                    reward = self.__calculate_reward(action[0], action[1], decision[0], diff)  
                     if(not self.__is_simple_agent):
                         self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
                     else:
                         self.selective_cache_agent.set_to_reward_history(reward[0])
+                else:
+                    past_sla = self.__sla_trend.get_last_range(diff)
+                    past_ret_costs = self.__retrieval_cost_trend.get_last_range(diff)
+                    past_request_rate = self.__request_rate_trend.get_last_range(diff)
+                    
+                    total_gain = 0
+                    total_requests = 0
+
+                    if(entity in self.__cached_attribute_access_trend and 
+                            attribute in self.__cached_attribute_access_trend[entity]):
+                        # This item has been cached in the last decision epoch 
+                        past_hr = self.__cached_hit_access_trend[entity][attribute].get_last_range(diff)
+                        past_ar = self.__cached_attribute_access_trend[entity][attribute].get_last_range(diff)
+
+                        for idx in range(0,len(past_ar)):
+                            price = past_hr[idx]*past_sla[idx][1]
+                            penalty = (1-past_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
+                            out = (1/past_request_rate[idx])*past_ar[idx]
+                            retrieval = (1-past_hr[idx])*past_ret_costs[idx]
+
+                            total_requests += out
+                            total_gain += out*(price - penalty - retrieval)
+                        
+                        # This returns the gain or loss of caching an item per request
+                        reward = round(total_gain/total_requests,3) if total_requests>0 else -10
+                        if(not self.__is_simple_agent):
+                            self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
+                        else:
+                            self.selective_cache_agent.set_to_reward_history(reward[0])
+            except NewContextException:
+                reward = -10
+                if(not self.__is_simple_agent):
+                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward, decision[0], decision[4]))
+                else:
+                    self.selective_cache_agent.set_to_reward_history(reward)
 
             if(action in self.__decision_history):
                 self.__decision_history_lock.acquire()

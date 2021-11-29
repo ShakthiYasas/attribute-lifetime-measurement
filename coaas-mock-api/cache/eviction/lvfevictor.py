@@ -16,7 +16,7 @@ class LVFEvictor(Evictor):
         mandatory, selective = self.select_entity_to_evict(internal=True)
 
         for entityid in mandatory:
-            eviction_list += [(entityid, att) for att in self.parent_cache.__entityhash[entityid].keys()]
+            eviction_list += [(entityid, att) for att in self.__cache.get_statistics_entity(entityid).keys()]
 
         now = datetime.now()
         cur_ret_latency = self.__cache.registry.get_ret_latency()
