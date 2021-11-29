@@ -17,7 +17,7 @@ class LFUEvictor(Evictor):
         if(len(sorted_c_ar)>0):
             for ent in sorted_c_ar:
                 att_access_ratio = list(map(lambda stat: 
-                    (stat[0], stat[1][0].get_queue_size()/(stat[1][0].get_head()-stat[1][0].get_last()).total_seconds()), 
+                    (stat[0], stat[1][0].get_queue_size()/(stat[1][0].get_last()-stat[1][0].get_head()).total_seconds()), 
                     self.__cache.get_statistics_entity(ent).items()))
                 att_c_ar = [att for att, access in sorted(att_access_ratio, key=lambda tup: tup[1]) if access < self.__threshold]
 
@@ -30,7 +30,7 @@ class LFUEvictor(Evictor):
     def select_entity_to_evict(self, internal=False, is_limited=False):
         cached_access_ratio = []
         for stat in self.__cache.get_statistics_all().items():
-            time_diff = (stat[1][0].get_head()-stat[1][0].get_last()).total_seconds()
+            time_diff = (stat[1][0].get_last()-stat[1][0].get_head()).total_seconds()
             if(time_diff > 0):
                 cached_access_ratio.append((stat[0], stat[1][0].get_queue_size()/time_diff))
             else:

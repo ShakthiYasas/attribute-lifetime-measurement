@@ -14,7 +14,7 @@ class NovelEvictor(Evictor):
             for entity, att in expired:
                 entity_stats = self.__cache.get_statistics_entity(entity)
                 att_stats = entity_stats[att]
-                access_rate = att_stats.get_queue_size()/(att_stats.get_head()-att_stats.get_last()).total_seconds()
+                access_rate = att_stats.get_queue_size()/(att_stats.get_last()-att_stats.get_head()).total_seconds()
                 if(access_rate < self.__threshold):
                     # The item is least frequently used
                     eviction_list.append((entity,att))
@@ -34,14 +34,15 @@ class NovelEvictor(Evictor):
         # Value = Delay + Popularity + Remaining Cache Life
         # The item with the least delay, least popularity and the least remaining time cache will be evicetd.
         entities = self.__cache.get_statistics_all().items()
-        y = self.__cache.get_hitrate_trend().getlist()
-        
-        totalreqs = sum([j[1] for j in y])  
 
         # rel_popularity = "number of accesses" within the time that the hit rate trend was recorded
-        rel_popularities = list(map(lambda stat: 
-            (stat[0], (stat[1][0].get_queue_size()*((len(y)*(self.__cache.window/1000))/(stat[1][0].get_head()-stat[1][0].get_last()).total_seconds()))/totalreqs), 
-            entities))
+        rel_popularities = []
+        for stat in entities:
+            total_time = (stat[1][0].get_last()-stat[1][0].get_head()).total_seconds()
+            if(total_time > 0):
+                rel_popularities.append((stat[0], stat[1][0].get_queue_size()/total_time))
+            else:
+                rel_popularities.append((stat[0], 0))
 
         most_popular = sorted(rel_popularities, key=lambda item: item[1])[-1][1]
         rel_popularities = dict([(entity, access/most_popular) for entity, access in rel_popularities])
@@ -51,7 +52,7 @@ class NovelEvictor(Evictor):
         providers_dict = {}
         for entityid, stats in entities:
             # Remaining Cached Life
-            cached_lt_res = self.__db.read_all_with_limit('entity-cached-lifetime',{
+            cached_lt_res = self.__cache.getdb.read_all_with_limit('entity-cached-lifetime',{
                         'entity': entityid,
                     },10)
             remaining_life = 0
