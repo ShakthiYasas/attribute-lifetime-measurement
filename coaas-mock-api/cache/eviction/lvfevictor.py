@@ -1,3 +1,4 @@
+import traceback
 from datetime import datetime
 import statistics
 
@@ -19,23 +20,35 @@ class LVFEvictor(Evictor):
             eviction_list += [(entityid, att) for att in self.__cache.get_statistics_entity(entityid).keys()]
 
         now = datetime.now()
-        cur_ret_latency = self.__cache.registry.get_ret_latency()
+        cur_ret_latency = (self.__cache.get_ret_latency())[0]
 
         for ent in selective:
             for att, stat in self.__cache.get_statistics_entity(ent).items():
                 # Popularity
-                att_access_ratio = (stat[0].get_queue_size())/((stat[0].get_last()-stat[0].get_head()).total_seconds())
+                time_diff = (stat[0].get_last()-stat[0].get_head()).total_seconds()
+                att_access_ratio = 0
+                if(time_diff>0):
+                    att_access_ratio = (stat[0].get_queue_size())/time_diff
+                
                 # Remaing Cached Lifetime
                 (remaining, cached) = self.__cache.get_cachedlifetime(ent, att)
-                relative_remaning = (now - remaining)/(remaining - cached)
+                remain = (remaining - cached).total_seconds()
+                relative_remaning = 0
+                if(remain > 0):
+                    relative_remaning = (now - remaining).total_seconds()/remain
+
                 # Delay 
-                providers = self.__cache.get_providers_for_attribute(ent, att)
+                providers = self.__cache.get_providers_for_attribute(ent, [att])
                 avg_delays = []
                 for prodid in providers.keys():
-                    cached_res = self.__cache.getdb.read_all_with_limit('responsetimes',{
+                    cached_res = self.__cache.getdb().read_all_with_limit('responsetimes',{
                                 'context_producer': prodid
                             }, 10)
-                    avg_delays.append(statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res))))
+                    if(not cached_res):
+                        avg_delays.append(9999)
+                    else:
+                        avg_delays.append(statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res))))
+                
                 rel_ret_latency = 1
                 avg_att_latency = statistics.mean(avg_delays)
                 if(cur_ret_latency != 0):
@@ -72,7 +85,7 @@ class LVFEvictor(Evictor):
         providers_dict = {}
         for entityid, stats in entities:
             # Remaining Cached Life
-            cached_lt_res = self.__cache.getdb.read_all_with_limit('entity-cached-lifetime',{
+            cached_lt_res = self.__cache.getdb().read_all_with_limit('entity-cached-lifetime',{
                         'entity': entityid,
                     },10)
             remaining_life = 0
@@ -88,8 +101,10 @@ class LVFEvictor(Evictor):
                     exp_time, cached_time = self.__cache.get_longest_cache_lifetime_for_entity(entityid)
                     rem_lf = (exp_time - datetime.now()).total_seconds()
                     cache_lf = (exp_time - cached_time).total_seconds()
-                    remaining_life = rem_lf/cache_lf
+                    if(cache_lf >0):
+                        remaining_life = rem_lf/cache_lf
                 except Exception:
+                    traceback.print_exc()
                     print("Error occured in fecthing longest lifetime for entity: " + str(entityid))
                 
             # Delay
@@ -99,10 +114,14 @@ class LVFEvictor(Evictor):
                 if(prodid in providers_dict):
                     continue
                 else:
-                    cached_res = self.__cache.getdb.read_all_with_limit('responsetimes',{
+                    cached_res = self.__cache.getdb().read_all_with_limit('responsetimes',{
                             'context_producer': prodid
                         }, 10)
-                    mean_rt = statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res)))
+                    
+                    mean_rt = 9999
+                    if(cached_res):
+                        mean_rt = statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res)))
+
                     delay_list.append(mean_rt)
                     providers_dict[prodid] = mean_rt
             ent_delays[entityid] = statistics.mean(delay_list)

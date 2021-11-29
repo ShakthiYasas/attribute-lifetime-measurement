@@ -175,8 +175,7 @@ class SQLLiteClient:
         res = self.__conn.execute(
             "SELECT lifetime, cached FROM CachedLifetime\
             WHERE entityid="+str(entityid)+" AND attribute='"+attribute+"'\
-            ORDER BY Id DESC\
-            LIMIT 1)").fetchone()
+            LIMIT 1").fetchone()
         return res
 
     def get_longest_cache_lifetime_for_entity(self, entityid):
@@ -204,9 +203,7 @@ class SQLLiteClient:
     
     def get_ret_latency(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
-        res = self.__conn.execute(
-            "SELECT latency cached FROM CurrentRetrievalLatency \
-            LIMIT 1)").fetchone()
+        res = self.__conn.execute("SELECT latency FROM CurrentRetrievalLatency WHERE Id=1 LIMIT 1").fetchone()
         return res
 
     # Initialize the SQLite instance 
@@ -214,7 +211,7 @@ class SQLLiteClient:
         try:
             self.__create_tables()
             self.__seed_tables_with_data()
-        except Exception as e:
+        except Exception:
             print('An error occured when seeding to database')
 
     def __seed_tables_with_data(self):

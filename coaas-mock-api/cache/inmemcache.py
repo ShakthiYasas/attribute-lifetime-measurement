@@ -1,7 +1,8 @@
+import statistics
 import time
 import _thread
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from lib.fifoqueue import FIFOQueue_2
 from cache.cacheagent import CacheAgent
@@ -104,10 +105,27 @@ class InMemoryCache(CacheAgent):
         return self.__db
     
     def get_cachedlifetime(self, entityid, attribute):
-        return self.__registry.get_cached_life(entityid, attribute)
+        in_db = self.__registry.get_cached_life(entityid, attribute)
+        if(in_db):
+            return in_db
+        else:
+            cached_time = self.__entityhash[entityid].freq_table[attribute][1]
+            avg_cached_lt = 0
+            cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
+                    'entity': entityid,
+                    'attribute': attribute
+                },10)
+            if(cached_lt_res):
+                avg_lts = list(map(lambda x: x['c_lifetime'], cached_lt_res))
+                avg_cached_lt = round(statistics.mean(avg_lts),3)
+            exp_time = cached_time + timedelta(seconds=avg_cached_lt)
+            return (exp_time, cached_time)
 
     def get_expired_lifetimes(self):
         return self.__registry.get_expired_cached_lifetimes()
+    
+    def get_ret_latency(self):
+        return self.__registry.get_ret_latency()
 
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
@@ -282,11 +300,34 @@ class InMemoryCache(CacheAgent):
     def get_providers_for_entity(self, entityid):
         return self.__registry.get_providers_for_entity(entityid)
     
-    def get_providers_for_attribute(self, entityid, attr):
-        return self.__registry.get_context_producers(entityid, attr)
+    def get_providers_for_attribute(self, entityid, attrlist):
+        return self.__registry.get_context_producers(entityid, attrlist)
     
     def reevaluate_for_eviction(self, entity, attribute):
         return self.caller_strategy.reevaluate_for_eviction(entity, attribute)
 
     def get_longest_cache_lifetime_for_entity(self, entityid):
-        return self.__registry.get_max_cached_lifetime(entityid)
+        in_db = self.__registry.get_longest_cache_lifetime_for_entity(entityid)
+        if(in_db):
+            return in_db
+        else:
+            max_cached = None
+            max_exp = None
+            for attribute in self.__entityhash[entityid].freq_table.keys():
+                cached_time = self.__entityhash[entityid].freq_table[attribute][1]
+                avg_cached_lt = 0
+                cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
+                        'entity': entityid,
+                        'attribute': attribute
+                    },10)
+                if(cached_lt_res):
+                    avg_lts = list(map(lambda x: x['c_lifetime'], cached_lt_res))
+                    avg_cached_lt = round(statistics.mean(avg_lts),3)
+            
+                exp_time = cached_time + timedelta(seconds=avg_cached_lt)
+                if(max_exp == None or exp_time > max_exp):
+                    max_cached = cached_time
+                    max_exp = exp_time
+
+
+            return (exp_time, max_cached)

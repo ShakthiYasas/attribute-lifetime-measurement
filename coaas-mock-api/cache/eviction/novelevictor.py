@@ -14,7 +14,11 @@ class NovelEvictor(Evictor):
             for entity, att in expired:
                 entity_stats = self.__cache.get_statistics_entity(entity)
                 att_stats = entity_stats[att]
-                access_rate = att_stats.get_queue_size()/(att_stats.get_last()-att_stats.get_head()).total_seconds()
+                access_rate = 0
+                time_diff = (att_stats.get_last()-att_stats.get_head()).total_seconds()
+                if(time_diff > 0):
+                    access_rate = att_stats.get_queue_size()/time_diff
+
                 if(access_rate < self.__threshold):
                     # The item is least frequently used
                     eviction_list.append((entity,att))
@@ -52,7 +56,7 @@ class NovelEvictor(Evictor):
         providers_dict = {}
         for entityid, stats in entities:
             # Remaining Cached Life
-            cached_lt_res = self.__cache.getdb.read_all_with_limit('entity-cached-lifetime',{
+            cached_lt_res = self.__cache.getdb().read_all_with_limit('entity-cached-lifetime',{
                         'entity': entityid,
                     },10)
             remaining_life = 0
@@ -79,10 +83,14 @@ class NovelEvictor(Evictor):
                 if(prodid in providers_dict):
                     continue
                 else:
-                    cached_res = self.__cache.getdb.read_all_with_limit('responsetimes',{
+                    cached_res = self.__cache.getdb().read_all_with_limit('responsetimes',{
                             'context_producer': prodid
                         }, 10)
-                    mean_rt = statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res)))
+                        
+                    mean_rt = 9999
+                    if(cached_res):
+                        mean_rt = statistics.mean(list(map(lambda x: x['avg_response_time'], cached_res)))
+
                     delay_list.append(mean_rt)
                     providers_dict[prodid] = mean_rt
             ent_delays[entityid] = statistics.mean(delay_list)
