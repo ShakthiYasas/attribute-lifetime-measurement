@@ -181,6 +181,12 @@ class InMemoryCache(CacheAgent):
     # Update cached lifetime
     def updatecachedlifetime(self, action, cachedlife):
         self.__registry.update_cached_life(action[0], action[1], cachedlife)
+    
+    def removeentitycachedlifetime(self, entityid):
+        self.__registry.remove_cached_life_entity(entityid)
+    
+    def removecachedlifetime(self,entity, attribute):
+        self.__registry.remove_cached_life(entity, attribute)
 
     # Evicts an entity from cache
     def __evict(self, entityid) -> None:

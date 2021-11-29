@@ -13,24 +13,33 @@ class NovelEvictor(Evictor):
         if(len(expired)>0):
             for entity, att in expired:
                 entity_stats = self.__cache.get_statistics_entity(entity)
-                att_stats = entity_stats[att]
-                access_rate = 0
-                time_diff = (att_stats.get_last()-att_stats.get_head()).total_seconds()
-                if(time_diff > 0):
-                    access_rate = att_stats.get_queue_size()/time_diff
+                try:
+                    if(entity_stats != None):
+                        if(att in entity_stats):
+                            att_stats = entity_stats[att]
+                            access_rate = 0
+                            time_diff = (att_stats[0].get_last()-att_stats[0].get_head()).total_seconds()
+                            if(time_diff > 0):
+                                access_rate = att_stats[0].get_queue_size()/time_diff
 
-                if(access_rate < self.__threshold):
-                    # The item is least frequently used
-                    eviction_list.append((entity,att))
-                else:
-                    # The item has been used frequently
-                    # Reevaluate the items
-                    action, (est_c_lifetime, est_delay) = self.__cache.reevaluate_for_eviction(entity, att)
-                    if(action == (0,0)):
-                        eviction_list.append((entity,att))
+                            if(access_rate < self.__threshold):
+                                # The item is least frequently used
+                                eviction_list.append((entity,att))
+                            else:
+                                # The item has been used frequently
+                                # Reevaluate the items
+                                action, (est_c_lifetime, est_delay) = self.__cache.reevaluate_for_eviction(entity, att)
+                                if(action == (0,0)):
+                                    eviction_list.append((entity,att))
+                                else:
+                                    wait_time = datetime.now()+timedelta(seconds=est_c_lifetime)
+                                    self.__cache.updatecachedlifetime(action[0], action[1], wait_time)
+                        else:
+                            self.__cache.removecachedlifetime(entity, att)
                     else:
-                        wait_time = datetime.now()+timedelta(seconds=est_c_lifetime)
-                        self.__cache.updatecachedlifetime(action[0], action[1], wait_time)
+                        self.__cache.removeentitycachedlifetime(entity)
+                except Exception:
+                    print('An error occured when selecting for eviction in Novel Evictor!')
 
         return eviction_list
     

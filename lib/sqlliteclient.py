@@ -1,4 +1,5 @@
 import sqlite3
+import datetime
 
 class SQLLiteClient:
     def __init__(self, db_name):
@@ -153,22 +154,37 @@ class SQLLiteClient:
     def add_cached_life(self, entityid, attribute, lifetime):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         cursor=self.__conn.cursor()
-        statement = "INSERT INTO CachedLifetime (entityid, attribute, lifetime, cached) VALUES\
-            ("+str(entityid)+",'"+str(attribute)+"','"+str(lifetime)+"', datetime('now'))"
-        self.__conn.execute(statement)
-        return cursor.lastrowid
+        if(self.get_cached_life(entityid, attribute)):
+            return self.update_cached_life(entityid, attribute, lifetime)
+        else:
+            statement = "INSERT INTO CachedLifetime (entityid, attribute, lifetime, cached) VALUES\
+                ("+str(entityid)+",'"+str(attribute)+"','"+str(lifetime)+"', datetime('now'))"
+            self.__conn.execute(statement)
+            self.__conn.commit()
+            return cursor.lastrowid
 
     def update_cached_life(self, entityid, attribute, lifetime):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
-        self.__conn.execute(
-            "UPDATE CachedLifetime SET lifetime='"+str(lifetime)+"'\
-            entityid="+str(entityid)+" AND attribute='"+attribute+"')")
+        cursor=self.__conn.cursor()
+        query_string = "UPDATE CachedLifetime SET lifetime='"+str(lifetime)+"'\
+            WHERE entityid="+str(entityid)+" AND attribute='"+attribute+"'"
+        self.__conn.execute(query_string)
+        self.__conn.commit()
+        return cursor.lastrowid
 
     def remove_cached_life(self, entityid, attribute):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "DELETE FROM CachedLifetime WHERE\
             entityid="+str(entityid)+" AND attribute='"+attribute+"'")
+        self.__conn.commit()
+    
+    def remove_cached_life_entity(self, entityid):
+        self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        self.__conn.execute(
+            "DELETE FROM CachedLifetime WHERE\
+            entityid="+str(entityid))
+        self.__conn.commit()
     
     def get_cached_life(self, entityid, attribute):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
@@ -190,16 +206,18 @@ class SQLLiteClient:
 
     def get_expired_cached_lifetimes(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         res = self.__conn.execute(
             "SELECT entityid, attribute FROM CachedLifetime\
-            WHERE lifetime<=datetime('now')").fetchall()
-        return res[0]
+            WHERE lifetime<='"+now+"'").fetchall()
+        return res
 
     # Current retrieval latency
     def update_ret_latency(self, latency):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
         self.__conn.execute(
             "UPDATE CurrentRetrievalLatency SET latency="+str(latency)+" WHERE Id=1")
+        self.__conn.commit()
     
     def get_ret_latency(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
