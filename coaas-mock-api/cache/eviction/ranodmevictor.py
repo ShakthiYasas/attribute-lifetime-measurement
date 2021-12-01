@@ -21,4 +21,6 @@ class RandomEvictor(Evictor):
     # Select a random entity to evict
     def select_entity_to_evict(self, internal=False, is_limited=False):
         secure_random = random.SystemRandom()
+        if(is_limited):
+            return [secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])]
         return secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])

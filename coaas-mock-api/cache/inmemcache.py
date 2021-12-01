@@ -161,18 +161,22 @@ class InMemoryCache(CacheAgent):
                 self.__create_new_entity_cache(entityid, cacheitems)       
 
     def __create_new_entity_cache(self, entityid, cacheitems):
-        recency_bit = True
-        now = datetime.now()
-        self.__entityhash[entityid] = LimitedSizeDict()
-        que = FIFOQueue_2(100)
-        que.push(now)
-        self.__entityhash.freq_table[entityid] = (que,now)
+        try:
+            recency_bit = True
+            now = datetime.now()
+            self.__entityhash[entityid] = LimitedSizeDict()
+            que = FIFOQueue_2(100)
+            que.push(now)
+            self.__entityhash.freq_table[entityid] = (que,now)
 
-        for att_name, values in cacheitems.items():
-            que_1 = FIFOQueue_2(100)
-            que_1.push(now)
-            self.__entityhash[entityid].freq_table[att_name] = (que_1,now)
-            self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
+            for att_name, values in cacheitems.items():
+                que_1 = FIFOQueue_2(100)
+                que_1.push(now)
+                self.__entityhash[entityid].freq_table[att_name] = (que_1,now)
+                self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
+        except Exception as e:
+            print('Expanding Cache Memory!')
+            raise e
 
     # Add to cached lifetime
     def addcachedlifetime(self, action, cachedlife):

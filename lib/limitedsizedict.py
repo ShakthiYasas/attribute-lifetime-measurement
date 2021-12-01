@@ -3,7 +3,7 @@ from lib.exceptions import OutOfCacheMemory
 
 # Implementing cache data structure as an ordered-limited dictionary
 class LimitedSizeDict(OrderedDict):
-    def __init__(self, enable_eviction=True, *args, **kwds,):
+    def __init__(self, enable_eviction=False, *args, **kwds,):
         # Frequency of access counter (count,[list of timestamps])
         self.freq_table = {}
         self.__enable_auto_eviction = enable_eviction
@@ -13,12 +13,14 @@ class LimitedSizeDict(OrderedDict):
         self._check_size_limit()
 
     def __setitem__(self, key, value):
-        OrderedDict.__setitem__(self, key, value)
-        if(self.__enable_auto_eviction):
-            self._check_size_limit()
+        if(self.is_full()):
+            if(self.__enable_auto_eviction):
+                self._check_size_limit()
+            else:
+                raise OutOfCacheMemory
         else:
-            raise OutOfCacheMemory
-
+            OrderedDict.__setitem__(self, key, value)
+        
     # This is a FIFO replacement
     def _check_size_limit(self):
         if self.size_limit is not None:
@@ -28,8 +30,12 @@ class LimitedSizeDict(OrderedDict):
 
     # Return whether cache is full
     def is_full(self):
-        return len(self) >= self.size_limit
+        if(self.size_limit == None):
+            return False
+        else:
+            return len(self) >= self.size_limit
 
     # Expand the dictionary by the same factor
     def expand_dictionary(self, size):
-        self.size_limit += size 
+        if(self.size_limit != None):
+            self.size_limit += size 
