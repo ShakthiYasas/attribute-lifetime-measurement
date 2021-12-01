@@ -140,6 +140,11 @@ class Statistics(Resource):
             ent_id = int(request.args.get('id'))
             data = selected_algo.get_cache_statistics(ent_id)
             return data, 200   
+        if(name == 'entities'):
+            if(strategy == 'reactive'):
+                return 404
+            data = selected_algo.get_currently_cached_entities()
+            return data, 200   
         elif(name == 'returns'):
             is_curr = str(request.args.get('current')).lower()
             if(is_curr == 'true'):

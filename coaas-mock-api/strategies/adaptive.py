@@ -1361,6 +1361,9 @@ class Adaptive(Strategy):
     def get_access_to_db(self):
         return self.__db
 
+    def get_currently_cached_entities(self):
+        return list(self.cache_memory.get_statistics_all().keys())
+
 class LearningThread (threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
