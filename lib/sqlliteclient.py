@@ -1,5 +1,9 @@
+import re
 import sqlite3
 import datetime
+
+REGEX = r"\..+"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 class SQLLiteClient:
     def __init__(self, db_name):
@@ -192,7 +196,13 @@ class SQLLiteClient:
             "SELECT lifetime, cached FROM CachedLifetime\
             WHERE entityid="+str(entityid)+" AND attribute='"+attribute+"'\
             LIMIT 1").fetchone()
-        return res
+
+        if(res):
+            life = datetime.datetime.strptime(re.sub(REGEX,'',res[0]), DATETIME_FORMAT)
+            cached = datetime.datetime.strptime(re.sub(REGEX,'',res[1]), DATETIME_FORMAT)
+            return (life,cached)
+        else:
+            return res
 
     def get_longest_cache_lifetime_for_entity(self, entityid):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)
@@ -202,7 +212,12 @@ class SQLLiteClient:
                 FROM CachedLifetime \
                 WHERE entityid="+str(entityid)+") AND entityid="+str(entityid)+" \
                 LIMIT 1").fetchone()         
-        return res
+        if(res):
+            life = datetime.datetime.strptime(re.sub(REGEX,'',res[0]), DATETIME_FORMAT)
+            cached = datetime.datetime.strptime(re.sub(REGEX,'',res[1]), DATETIME_FORMAT)
+            return (life,cached)
+        else:
+            return res
 
     def get_expired_cached_lifetimes(self):
         self.__conn = sqlite3.connect(self.__dbname+'.db', check_same_thread=False)

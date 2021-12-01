@@ -58,7 +58,7 @@ class LVFEvictor(Evictor):
 
                 value = att_access_ratio + relative_remaning + rel_ret_latency
                 if(value < self.__threshold):
-                    eviction_list.append(ent, att)
+                    eviction_list.append((ent, att))
 
         return eviction_list
 

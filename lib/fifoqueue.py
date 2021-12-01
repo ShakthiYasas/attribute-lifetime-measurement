@@ -58,3 +58,10 @@ class FIFOQueue_2():
     
     def isfull(self):
         return self.__size == len(self.__queue)
+    
+    def remove_items(self, items):
+        for item in items:
+            try:
+                self.__queue.remove(item)
+            except Exception:
+                print('Item not found to remove from the queue!')
