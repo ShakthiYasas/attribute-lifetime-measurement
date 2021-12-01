@@ -162,7 +162,7 @@ class InMemoryCache(CacheAgent):
                     # If not, then call the expansion routine and then save the item
                     self.__entityhash.expand_dictionary(self.__cache_size)
 
-                self.__create_new_entity_cache(entityid, cacheitems) 
+                _ = self.__create_new_entity_cache(entityid, cacheitems) 
                       
     def __create_new_entity_cache(self, entityid, cacheitems):
         try:
