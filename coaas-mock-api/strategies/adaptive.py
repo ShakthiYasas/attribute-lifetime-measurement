@@ -39,7 +39,7 @@ class Adaptive(Strategy):
     __temp_entity_att_provider_map = {}
 
     # Temporary List
-    __currently_eval = []
+    __currently_eval = set()
 
     # Counters
     rr_trend_size = 0
@@ -83,11 +83,10 @@ class Adaptive(Strategy):
         subscribe("subscribed_actions", self.sub_cache_item)
         subscribe("subscribed_evictions", self.sub_evictor)
         subscribe("subscribed_learner", self.sub_decisioned_item)
-          
+
     # Init_cache initializes the cache memory. 
     def init_cache(self):
         self.__learning_skip = max(5,self.trend_ranges[0])
-        self.__longtime = (self.trend_ranges[2]*self.__moving_window)/1000
         setattr(self.service_selector, 'service_registry', self.service_registry)
         setattr(self.service_selector, 'session', self.session)
 
@@ -162,7 +161,7 @@ class Adaptive(Strategy):
         dup_obs = self.__observed.copy()
         __reqs_in_window = self.__reqs_in_window
         for key,value in dup_obs.items():
-            if(value['req_ts'][-1] <= exp_time):
+            if(len(value['req_ts'])>0 and value['req_ts'][-1] <= exp_time):
                 # The entire entity hasn't been accessed recently
                 if(key in self.__observed):
                     del self.__observed[key]
@@ -318,7 +317,7 @@ class Adaptive(Strategy):
             except NewContextException:
                 reward = -10
                 if(not self.__is_simple_agent):
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward, decision[0], decision[4]))
+                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward, {'features':decision[0]}, decision[4]))
                 else:
                     self.selective_cache_agent.set_to_reward_history(reward)
 
@@ -380,7 +379,7 @@ class Adaptive(Strategy):
                 conditions = ent['conditions']
             lifetimes = None
             if(self.__isstatic):
-                lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)
+                lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)          
 
             if(entityid in self.cache_memory.get_statistics_all()):
                 reference = None
@@ -551,14 +550,15 @@ class Adaptive(Strategy):
         return output
 
     def __evaluate_and_updated_observed_in_thread(self, entityid, out, ref_key):
+        self.__observedLock.acquire()
+        self.__update_observed(entityid, list(out.keys()))
+        self.__observedLock.release()
+
         if(self.__window_counter >= self.trend_ranges[1]+1):
             # Run this in the background
             self.__evaluate_for_caching(entityid, out, ref_key)
             self.__evaluated.add(entityid)
-        else:
-            self.__observedLock.acquire()
-            self.__update_observed(entityid, list(out.keys()))
-            self.__observedLock.release()
+            
 
     ###################################################################################
     # Section 03 - Evluating to Cache
@@ -608,9 +608,9 @@ class Adaptive(Strategy):
                                 else:
                                     self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                     else:
-                        if(not((entityid, att) in self.__currently_eval)):
-                            self.__currently_eval.append((entityid,att))
-                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,self.__skiprandom,ref_key))                   
+                        # if(not((entityid, att) in self.__currently_eval)):
+                        self.__currently_eval.add((entityid,att))
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,self.__skiprandom,ref_key))                
             except NewContextException:
                 if(entityid in self.__delay_dict):
                     self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -629,7 +629,8 @@ class Adaptive(Strategy):
         if(not (entityid in self.__evaluated)):
             # Entity hasn't been evaluted in this window before
             for att in attributes.keys():
-                if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
+                checker = self.__check_delay(entityid, att) or self.__is_spike(entityid, att)
+                if(checker):
                     try:
                         observation = self.__translate_to_state(entityid,att)
                         action, (est_c_lifetime, est_delay) = None, (None, None)
@@ -650,9 +651,9 @@ class Adaptive(Strategy):
                                     else:
                                         self.__delay_dict[entityid] = { att: self.__window_counter + est_delay }
                         else:
-                            if(not((entityid, att) in self.__currently_eval)):
-                                self.__currently_eval.append((entityid,att))
-                                self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,self.__skiprandom,ref_key)) 
+                            #if(not((entityid, att) in self.__currently_eval)):
+                            self.__currently_eval.add((entityid,att))
+                            self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation,self.__skiprandom,ref_key))  
                     except NewContextException:
                         if(entityid in self.__delay_dict):
                             self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -678,16 +679,6 @@ class Adaptive(Strategy):
                     del self.__observed[entityid][att]
             if(entityid in self.__observed and self.__observed[entityid]):
                 del self.__observed[entityid]
-            # Update the observed list for uncached entities and attributes 
-            self.__observedLock.acquire()
-            self.__update_observed(entityid, list(set(updated_attr_dict) - set(attributes)))
-            self.__observedLock.release()
-        else:
-            # Update the observed list for uncached entities and attributes 
-            if(self.__is_simple_agent):
-                self.__observedLock.acquire()
-                self.__update_observed(entityid, attributes)
-                self.__observedLock.release()
 
         if(random_one):
             for entity, att, cachelife in random_one:
@@ -890,12 +881,13 @@ class Adaptive(Strategy):
     # Translating an observation to a state
     def __translate_to_state(self, entityid, att):
         isobserved = self.__isobserved(entityid, att)
+        iscached = self.cache_memory.get_statistics(entityid, att)
         # Access Rates [0-5]
         fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
         # Hit Rates and Expectations [6-11]
         lifetimes = self.service_registry.get_context_producers(entityid,[att])
         # The above step could be optimzed by using a view (in SQL that updates by a trigger)
-        new_feas, avg_latency = self.__calculate_hitrate_features(isobserved, entityid, att, lifetimes)
+        new_feas, avg_latency = self.__calculate_hitrate_features(bool(not iscached and isobserved), entityid, att, lifetimes)
         fea_vec = fea_vec + new_feas
         # Average Cached Lifetime [12]
         cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
@@ -994,11 +986,11 @@ class Adaptive(Strategy):
         return fea_vec
     
     # Calculates the hit rates for the given observation
-    def __calculate_hitrate_features(self, isobserved, entityid, att, lifetimes):
+    def __calculate_hitrate_features(self, isnotcached, entityid, att, lifetimes):
         fea_vec = []
         avg_rt = self.service_selector.get_average_responsetime_for_attribute(list(map(lambda x: x[0], lifetimes.items()))) if lifetimes else 9999
 
-        if(isobserved):
+        if(isnotcached):
             # No current hit rates to report 
             # Expected Hit Rate (If not Cached)
             fea_vec = self.get_projected_hit_rate(entityid, att, avg_rt, lifetimes)

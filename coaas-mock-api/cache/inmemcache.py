@@ -146,20 +146,24 @@ class InMemoryCache(CacheAgent):
                     self.__entityhash[entityid].freq_table[att_name] = (que,now)
                     self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]   
         else:
-            try:
-                self.__create_new_entity_cache(entityid, cacheitems)
-            except OutOfCacheMemory:
+            result = self.__create_new_entity_cache(entityid, cacheitems)
+            if(result == -1):
                 # Check if any entities can be removed from cache
-                entity_ids = self.__evictor.select_entity_to_evict(is_limited=self.is_limited_cache)
-                if(entity_ids):
-                    # If there can be, then remove them and replace by the new ones 
-                    for ent_id in entity_ids:
-                        self.evict(ent_id)
+                if(self.__evictor != None):
+                    entity_ids = self.__evictor.select_entity_to_evict(is_limited=self.is_limited_cache)
+                    if(entity_ids):
+                        # If there can be, then remove them and replace by the new ones 
+                        for ent_id in entity_ids:
+                            self.evict(ent_id)
+                    else:
+                        # If not, then call the expansion routine and then save the item
+                        self.__entityhash.expand_dictionary(self.__cache_size)
                 else:
                     # If not, then call the expansion routine and then save the item
                     self.__entityhash.expand_dictionary(self.__cache_size)
-                self.__create_new_entity_cache(entityid, cacheitems)       
 
+                self.__create_new_entity_cache(entityid, cacheitems) 
+                      
     def __create_new_entity_cache(self, entityid, cacheitems):
         try:
             recency_bit = True
@@ -174,9 +178,9 @@ class InMemoryCache(CacheAgent):
                 que_1.push(now)
                 self.__entityhash[entityid].freq_table[att_name] = (que_1,now)
                 self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
-        except Exception as e:
-            print('Expanding Cache Memory!')
-            raise e
+            return 0
+        except OutOfCacheMemory:
+            return -1
 
     # Add to cached lifetime
     def addcachedlifetime(self, action, cachedlife):
@@ -294,14 +298,16 @@ class InMemoryCache(CacheAgent):
         return self.__entityhash.freq_table
 
     # Retrive frequency of access of all attribute of an entity
-    def get_statistics_entity(self, entityid)->dict:
+    def get_statistics_entity(self, entityid):
         if(entityid in self.__entityhash):
             return self.__entityhash[entityid].freq_table
         else: return None
 
     # Retrive frequency of access statistics for a context attribute
     def get_statistics(self, entityid, attribute):
-        return self.__entityhash[entityid].freq_table[attribute]
+        if(entityid in self.__entityhash and attribute in self.__entityhash[entityid].freq_table):
+            return self.__entityhash[entityid].freq_table[attribute]
+        else: return None
 
     # Returns the trend of the hit rate with in the moving window
     def get_hitrate_trend(self):

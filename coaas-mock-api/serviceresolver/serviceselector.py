@@ -90,6 +90,7 @@ class ServiceSelector:
                     self.__db.insert_one('responsetimes',{
                         'context_producer': prodid,
                         'avg_response_time': statistics.mean(self.__statistics[prodid]['queue'].getlist()),
+                        'cum_retrievals': self.__statistics[prodid]['count'],
                         'timestamp': aft_time,
                         'session':self.session
                     })
