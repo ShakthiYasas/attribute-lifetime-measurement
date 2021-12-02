@@ -1,6 +1,8 @@
 import time
 import queue
+import os.path
 import threading
+from os import path
 
 import numpy as np 
 import tensorflow as tf
@@ -83,32 +85,41 @@ class DDPGACAgent(threading.Thread, Agent):
     
     # Executing the thread
     def run(self):
-        # Initializing Tensorflow Session
-        self.__session = tf.compat.v1.Session()
+        # Initializing Tensorflow Session'
+        if(path.exists(CHECKPOINT_PATH)):
+            with tf.compat.v1.Session() as sess:    
+                self.__session_saver = tf.compat.v1.train.import_meta_graph(CHECKPOINT_PATH+'ddpg-session.meta')
+                self.__session_saver.restore(sess,tf.train.latest_checkpoint(CHECKPOINT_PATH))
+                self.__session = sess
+        else:   
+            self.__session = tf.compat.v1.Session()
 
-        # Actor-Critic Networks
-        self.__critic = Critic(self.__critic_lr, 'Critic', self.__session)
-        self.__actor = Actor(self.__actor_lr, 'Actor', self.__session, self.__action_bound, self.__batch_size)
-        
-        # Target Actor-Critic Networks
-        self.__target_critic = Critic(self.__critic_lr, 'TargetCritic', self.__session)
-        self.__target_actor = Actor(self.__actor_lr, 'TargetActor', self.__session, self.__action_bound, self.__batch_size)
-        
-        # Noise generator for the action space
-        self.__noise = ActionNoise(np.zeros(N_ACTIONS))
+            # Actor-Critic Networks
+            self.__critic = Critic(self.__critic_lr, 'Critic', self.__session)
+            self.__actor = Actor(self.__actor_lr, 'Actor', self.__session, self.__action_bound, self.__batch_size)
+            
+            # Target Actor-Critic Networks
+            self.__target_critic = Critic(self.__critic_lr, 'TargetCritic', self.__session)
+            self.__target_actor = Actor(self.__actor_lr, 'TargetActor', self.__session, self.__action_bound, self.__batch_size)
+            
+            # Noise generator for the action space
+            self.__noise = ActionNoise(np.zeros(N_ACTIONS))
 
-        self.__update_critic = []
-        for i in range(len(self.__target_critic.params)):
-            self.__update_critic.append(self.__target_critic.params[i].assign(
-                    tf.multiply(self.__critic.params[i], self.__tau) + tf.multiply(self.__target_critic.params[i], 1 - self.__tau)))
-        
-        self.__update_actor= []
-        for i in range(len(self.__target_actor.params)):
-            self.__update_actor.append(self.__target_actor.params[i].assign(
-                    tf.multiply(self.__actor.params[i], self.__tau) + tf.multiply(self.__target_actor.params[i], 1 - self.__tau)))
+            self.__update_critic = []
+            for i in range(len(self.__target_critic.params)):
+                self.__update_critic.append(self.__target_critic.params[i].assign(
+                        tf.multiply(self.__critic.params[i], self.__tau) + tf.multiply(self.__target_critic.params[i], 1 - self.__tau)))
+            
+            self.__update_actor= []
+            for i in range(len(self.__target_actor.params)):
+                self.__update_actor.append(self.__target_actor.params[i].assign(
+                        tf.multiply(self.__actor.params[i], self.__tau) + tf.multiply(self.__target_actor.params[i], 1 - self.__tau)))
 
-        self.__session.run(tf.compat.v1.global_variables_initializer())
-        self.__update_network_params(True)
+            self.__session.run(tf.compat.v1.global_variables_initializer())
+            
+            # Session Saver
+            self.__session_saver = tf.compat.v1.train.Saver()
+            self.__update_network_params(True)
 
         while True:
             try:
@@ -129,6 +140,8 @@ class DDPGACAgent(threading.Thread, Agent):
             self.__tau = tau_copy
         else:
             self.__update_networks()
+        
+        self.__session_saver.save(self.__session, CHECKPOINT_PATH+'ddpg-session')
 
     # Internal method for above
     def __update_networks(self):
