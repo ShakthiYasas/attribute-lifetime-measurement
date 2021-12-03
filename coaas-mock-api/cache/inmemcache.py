@@ -154,7 +154,7 @@ class InMemoryCache(CacheAgent):
                     if(entity_ids):
                         # If there can be, then remove them and replace by the new ones 
                         for ent_id in entity_ids:
-                            self.evict(ent_id)
+                            self.__evict(ent_id)
                     else:
                         # If not, then call the expansion routine and then save the item
                         self.__entityhash.expand_dictionary(self.__cache_size)
@@ -180,6 +180,7 @@ class InMemoryCache(CacheAgent):
                 self.__entityhash[entityid][att_name] = [list(tup)+[recency_bit] for tup in values]
             return 0
         except OutOfCacheMemory:
+            print('Out of cache memory')
             return -1
 
     # Add to cached lifetime
@@ -203,10 +204,15 @@ class InMemoryCache(CacheAgent):
         
         if(self.__entityhash[entityid].freq_table.items()):
             for key,value in self.__entityhash[entityid].freq_table.items():
+                cachedtime = None
+                if(len(value)>2):
+                    cachedtime = value[2]
+                else:
+                    cachedtime = value[1]
                 attribute_lifetimes.append({
                     'entityid': entityid,
                     'attribute': key,
-                    'c_lifetime': (now - value[2]).total_seconds()
+                    'c_lifetime': (now - cachedtime).total_seconds()
                 })
                 self.__registry.remove_cached_life(entityid, key)
             

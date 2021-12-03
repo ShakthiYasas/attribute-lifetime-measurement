@@ -3,7 +3,7 @@ from lib.limitedsizedict import LimitedSizeDict
 class CacheAgent(object):
     def __init__(self, config, db, registry=None): pass
     # Eviction
-    def evict(self, entityid) -> None: pass
+    def __evict(self, entityid) -> None: pass
     # Store 
     def save(self, entityid, cacheitems) -> None: pass
     # Retrieve

@@ -9,7 +9,7 @@ class CloudCache(CacheAgent):
         self.window = config.window_size
 
     # Evicts an entity from cache
-    def evict(self, entityid) -> None: pass
+    def __evict(self, entityid) -> None: pass
     
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None: pass

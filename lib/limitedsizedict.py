@@ -39,6 +39,7 @@ class LimitedSizeDict(OrderedDict):
     def expand_dictionary(self, size):
         if(self.size_limit != None):
             self.size_limit += size 
+            print('Expanded Cache Memory and new size: '+str(self.size_limit))
 
     # Return the size of the cache
     def get_size(self):

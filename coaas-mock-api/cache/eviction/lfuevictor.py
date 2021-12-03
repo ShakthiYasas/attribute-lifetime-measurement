@@ -1,7 +1,7 @@
 from cache.eviction.evictor import Evictor
 
 class LFUEvictor(Evictor):
-    def __init__(self, cache, threshold = 1.0):
+    def __init__(self, cache, threshold = 0.5):
         self.__cache = cache
         self.__threshold = threshold
     
@@ -57,5 +57,6 @@ class LFUEvictor(Evictor):
             sorted_entities = [entity_access_pair for entity_access_pair in sorted(cached_access_ratio, key=lambda tup: tup[1])]
             if(is_limited):
                 return [sorted_entities[0][0]]
-                        
-            return [entity for entity, access in sorted_entities if access < self.__threshold]
+
+            selected = [entity for entity, access in sorted_entities if access < self.__threshold]    
+            return selected

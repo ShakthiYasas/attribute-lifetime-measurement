@@ -167,7 +167,9 @@ class ACAgent(threading.Thread, Agent):
     def choose_action(self, paramters): 
         observation = paramters[0]
         skip_random = paramters[1]
-        ref_key = paramters[2]
+        ref_key = None
+        if(len(paramters)>2):
+            ref_key = paramters[2]
 
         obs = np.asarray(observation['features'])[np.newaxis, :]
         entityid = observation['entityid']

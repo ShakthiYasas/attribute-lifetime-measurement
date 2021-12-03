@@ -23,4 +23,4 @@ class RandomEvictor(Evictor):
         secure_random = random.SystemRandom()
         if(is_limited):
             return [secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])]
-        return secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])
+        return [secure_random.choice([entityid for entityid in self.__cache.get_statistics_all().keys()])]

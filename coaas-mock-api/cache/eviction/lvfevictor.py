@@ -77,8 +77,8 @@ class LVFEvictor(Evictor):
             else:
                 rel_popularities.append((stat[0], 0))
 
-        most_popular = sorted(rel_popularities, key=lambda item: item[1])[-1][1]
-        rel_popularities = dict([(entity, access/most_popular) for entity, access in rel_popularities])
+        most_popular = sorted(rel_popularities, key=lambda item: item[1], reverse=True)[0][1]
+        rel_popularities = dict([(entity, access/most_popular if most_popular > 0 else 0) for entity, access in rel_popularities])
 
         calculated_value = {}
         ent_delays = {}
@@ -94,7 +94,7 @@ class LVFEvictor(Evictor):
                 rem_l = avg_lts - (datetime.now()-stats[1]).total_seconds()
                 # Remaining cached life as a ratio of total cached lifetime
                 # This could be a negative value as well.
-                remaining_life = rem_l/avg_lts 
+                remaining_life = rem_l/avg_lts if avg_lts > 0 else 0
             else:
                 # Get the cached expected cached lifetime of the entity attributes
                 try:
@@ -102,7 +102,7 @@ class LVFEvictor(Evictor):
                     rem_lf = (exp_time - datetime.now()).total_seconds()
                     cache_lf = (exp_time - cached_time).total_seconds()
                     if(cache_lf >0):
-                        remaining_life = rem_lf/cache_lf
+                        remaining_life = rem_lf/cache_lf if cache_lf > 0 else 0
                 except Exception:
                     traceback.print_exc()
                     print("Error occured in fecthing longest lifetime for entity: " + str(entityid))
@@ -130,7 +130,8 @@ class LVFEvictor(Evictor):
 
         most_delaying = sorted(ent_delays.items(), key=lambda item: item[1])[-1]
         for entityid, value in calculated_value.items():
-            calculated_value[entityid] = value + (ent_delays[entityid]/most_delaying[1])
+            rel_delay = ent_delays[entityid]/most_delaying[1] if most_delaying[1] > 0 else 0
+            calculated_value[entityid] = value + rel_delay
 
         if(internal):
             mandatory = []
