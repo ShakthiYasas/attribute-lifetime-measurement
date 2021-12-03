@@ -58,7 +58,7 @@ class NovelEvictor(Evictor):
                 rel_popularities.append((stat[0], 0))
 
         most_popular = sorted(rel_popularities, key=lambda item: item[1])[-1][1]
-        rel_popularities = dict([(entity, access/most_popular) for entity, access in rel_popularities])
+        rel_popularities = dict([(entity, access/most_popular) if most_popular > 0 else (entity,0) for entity, access in rel_popularities])
 
         calculated_value = {}
         ent_delays = {}
@@ -81,7 +81,7 @@ class NovelEvictor(Evictor):
                     exp_time, cached_time = self.__cache.get_longest_cache_lifetime_for_entity(entityid)
                     rem_lf = (exp_time - datetime.now()).total_seconds()
                     cache_lf = (exp_time - cached_time).total_seconds()
-                    remaining_life = rem_lf/cache_lf
+                    remaining_life = rem_lf/cache_lf if cache_lf > 0 else 0
                 except Exception:
                     print("Error occured in fecthing longest lifetime for entity: " + str(entityid))
 
@@ -108,7 +108,8 @@ class NovelEvictor(Evictor):
 
         most_delaying = sorted(ent_delays.items(), key=lambda item: item[1])[-1]
         for entityid, value in calculated_value.items():
-            calculated_value[entityid] = value + (ent_delays[entityid]/most_delaying[1])
+            rel_remain = ent_delays[entityid]/most_delaying[1] if most_delaying[1] > 0 else 0
+            calculated_value[entityid] = value + rel_remain
 
         if(internal):
             mandatory = []

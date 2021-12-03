@@ -225,8 +225,10 @@ class InMemoryCache(CacheAgent):
             'c_lifetime': (now - self.__entityhash.freq_table[entityid][1]).total_seconds()
         })
 
-        del self.__entityhash[entityid]
-        del self.__entityhash.freq_table[entityid]
+        if(entityid in self.__entityhash):
+            del self.__entityhash[entityid]
+        if(entityid in self.__entityhash.freq_table):
+            del self.__entityhash.freq_table[entityid]
 
         # Publish this evition to stats in Adaptive
         post_event_with_params("subscribed_evictions", (entityid, None))
