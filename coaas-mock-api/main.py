@@ -145,6 +145,11 @@ class Statistics(Resource):
                 return 404
             data = selected_algo.get_currently_cached_entities()
             return data, 200   
+        if(name == 'hit-rates'):
+            if(strategy == 'reactive'):
+                return 404
+            data = selected_algo.get_hit_rate_variation().getlist()
+            return data, 200 
         elif(name == 'returns'):
             is_curr = str(request.args.get('current')).lower()
             if(is_curr == 'true'):

@@ -1359,6 +1359,9 @@ class Adaptive(Strategy):
     def get_currently_cached_entities(self):
         return list(self.cache_memory.get_statistics_all().keys())
 
+    def get_hit_rate_variation(self):
+        return self.cache_memory.get_hitrate_trend()
+
 class LearningThread (threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)

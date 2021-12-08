@@ -9,7 +9,6 @@ from lib.fifoqueue import FIFOQueue_2
 from lib.event import post_event_with_params
 from agents.exploreagent import RandomAgent, MRUAgent, MFUAgent
 
-
 import numpy as np
 import keras.backend as kb
 from tensorflow import keras
@@ -19,6 +18,8 @@ from keras.layers import Input, Dense
 from tensorflow.python.framework.ops import disable_eager_execution
 
 from agents.classifier.linkedcluster import LinkedCluster
+
+MAX_WORKERS = 50
 
 LAYER_1_NEURONS = 512
 LAYER_2_NEURONS = 256
@@ -94,11 +95,11 @@ class ACAgent(threading.Thread, Agent):
     def run(self):
         # Setting up Actor and Critic Networks
         self.actor, self.policy, self.critic = self.__build_actor_critic()
-
         while True:
             try:
                 function, args, kwargs = self.q.get(timeout=self.timeout)
-                function(*args, **kwargs)
+                _ = function(*args, **kwargs)
+
             except queue.Empty:
                 self.__idle()
 
@@ -180,6 +181,9 @@ class ACAgent(threading.Thread, Agent):
         if(probabilities[0] > probabilities[1]):
             action = 0
 
+        print(str(action)+' for entity:'+str(entityid)+' and att:'+str(attribute))
+        print()
+
         if(action == 0):
             # Item is defenitly not to be cached
             delay_time = self.__calculate_delay(probabilities[action])
@@ -201,6 +205,8 @@ class ACAgent(threading.Thread, Agent):
             # Decided to be cached
             cached_lifetime = self.__calculate_expected_cached_lifetime(entityid, attribute, probabilities[action])
             post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features'], ref_key))
+
+        return 0
 
     def __calculate_expected_cached_lifetime(self, entityid, attr, prob):
         cached_lt_res = self.__caller.get_access_to_db().read_all_with_limit('attribute-cached-lifetime',{
@@ -242,10 +248,14 @@ class ACAgent(threading.Thread, Agent):
         self.critic.fit(state, target_value, verbose=0)
 
         # Saving the model again as an update
+        # print('This issue start to happen when learn is called?')
         self.actor.save(ACTOR_MODEL_PATH)
         self.critic.save(CRITIC_MODEL_PATH)
 
+        # print('After Saving!')
+
         self.__learn_step_counter+=1
+        # print('Leaning Step Counter: '+str(self.__learn_step_counter))
 
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:
@@ -270,7 +280,7 @@ class ACAgent(threading.Thread, Agent):
                 self.__epsilons = self.epsilons_min
             elif(self.__epsilons > self.__epsilons_max):
                 self.__epsilons = self.__epsilons_max
-
+        
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
     
     # Get the value of the epsilon value now

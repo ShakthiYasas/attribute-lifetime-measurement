@@ -1,7 +1,7 @@
-import statistics
 import time
 import _thread
 import threading
+import statistics
 from datetime import datetime, timedelta
 
 from lib.fifoqueue import FIFOQueue_2
@@ -42,6 +42,7 @@ class InMemoryCache(CacheAgent):
 
     def run(self):
         while True:
+            time.sleep(self.window/1000)
             # Hit rate is calculated in each window
             self.calculate_hitrate()
 
@@ -60,10 +61,9 @@ class InMemoryCache(CacheAgent):
                 else:
                     self.__evict(items_to_evict)
 
-            _thread.start_new_thread(self.__reset_provider_recency, ())
-
-            time.sleep(self.window/1000)
+            # self.__reset_provider_recency()          
     
+    # Resets the recency flag of providers after each window
     def __reset_provider_recency(self):
         threads = []
         copy_of_hashtable = self.__entityhash.copy()
@@ -99,8 +99,15 @@ class InMemoryCache(CacheAgent):
     def calculate_hitrate(self):
         local = self.__localstats.copy()
         self.__localstats.clear()
-        self.__hitrate_trend.push((sum(local)/len(local) if local else 0,len(local)))
-    
+        current_hitrate = sum(local)/len(local) if local else 0
+        self.__hitrate_trend.push(current_hitrate,len(local))
+
+        _thread.start_new_thread(self.__db.insert_one, ('hit-rate-variation',{
+            'session': self.caller_strategy.session,
+            'hitrate': current_hitrate,
+            'requests': len(local)
+        }))
+
     def getdb(self):
         return self.__db
     
