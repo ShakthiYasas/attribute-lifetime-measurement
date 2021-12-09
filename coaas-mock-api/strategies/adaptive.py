@@ -380,7 +380,7 @@ class Adaptive(Strategy):
             if(self.__isstatic):
                 lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)          
 
-            if(entityid in self.cache_memory.get_statistics_all()):
+            if(entityid in self.cache_memory.run('get_statistics_all')):
                 reference = None
                 # Entity is cached
                 # Atleast one of the attributes of the entity is already cached 
@@ -389,13 +389,14 @@ class Adaptive(Strategy):
 
                 output[entityid] = {}
                 # Refetch from the producer if atleast 1 of it's attributes are not available or not fresh
-                is_all_cached, uncached = self.cache_memory.are_all_atts_cached(entityid, ent['attributes'])
+                is_all_cached, uncached = self.cache_memory.run('are_all_atts_cached', (entityid, ent['attributes']))
+                
                 if(is_all_cached):
                     self.__learning_counter -= 1
                     # All of the attributes requested are in cache for the entity
                     for att_name in ent['attributes']:
                         # Get all values from the context producers for the attribute in cache
-                        att_in_cache = self.cache_memory.get_value_by_key(entityid, att_name)
+                        att_in_cache = self.cache_memory.run('get_value_by_key', (entityid, att_name))
                         ishit = 1
                         if(not self.__isstatic):
                             for prodid,val,lastret, rec_bit in att_in_cache:
@@ -453,7 +454,7 @@ class Adaptive(Strategy):
                         
                         for att_name in att_in_cache:
                             ishit = 1
-                            pro_att = self.cache_memory.get_value_by_key(entityid, att_name)
+                            pro_att = self.cache_memory.run('get_value_by_key', (entityid, att_name))
                             for prodid,val,lastret,rec_bit in pro_att:
                                 if(prodid in lifetimes):
                                     lt = lifetimes[prodid]['lifetimes'][att_name]
@@ -504,7 +505,7 @@ class Adaptive(Strategy):
                 for t in threads:
                     t.join()
 
-                val = self.cache_memory.get_values_for_entity(entityid, ent['attributes'])
+                val = self.cache_memory.run('get_values_for_entity', (entityid, ent['attributes']))
                 
                 for att_name,prod_values in val.items():
                     if(prod_values != None):
@@ -587,7 +588,7 @@ class Adaptive(Strategy):
                         action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)                
                         if(action != (0,0)):
                             wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                            self.cache_memory.addcachedlifetime(action, wait_time)
+                            self.cache_memory.run('addcachedlifetime', (action, wait_time))
                             self.__last_actions.append(action)
                             actions.append(action[1])
                         else:
@@ -598,13 +599,13 @@ class Adaptive(Strategy):
                         
                         if(action != (0,0) and action[0] == entityid):
                                 wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                                self.cache_memory.addcachedlifetime(action, wait_time)
+                                self.cache_memory.run('addcachedlifetime', (action, wait_time))
                                 self.__last_actions.append(action)
                                 actions.append(action[1])
                         else:
                             if(action != (0,0)):
                                 wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                                self.cache_memory.addcachedlifetime(action, wait_time)
+                                self.cache_memory.run('addcachedlifetime', (action, wait_time))
                                 self.__last_actions.append(action)
                                 self.__cache_entity_attribute_pairs([action])
                             else:
@@ -646,7 +647,7 @@ class Adaptive(Strategy):
                             if(action != (0,0) and action[0] == entityid):
                                 updated_attr_dict.append(action[1])
                                 wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                                self.cache_memory.addcachedlifetime(action, wait_time)
+                                self.cache_memory.run('addcachedlifetime', (action, wait_time))
                                 is_caching = True
                             else:
                                 if(action != (0,0)):
@@ -668,7 +669,7 @@ class Adaptive(Strategy):
             for att in updated_attr_dict:
                 updated_dict[att] = attributes[att]
             # print('From Evlauting for cache!')
-            self.cache_memory.save(entityid,updated_dict)
+            self.cache_memory.run('save', (entityid,updated_dict))
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:updated_attr_dict})  
@@ -685,7 +686,7 @@ class Adaptive(Strategy):
             for entity, att, cachelife in random_one:
                 
                 wait_time = now + datetime.timedelta(seconds=cachelife)
-                self.cache_memory.addcachedlifetime(action, wait_time)
+                self.cache_memory.run('addcachedlifetime', (action, wait_time))
                 self.__last_actions.append((entity, att))
             self.__cache_entity_attribute_pairs(random_one, is_random=True)
     
@@ -770,7 +771,7 @@ class Adaptive(Strategy):
                     # The item is to be cached
                     # Could be a random one or an item evulated to be cached
                     wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
-                    self.cache_memory.addcachedlifetime((entity, attribute), wait_time)
+                    self.cache_memory.run('addcachedlifetime', ((entity, attribute), wait_time))
                     self.__last_actions.append((entity, attribute))
                     ent_att_pairs.append((entity, attribute))
                 else:
@@ -846,7 +847,7 @@ class Adaptive(Strategy):
             li = [(prodid,value['url']) for prodid, value in lifetimes.items()]
             response = self.service_selector.get_response_for_entity(attlist,li)
             # print('From Caching entity attribute pair')
-            self.cache_memory.save(entityid, response)
+            self.cache_memory.run('save', (entityid, response))
             
             for att in attlist:
                 if(entityid in self.__cached):
@@ -894,7 +895,7 @@ class Adaptive(Strategy):
     # Translating an observation to a state
     def __translate_to_state(self, entityid, att):
         isobserved = self.__isobserved(entityid, att)
-        iscached = self.cache_memory.get_statistics(entityid, att)
+        iscached = self.cache_memory.run('get_statistics',(entityid, att))
         # Access Rates [0-5]
         fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
         # Hit Rates and Expectations [6-11]
@@ -1055,7 +1056,7 @@ class Adaptive(Strategy):
                         list(map(lambda k: (k[0],k[1]['url']), metadata.items())))
             # Save items in cache
             #print('From refreshing entity')
-            self.cache_memory.save(entityid,response)
+            self.cache_memory.run('save', (entityid,response))
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:response})
@@ -1067,7 +1068,7 @@ class Adaptive(Strategy):
             response = self.service_selector.get_response_for_entity(attribute_list,[(prodid,url)])
             # Save items in cache
             # print('From Refreshing context provider')
-            self.cache_memory.save(entityid,response)
+            self.cache_memory.run('save', (entityid,response))
             # Push to profiler
             if(not self.__isstatic):
                 self.__profiler.reactive_push({entityid:response})
@@ -1162,7 +1163,7 @@ class Adaptive(Strategy):
 
      # Get attributes not cached for the entity
     def __get_attributes_not_cached(self, entityid, attributes):
-        return list(set(attributes) - set(self.cache_memory.get_attributes_of_entity(entityid)))
+        return list(set(attributes) - set(self.cache_memory.run('get_attributes_of_entity', (entityid,))))
 
     # Calculate the rewards actions taken in the previous window
     def __calculate_reward(self, entityid, att, previous_state, diff):   
@@ -1313,7 +1314,7 @@ class Adaptive(Strategy):
 
     # Get a snap shot of the cache memory statistics
     def get_cache_statistics(self, entityid):
-        res = self.cache_memory.get_statistics_entity(entityid)
+        res = self.cache_memory.run('get_statistics_entity', (entityid,))
         output = {
                 'cached_attributes': [i for i in res.keys()] if res else {},
                 'epsilon' : self.selective_cache_agent.get_current_epsilon(),
@@ -1338,7 +1339,7 @@ class Adaptive(Strategy):
                     output[stat['window']] = stat['return']
         else:
             if(self.__window_counter >= self.trend_ranges[1]):
-                hit_rate = self.cache_memory.get_last_hitrate(10)
+                hit_rate = self.cache_memory.run('get_last_hitrate', (10,))
 
             slas = self.__sla_trend.getlist()
             request_rates = self.__request_rate_trend.get_last_range(10)
@@ -1358,7 +1359,7 @@ class Adaptive(Strategy):
     def get_current_cost(self):
         hit_rate = 0
         if(self.__window_counter >= self.trend_ranges[1]):
-            hr = self.cache_memory.get_last_hitrate(1)
+            hr = self.cache_memory.run('get_last_hitrate',(1,))
             hit_rate = hr[0] if isinstance(hr,Tuple) else hr
         
         sla = self.__sla_trend.get_last()
@@ -1371,10 +1372,10 @@ class Adaptive(Strategy):
         return self.__db
 
     def get_currently_cached_entities(self):
-        return list(self.cache_memory.get_statistics_all().keys())
+        return list(self.cache_memory.run('get_statistics_all').keys())
 
     def get_hit_rate_variation(self):
-        return self.cache_memory.get_hitrate_trend()
+        return self.cache_memory.run('get_hitrate_trend')
 
 class LearningThread (threading.Thread):
     def __init__(self):

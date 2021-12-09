@@ -1,4 +1,6 @@
 import sys, os
+
+from lib.cacheclient import GRPCClient
 sys.path.append(os.path.abspath(os.path.join('..')))
 
 
@@ -19,7 +21,6 @@ from lib.sqlliteclient import SQLLiteClient
 
 from cache.cachefactory import CacheFactory
 from strategies.strategyfactory import StrategyFactory
-from configurations.cacheconfig import CacheConfiguration
 
 from agents.agentfactory import AgentFactory
 
@@ -74,8 +75,7 @@ class PlatformMock(Resource):
     isCaching = default_config['IsCaching'] 
     if(strategy != 'reactive' or isCaching != 'True'):
         #Initializing cache memory
-        cache_fac = CacheFactory(CacheConfiguration(default_config), __service_registry)
-        setattr(selected_algo, 'cache_memory', cache_fac.get_cache_memory(db))
+        setattr(selected_algo, 'cache_memory', GRPCClient())
 
         # Initialize the Selective Caching Agent
         agent_fac = AgentFactory(default_config['RLAgent'], config, selected_algo)

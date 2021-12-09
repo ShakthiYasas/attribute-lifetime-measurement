@@ -88,11 +88,11 @@ message ListOfCachedItems {
 }
 
 message CachedRecords {
-    map<string, ListOfCachedItems> attributes = 1;
+    map<string, google.protobuf.Value> attributes = 1;
 }
 
 message Statistic {
-    google.protobuf.Value datelist = 1;
+    repeated google.protobuf.Timestamp datelist = 1;
     google.protobuf.Timestamp cachedTime = 2;
 }
 
