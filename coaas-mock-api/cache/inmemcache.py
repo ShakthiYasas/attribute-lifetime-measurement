@@ -100,7 +100,7 @@ class InMemoryCache(CacheAgent):
         local = self.__localstats.copy()
         self.__localstats.clear()
         current_hitrate = sum(local)/len(local) if local else 0
-        self.__hitrate_trend.push(current_hitrate,len(local))
+        self.__hitrate_trend.push((current_hitrate,len(local)))
 
         _thread.start_new_thread(self.__db.insert_one, ('hit-rate-variation',{
             'session': self.caller_strategy.session,

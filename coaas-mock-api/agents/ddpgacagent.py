@@ -245,11 +245,14 @@ class DDPGACAgent(threading.Thread, Agent):
                     rho = np.mean(np.array(self.reward_history.getlist()))
                     if rho >= self.__reward_threshold:
                         self.__epsilons -= self.__epsilons_decrement
+                        self.modify_dicount_rate(False) 
                     else:
-                        self.__epsilons += self.__epsilons_increment              
+                        self.__epsilons += self.__epsilons_increment
+                        self.modify_dicount_rate()            
                 # Traditional e-greedy
                 else:
                     self.__epsilons -= self.__epsilons_decrement
+                    self.modify_dicount_rate(False) 
 
             # Enforce upper bound and lower bound
             if(self.__epsilons < self.epsilons_min):
@@ -259,6 +262,13 @@ class DDPGACAgent(threading.Thread, Agent):
 
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
     
+    # Modify Discount Rate
+    def modify_dicount_rate(self, increment=True):
+        if(increment):
+            self.__gamma = self.__epsilons_max if self.__gamma + self.__epsilons_increment > self.__epsilons_max else self.__gamma + self.__epsilons_increment
+        else:
+            self.__gamma = self.epsilons_min if self.__gamma - self.__epsilons_decrement < self.epsilons_min else self.__gamma - self.__epsilons_increment
+
     # Generic method to save the current state of the learnt models
     def save_models(self):
         self.__actor.save_checkpoint()

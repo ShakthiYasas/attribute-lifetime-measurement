@@ -99,12 +99,13 @@ class ACAgent(threading.Thread, Agent):
             try:
                 function, args, kwargs = self.q.get(timeout=self.timeout)
                 _ = function(*args, **kwargs)
+                # time.sleep(0.25) 
 
             except queue.Empty:
                 self.__idle()
 
     def __idle(self):
-        time.sleep(0.5) 
+        time.sleep(2.5) 
 
     # Approximates the policy and value using the Neural Network
     # Actor: state is input and probability of each action is output of model
@@ -181,8 +182,8 @@ class ACAgent(threading.Thread, Agent):
         if(probabilities[0] > probabilities[1]):
             action = 0
 
-        print(str(action)+' for entity:'+str(entityid)+' and att:'+str(attribute))
-        print()
+        # print(str(action)+' for entity:'+str(entityid)+' and att:'+str(attribute))
+        # print()
 
         if(action == 0):
             # Item is defenitly not to be cached
@@ -269,11 +270,14 @@ class ACAgent(threading.Thread, Agent):
                     rho = np.mean(np.array(self.reward_history.getlist()))
                     if rho >= self.__reward_threshold:
                         self.__epsilons -= self.__epsilons_decrement
+                        self.modify_dicount_rate(False) 
                     else:
-                        self.__epsilons += self.__epsilons_increment              
+                        self.__epsilons += self.__epsilons_increment  
+                        self.modify_dicount_rate()             
                 # Traditional e-greedy
                 else:
                     self.__epsilons -= self.__epsilons_decrement
+                    self.modify_dicount_rate(False) 
 
             # Enforce upper bound and lower bound
             if(self.__epsilons < self.epsilons_min):
@@ -283,6 +287,13 @@ class ACAgent(threading.Thread, Agent):
         
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
     
+    # Modify Discount Rate
+    def modify_dicount_rate(self, increment=True):
+        if(increment):
+            self.__gamma = self.__epsilons_max if self.__gamma + self.__epsilons_increment > self.__epsilons_max else self.__gamma + self.__epsilons_increment
+        else:
+            self.__gamma = self.epsilons_min if self.__gamma - self.__epsilons_decrement < self.epsilons_min else self.__gamma - self.__epsilons_increment
+
     # Get the value of the epsilon value now
     def get_current_epsilon(self):
         return self.__epsilons

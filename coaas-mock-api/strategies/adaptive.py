@@ -572,6 +572,7 @@ class Adaptive(Strategy):
         now = datetime.datetime.now()
         for att in attributes:
             if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
+                # print('There is a spike or no delay restriction!')
                 # Translate the entity,attribute pair to a state
                 observation = self.__translate_to_state(entityid,att)
                 if(observation==None):
@@ -629,6 +630,7 @@ class Adaptive(Strategy):
             # Entity hasn't been evaluted in this window before
             for att in attributes.keys():
                 checker = self.__check_delay(entityid, att) or self.__is_spike(entityid, att)
+                # print('There is a spike or no delay restriction!')
                 if(checker):
                     observation = self.__translate_to_state(entityid,att)
                     if(observation == None):
@@ -696,23 +698,35 @@ class Adaptive(Strategy):
                 del self.__delay_dict[entity][attr]
                 if(not self.__delay_dict[entity]):
                     del self.__delay_dict[entity]
+                # print('Entity has elapsed delay time!')
                 return True
         else: 
+            # print('Entity is not delayed!')
             return True
     
     # Check if the context attribute is observed to show a spike in demand
     def __is_spike(self,entity,attr):
+        # print('Entity: '+ str(entity) + ' attribute: '+ str(attr))
+        # print('Is observed: '+ str(self.__isobserved(entity, attr)))
+        # print('Entity in Access trend: '+ str(entity in self.__attribute_access_trend))
+        # if(entity in self.__attribute_access_trend):
+        #     print('Attribute in Access Trend: '+ str(attr in self.__attribute_access_trend[entity]))
+
         if(self.__isobserved(entity, attr) and entity in self.__attribute_access_trend
                 and attr in self.__attribute_access_trend[entity]):
             att_trend = self.__attribute_access_trend[entity][attr].get_last_range(2)
+            # print(att_trend)
             if(len(att_trend)<2):
                 return False
             if(att_trend[1] > 0):
                 growth = (att_trend[1] - att_trend[0])/att_trend[1]
+                # print('Growth: '+ str(growth))
                 if(growth >= 10):
                     return True
             return False
-        else: return False  
+        else: 
+            # print('Entity: '+ str(entity) + ' attribute: '+ str(attr) + ' is not in the observed list and/or the access trend!')
+            return False  
 
     def sub_decisioned_item(self, parameters):
         entity = parameters[0]
