@@ -1338,7 +1338,7 @@ class Adaptive(Strategy):
                     output[stat['window']] = stat['return']
         else:
             if(self.__window_counter >= self.trend_ranges[1]):
-                hit_rate = self.cache_memory.get_hitrate_trend().get_last_range(10)
+                hit_rate = self.cache_memory.get_last_hitrate(10)
 
             slas = self.__sla_trend.getlist()
             request_rates = self.__request_rate_trend.get_last_range(10)
@@ -1358,7 +1358,7 @@ class Adaptive(Strategy):
     def get_current_cost(self):
         hit_rate = 0
         if(self.__window_counter >= self.trend_ranges[1]):
-            hr = self.cache_memory.get_hitrate_trend().get_last()
+            hr = self.cache_memory.get_last_hitrate(1)
             hit_rate = hr[0] if isinstance(hr,Tuple) else hr
         
         sla = self.__sla_trend.get_last()

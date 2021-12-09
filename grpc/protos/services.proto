@@ -1,0 +1,106 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Cache Memory Service
+service CacheService {
+    rpc save(CacheItem) returns (Empty) {}
+    rpc addcachedlifetime(CachedLife) returns (Empty) {}
+    rpc get_hitrate_trend(Empty) returns (ListOfFloat) {}
+    rpc updatecachedlifetime(CachedLife) returns (Empty) {}
+    rpc is_cached(EntityAttributePair) returns (BoolType) {} 
+    rpc get_statistics_all(Empty) returns (FrequencyTable) {} 
+    rpc get_last_hitrate(CacheResponse) returns (ListOfFloat) {}
+    rpc get_statistics(EntityAttributePair) returns (Statistic) {}
+    rpc removeentitycachedlifetime(CacheResponse) returns (Empty) {}
+    rpc removecachedlifetime(EntityAttributePair) returns (Empty) {}
+    rpc get_statistics_entity(CacheResponse) returns (FrequencyTable) {} 
+    rpc get_attributes_of_entity(CacheResponse) returns (ListOfString) {} 
+    rpc get_value_by_key(EntityAttributePair) returns (ListOfCachedItems) {}  
+    rpc get_values_for_entity(EntityAttributeList) returns (CachedRecords) {} 
+    rpc are_all_atts_cached(EntityAttributeList) returns (CachedAttributes) {}    
+}
+
+message CacheItem {
+    int32 entityid = 1;
+    map<string, ListOfTriplets> cacheitems = 2;
+}
+
+message BoolType {
+    bool status = 1;
+}
+
+message CacheResponse {
+    int32 count = 1;
+}
+
+message EntityAttributeList {
+    int32 entityId = 1;
+    ListOfString attributes = 2;
+} 
+
+message ListOfTriplets {
+    repeated Triplet tuple = 1;
+}
+
+message ListOfString {
+    repeated string string = 1;
+}
+
+message ListOfFloat {
+    repeated float realNumber = 1;
+}
+
+message ListOfValues {
+    repeated google.protobuf.Value values = 1;
+}
+
+message Triplet{
+    int32 prodid = 1;
+    google.protobuf.Value cachableitem = 2;
+    google.protobuf.Timestamp cachedtime = 3;
+}
+
+message CachedLife{
+    EntityAttributePair action = 1;
+    google.protobuf.Timestamp cacheLife = 2;
+}
+
+message EntityAttributePair{
+    int32 entityId = 1;
+    string attribute = 2;
+}
+
+message CachedAttributes{
+    bool isCached = 1;
+    ListOfString attributeList = 2;
+}
+
+message CachedItem {
+    int32 prodid = 1;
+    google.protobuf.Value response = 2;
+    google.protobuf.Timestamp cachedTime = 3;
+    bool recencybit = 4;
+}
+
+message ListOfCachedItems {
+    repeated CachedItem values = 1;
+}
+
+message CachedRecords {
+    map<string, ListOfCachedItems> attributes = 1;
+}
+
+message Statistic {
+    google.protobuf.Value datelist = 1;
+    google.protobuf.Timestamp cachedTime = 2;
+}
+
+message FrequencyTable {
+    map<string, Statistic> attributes = 1;
+}
+
+message Empty { }
+
+// Compiling 
+// python -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/services.proto

@@ -44,7 +44,7 @@ class InMemoryCache(CacheAgent):
         while True:
             time.sleep(self.window/1000)
             # Hit rate is calculated in each window
-            self.calculate_hitrate()
+            self.__calculate_hitrate()
 
             # Items are evicted every each window
             if(self.__evictor and self.__entityhash.is_full()):
@@ -96,7 +96,7 @@ class InMemoryCache(CacheAgent):
             self.__entityhash[entityid][attr] = [(cache_item[0], cache_item[1], cache_item[2], False) for cache_item in self.__entityhash[entityid][attr]]
             self.__cache_write_lock.release()
 
-    def calculate_hitrate(self):
+    def __calculate_hitrate(self):
         local = self.__localstats.copy()
         self.__localstats.clear()
         current_hitrate = sum(local)/len(local) if local else 0
@@ -108,6 +108,9 @@ class InMemoryCache(CacheAgent):
             'requests': len(local)
         }))
 
+    ###################################
+    # Used by the eviction algorithms #
+    ###################################
     def getdb(self):
         return self.__db
     
@@ -134,6 +137,9 @@ class InMemoryCache(CacheAgent):
     def get_ret_latency(self):
         return self.__registry.get_ret_latency()
 
+    ##############################################
+    #              Caching Operations            #
+    ##############################################
     # Insert/Update to cache by key
     def save(self, entityid, cacheitems) -> None:
         recency_bit = True
@@ -259,7 +265,7 @@ class InMemoryCache(CacheAgent):
         post_event_with_params("subscribed_evictions", (entityid, attribute))
 
     # Get all attributes cached for an entity
-    def get_attributes_of_entity(self,entityid) -> LimitedSizeDict:
+    def get_attributes_of_entity(self,entityid):
         return list(self.__entityhash[entityid].keys())
 
     # Check if the entity is cached
@@ -326,7 +332,13 @@ class InMemoryCache(CacheAgent):
 
     # Returns the trend of the hit rate with in the moving window
     def get_hitrate_trend(self):
-        return self.__hitrate_trend
+        return self.__hitrate_trend.getlist()
+
+    def get_last_hitrate(self, count):
+        if(count == 1):
+            return self.__hitrate_trend.get_last()
+        else:
+            return self.__hitrate_trend.get_last_range(count)
 
     def get_providers_for_entity(self, entityid):
         return self.__registry.get_providers_for_entity(entityid)
