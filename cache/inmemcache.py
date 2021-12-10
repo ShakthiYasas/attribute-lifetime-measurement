@@ -340,7 +340,7 @@ class InMemoryCache(CacheAgent):
 
     def get_last_hitrate(self, count):
         if(count == 1):
-            return self.__hitrate_trend.get_last()
+            return [self.__hitrate_trend.get_last()]
         else:
             return self.__hitrate_trend.get_last_range(count)
 

@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0eservices.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x91\x01\n\tCacheItem\x12\x10\n\x08\x65ntityid\x18\x01 \x01(\x05\x12.\n\ncacheitems\x18\x02 \x03(\x0b\x32\x1a.CacheItem.CacheitemsEntry\x1a\x42\n\x0f\x43\x61\x63heitemsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1e\n\x05value\x18\x02 \x01(\x0b\x32\x0f.ListOfTriplets:\x02\x38\x01\"\x1a\n\x08\x42oolType\x12\x0e\n\x06status\x18\x01 \x01(\x08\"\x1e\n\rCacheResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x05\"J\n\x13\x45ntityAttributeList\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12!\n\nattributes\x18\x02 \x01(\x0b\x32\r.ListOfString\")\n\x0eListOfTriplets\x12\x17\n\x05tuple\x18\x01 \x03(\x0b\x32\x08.Triplet\"\x1e\n\x0cListOfString\x12\x0e\n\x06string\x18\x01 \x03(\t\"!\n\x0bListOfFloat\x12\x12\n\nrealNumber\x18\x01 \x03(\x02\"6\n\x0cListOfValues\x12&\n\x06values\x18\x01 \x03(\x0b\x32\x16.google.protobuf.Value\"w\n\x07Triplet\x12\x0e\n\x06prodid\x18\x01 \x01(\x05\x12,\n\x0c\x63\x61\x63hableitem\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value\x12.\n\ncachedtime\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"a\n\nCachedLife\x12$\n\x06\x61\x63tion\x18\x01 \x01(\x0b\x32\x14.EntityAttributePair\x12-\n\tcacheLife\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\":\n\x13\x45ntityAttributePair\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12\x11\n\tattribute\x18\x02 \x01(\t\"J\n\x10\x43\x61\x63hedAttributes\x12\x10\n\x08isCached\x18\x01 \x01(\x08\x12$\n\rattributeList\x18\x02 \x01(\x0b\x32\r.ListOfString\"\x8a\x01\n\nCachedItem\x12\x0e\n\x06prodid\x18\x01 \x01(\x05\x12(\n\x08response\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value\x12.\n\ncachedTime\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nrecencybit\x18\x04 \x01(\x08\"0\n\x11ListOfCachedItems\x12\x1b\n\x06values\x18\x01 \x03(\x0b\x32\x0b.CachedItem\"\x8e\x01\n\rCachedRecords\x12\x32\n\nattributes\x18\x01 \x03(\x0b\x32\x1e.CachedRecords.AttributesEntry\x1aI\n\x0f\x41ttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value:\x02\x38\x01\"i\n\tStatistic\x12,\n\x08\x64\x61telist\x18\x01 \x03(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\ncachedTime\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x84\x01\n\x0e\x46requencyTable\x12\x33\n\nattributes\x18\x01 \x03(\x0b\x32\x1f.FrequencyTable.AttributesEntry\x1a=\n\x0f\x41ttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x19\n\x05value\x18\x02 \x01(\x0b\x32\n.Statistic:\x02\x38\x01\"\x07\n\x05\x45mpty2\xab\x06\n\x0c\x43\x61\x63heService\x12\x1c\n\x04save\x12\n.CacheItem\x1a\x06.Empty\"\x00\x12*\n\x11\x61\x64\x64\x63\x61\x63hedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12+\n\x11get_hitrate_trend\x12\x06.Empty\x1a\x0c.ListOfFloat\"\x00\x12-\n\x14updatecachedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12.\n\tis_cached\x12\x14.EntityAttributePair\x1a\t.BoolType\"\x00\x12/\n\x12get_statistics_all\x12\x06.Empty\x1a\x0f.FrequencyTable\"\x00\x12\x32\n\x10get_last_hitrate\x12\x0e.CacheResponse\x1a\x0c.ListOfFloat\"\x00\x12\x34\n\x0eget_statistics\x12\x14.EntityAttributePair\x1a\n.Statistic\"\x00\x12\x36\n\x1aremoveentitycachedlifetime\x12\x0e.CacheResponse\x1a\x06.Empty\"\x00\x12\x36\n\x14removecachedlifetime\x12\x14.EntityAttributePair\x1a\x06.Empty\"\x00\x12:\n\x15get_statistics_entity\x12\x0e.CacheResponse\x1a\x0f.FrequencyTable\"\x00\x12;\n\x18get_attributes_of_entity\x12\x0e.CacheResponse\x1a\r.ListOfString\"\x00\x12>\n\x10get_value_by_key\x12\x14.EntityAttributePair\x1a\x12.ListOfCachedItems\"\x00\x12?\n\x15get_values_for_entity\x12\x14.EntityAttributeList\x1a\x0e.CachedRecords\"\x00\x12@\n\x13\x61re_all_atts_cached\x12\x14.EntityAttributeList\x1a\x11.CachedAttributes\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\x0eservices.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x91\x01\n\tCacheItem\x12\x10\n\x08\x65ntityid\x18\x01 \x01(\x05\x12.\n\ncacheitems\x18\x02 \x03(\x0b\x32\x1a.CacheItem.CacheitemsEntry\x1a\x42\n\x0f\x43\x61\x63heitemsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1e\n\x05value\x18\x02 \x01(\x0b\x32\x0f.ListOfTriplets:\x02\x38\x01\"\x1a\n\x08\x42oolType\x12\x0e\n\x06status\x18\x01 \x01(\x08\"\x1e\n\rCacheResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x05\"J\n\x13\x45ntityAttributeList\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12!\n\nattributes\x18\x02 \x01(\x0b\x32\r.ListOfString\")\n\x0eListOfTriplets\x12\x17\n\x05tuple\x18\x01 \x03(\x0b\x32\x08.Triplet\"\x1e\n\x0cListOfString\x12\x0e\n\x06string\x18\x01 \x03(\t\"!\n\x0bListOfFloat\x12\x12\n\nrealNumber\x18\x01 \x03(\x02\"6\n\x0cListOfValues\x12&\n\x06values\x18\x01 \x03(\x0b\x32\x16.google.protobuf.Value\"w\n\x07Triplet\x12\x0e\n\x06prodid\x18\x01 \x01(\x05\x12,\n\x0c\x63\x61\x63hableitem\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value\x12.\n\ncachedtime\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"a\n\nCachedLife\x12$\n\x06\x61\x63tion\x18\x01 \x01(\x0b\x32\x14.EntityAttributePair\x12-\n\tcacheLife\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\":\n\x13\x45ntityAttributePair\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12\x11\n\tattribute\x18\x02 \x01(\t\"J\n\x10\x43\x61\x63hedAttributes\x12\x10\n\x08isCached\x18\x01 \x01(\x08\x12$\n\rattributeList\x18\x02 \x01(\x0b\x32\r.ListOfString\"\x8a\x01\n\nCachedItem\x12\x0e\n\x06prodid\x18\x01 \x01(\x05\x12(\n\x08response\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value\x12.\n\ncachedTime\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nrecencybit\x18\x04 \x01(\x08\"0\n\x11ListOfCachedItems\x12\x1b\n\x06values\x18\x01 \x03(\x0b\x32\x0b.CachedItem\"\x8e\x01\n\rCachedRecords\x12\x32\n\nattributes\x18\x01 \x03(\x0b\x32\x1e.CachedRecords.AttributesEntry\x1aI\n\x0f\x41ttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value:\x02\x38\x01\"i\n\tStatistic\x12,\n\x08\x64\x61telist\x18\x01 \x03(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\ncachedTime\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x1c\n\nJSONString\x12\x0e\n\x06string\x18\x01 \x01(\t\"-\n\x10HitRateStatistic\x12\x19\n\x07hitrate\x18\x01 \x03(\x0b\x32\x08.HitStat\")\n\x07HitStat\x12\x0f\n\x07hitrate\x18\x01 \x01(\x02\x12\r\n\x05\x63ount\x18\x02 \x01(\x05\"\x07\n\x05\x45mpty2\xa8\x06\n\x0c\x43\x61\x63heService\x12\x1c\n\x04save\x12\n.CacheItem\x1a\x06.Empty\"\x00\x12*\n\x11\x61\x64\x64\x63\x61\x63hedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12+\n\x11get_hitrate_trend\x12\x06.Empty\x1a\x0c.ListOfFloat\"\x00\x12-\n\x14updatecachedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12.\n\tis_cached\x12\x14.EntityAttributePair\x1a\t.BoolType\"\x00\x12+\n\x12get_statistics_all\x12\x06.Empty\x1a\x0b.JSONString\"\x00\x12\x37\n\x10get_last_hitrate\x12\x0e.CacheResponse\x1a\x11.HitRateStatistic\"\x00\x12\x34\n\x0eget_statistics\x12\x14.EntityAttributePair\x1a\n.Statistic\"\x00\x12\x36\n\x1aremoveentitycachedlifetime\x12\x0e.CacheResponse\x1a\x06.Empty\"\x00\x12\x36\n\x14removecachedlifetime\x12\x14.EntityAttributePair\x1a\x06.Empty\"\x00\x12\x36\n\x15get_statistics_entity\x12\x0e.CacheResponse\x1a\x0b.JSONString\"\x00\x12;\n\x18get_attributes_of_entity\x12\x0e.CacheResponse\x1a\r.ListOfString\"\x00\x12>\n\x10get_value_by_key\x12\x14.EntityAttributePair\x1a\x12.ListOfCachedItems\"\x00\x12?\n\x15get_values_for_entity\x12\x14.EntityAttributeList\x1a\x0e.CachedRecords\"\x00\x12@\n\x13\x61re_all_atts_cached\x12\x14.EntityAttributeList\x1a\x11.CachedAttributes\"\x00\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,])
 
@@ -693,25 +693,18 @@ _STATISTIC = _descriptor.Descriptor(
 )
 
 
-_FREQUENCYTABLE_ATTRIBUTESENTRY = _descriptor.Descriptor(
-  name='AttributesEntry',
-  full_name='FrequencyTable.AttributesEntry',
+_JSONSTRING = _descriptor.Descriptor(
+  name='JSONString',
+  full_name='JSONString',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='key', full_name='FrequencyTable.AttributesEntry.key', index=0,
+      name='string', full_name='JSONString.string', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='value', full_name='FrequencyTable.AttributesEntry.value', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -721,26 +714,27 @@ _FREQUENCYTABLE_ATTRIBUTESENTRY = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=b'8\001',
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1402,
-  serialized_end=1463,
+  serialized_start=1330,
+  serialized_end=1358,
 )
 
-_FREQUENCYTABLE = _descriptor.Descriptor(
-  name='FrequencyTable',
-  full_name='FrequencyTable',
+
+_HITRATESTATISTIC = _descriptor.Descriptor(
+  name='HitRateStatistic',
+  full_name='HitRateStatistic',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='attributes', full_name='FrequencyTable.attributes', index=0,
+      name='hitrate', full_name='HitRateStatistic.hitrate', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -749,7 +743,7 @@ _FREQUENCYTABLE = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_FREQUENCYTABLE_ATTRIBUTESENTRY, ],
+  nested_types=[],
   enum_types=[
   ],
   serialized_options=None,
@@ -758,8 +752,47 @@ _FREQUENCYTABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1331,
-  serialized_end=1463,
+  serialized_start=1360,
+  serialized_end=1405,
+)
+
+
+_HITSTAT = _descriptor.Descriptor(
+  name='HitStat',
+  full_name='HitStat',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='hitrate', full_name='HitStat.hitrate', index=0,
+      number=1, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='count', full_name='HitStat.count', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1407,
+  serialized_end=1448,
 )
 
 
@@ -783,8 +816,8 @@ _EMPTY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1465,
-  serialized_end=1472,
+  serialized_start=1450,
+  serialized_end=1457,
 )
 
 _CACHEITEM_CACHEITEMSENTRY.fields_by_name['value'].message_type = _LISTOFTRIPLETS
@@ -806,9 +839,7 @@ _CACHEDRECORDS_ATTRIBUTESENTRY.containing_type = _CACHEDRECORDS
 _CACHEDRECORDS.fields_by_name['attributes'].message_type = _CACHEDRECORDS_ATTRIBUTESENTRY
 _STATISTIC.fields_by_name['datelist'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _STATISTIC.fields_by_name['cachedTime'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
-_FREQUENCYTABLE_ATTRIBUTESENTRY.fields_by_name['value'].message_type = _STATISTIC
-_FREQUENCYTABLE_ATTRIBUTESENTRY.containing_type = _FREQUENCYTABLE
-_FREQUENCYTABLE.fields_by_name['attributes'].message_type = _FREQUENCYTABLE_ATTRIBUTESENTRY
+_HITRATESTATISTIC.fields_by_name['hitrate'].message_type = _HITSTAT
 DESCRIPTOR.message_types_by_name['CacheItem'] = _CACHEITEM
 DESCRIPTOR.message_types_by_name['BoolType'] = _BOOLTYPE
 DESCRIPTOR.message_types_by_name['CacheResponse'] = _CACHERESPONSE
@@ -825,7 +856,9 @@ DESCRIPTOR.message_types_by_name['CachedItem'] = _CACHEDITEM
 DESCRIPTOR.message_types_by_name['ListOfCachedItems'] = _LISTOFCACHEDITEMS
 DESCRIPTOR.message_types_by_name['CachedRecords'] = _CACHEDRECORDS
 DESCRIPTOR.message_types_by_name['Statistic'] = _STATISTIC
-DESCRIPTOR.message_types_by_name['FrequencyTable'] = _FREQUENCYTABLE
+DESCRIPTOR.message_types_by_name['JSONString'] = _JSONSTRING
+DESCRIPTOR.message_types_by_name['HitRateStatistic'] = _HITRATESTATISTIC
+DESCRIPTOR.message_types_by_name['HitStat'] = _HITSTAT
 DESCRIPTOR.message_types_by_name['Empty'] = _EMPTY
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -957,20 +990,26 @@ Statistic = _reflection.GeneratedProtocolMessageType('Statistic', (_message.Mess
   })
 _sym_db.RegisterMessage(Statistic)
 
-FrequencyTable = _reflection.GeneratedProtocolMessageType('FrequencyTable', (_message.Message,), {
-
-  'AttributesEntry' : _reflection.GeneratedProtocolMessageType('AttributesEntry', (_message.Message,), {
-    'DESCRIPTOR' : _FREQUENCYTABLE_ATTRIBUTESENTRY,
-    '__module__' : 'services_pb2'
-    # @@protoc_insertion_point(class_scope:FrequencyTable.AttributesEntry)
-    })
-  ,
-  'DESCRIPTOR' : _FREQUENCYTABLE,
+JSONString = _reflection.GeneratedProtocolMessageType('JSONString', (_message.Message,), {
+  'DESCRIPTOR' : _JSONSTRING,
   '__module__' : 'services_pb2'
-  # @@protoc_insertion_point(class_scope:FrequencyTable)
+  # @@protoc_insertion_point(class_scope:JSONString)
   })
-_sym_db.RegisterMessage(FrequencyTable)
-_sym_db.RegisterMessage(FrequencyTable.AttributesEntry)
+_sym_db.RegisterMessage(JSONString)
+
+HitRateStatistic = _reflection.GeneratedProtocolMessageType('HitRateStatistic', (_message.Message,), {
+  'DESCRIPTOR' : _HITRATESTATISTIC,
+  '__module__' : 'services_pb2'
+  # @@protoc_insertion_point(class_scope:HitRateStatistic)
+  })
+_sym_db.RegisterMessage(HitRateStatistic)
+
+HitStat = _reflection.GeneratedProtocolMessageType('HitStat', (_message.Message,), {
+  'DESCRIPTOR' : _HITSTAT,
+  '__module__' : 'services_pb2'
+  # @@protoc_insertion_point(class_scope:HitStat)
+  })
+_sym_db.RegisterMessage(HitStat)
 
 Empty = _reflection.GeneratedProtocolMessageType('Empty', (_message.Message,), {
   'DESCRIPTOR' : _EMPTY,
@@ -982,7 +1021,6 @@ _sym_db.RegisterMessage(Empty)
 
 _CACHEITEM_CACHEITEMSENTRY._options = None
 _CACHEDRECORDS_ATTRIBUTESENTRY._options = None
-_FREQUENCYTABLE_ATTRIBUTESENTRY._options = None
 
 _CACHESERVICE = _descriptor.ServiceDescriptor(
   name='CacheService',
@@ -991,8 +1029,8 @@ _CACHESERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1475,
-  serialized_end=2286,
+  serialized_start=1460,
+  serialized_end=2268,
   methods=[
   _descriptor.MethodDescriptor(
     name='save',
@@ -1050,7 +1088,7 @@ _CACHESERVICE = _descriptor.ServiceDescriptor(
     index=5,
     containing_service=None,
     input_type=_EMPTY,
-    output_type=_FREQUENCYTABLE,
+    output_type=_JSONSTRING,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),
@@ -1060,7 +1098,7 @@ _CACHESERVICE = _descriptor.ServiceDescriptor(
     index=6,
     containing_service=None,
     input_type=_CACHERESPONSE,
-    output_type=_LISTOFFLOAT,
+    output_type=_HITRATESTATISTIC,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),
@@ -1100,7 +1138,7 @@ _CACHESERVICE = _descriptor.ServiceDescriptor(
     index=10,
     containing_service=None,
     input_type=_CACHERESPONSE,
-    output_type=_FREQUENCYTABLE,
+    output_type=_JSONSTRING,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

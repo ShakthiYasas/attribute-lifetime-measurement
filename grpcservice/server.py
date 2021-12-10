@@ -2,6 +2,8 @@ import sys, os
 sys.path.append(os.path.abspath(os.path.join('..')))
 
 import time
+import json
+import traceback
 import configparser
 from pathlib import Path
 from concurrent import futures
@@ -30,40 +32,52 @@ class Listener(pb2_grpc.CacheServiceServicer):
         __cache_fac = CacheFactory(CacheConfiguration(default_config), service_registry)
         self.__cache_memory = __cache_fac.get_cache_memory(db)
 
+    def get_statistics_all(self, request, context): 
+        try:
+            result = self.__cache_memory.get_statistics_all()
+            return pb2.JSONString(string = json.dumps(result))
+        except Exception:
+            print('An error occured : ' + traceback.format_exc())
+    
+    # Fine
     def save(self, request, context):
         self.__cache_memory.save(request.entityid, request.cacheitems)
 
     def addcachedlifetime(self, request, context):
         self.__cache_memory.addcachedlifetime(request.action, request.cacheLife)
 
-    def get_hitrate_trend(self, request, context): 
-        return self.__cache_memory.get_hitrate_trend()
-
     def updatecachedlifetime(self, request, context):
         self.__cache_memory.updatecachedlifetime(request.action, request.cacheLife)
 
-    def is_cached(self, request, context):
-        response = self.__cache_memory.is_cached(request.entityId, request.attribute) 
-        return pb2.BoolType(status = True if response else False)
-
-    def get_statistics_all(self, request, context): 
-        return pb2.FrequencyTable(attributes = self.__cache_memory.get_statistics_all())
-
-    def get_last_hitrate(self, request, context):
-        return self.__cache_memory.get_last_hitrate(request.count)
-
-    def get_statistics(self, request, context): 
-        response = self.__cache_memory.get_statistics(request.entityId, request.attribute)
-        return pb2.Statistic(datelist = response[0], cachedTime = response[1])
-    
     def removeentitycachedlifetime(self, request, context): 
         self.__cache_memory.removeentitycachedlifetime(request.count)
 
     def removecachedlifetime(self, request, context): 
         self.__cache_memory.removecachedlifetime(request.entityId, request.attribute)
-
+    
+    def get_statistics(self, request, context): 
+        response = self.__cache_memory.get_statistics(request.entityId, request.attribute)
+        return pb2.Statistic(datelist = response[0], cachedTime = response[1])
+    
     def get_statistics_entity(self, request, context): 
-        return pb2.FrequencyTable(attributes = self.__cache_memory.get_statistics_entity(request.count))
+        result = self.__cache_memory.get_statistics_entity(request.count)
+        return pb2.JSONString(string = json.dumps(result))
+
+    # Should be fine
+    def is_cached(self, request, context):
+        response = self.__cache_memory.is_cached(request.entityId, request.attribute) 
+        return pb2.BoolType(status = True if response else False)
+
+    # Not sure
+    def get_hitrate_trend(self, request, context): 
+        return self.__cache_memory.get_hitrate_trend()
+
+    def get_last_hitrate(self, request, context):
+        res = self.__cache_memory.get_last_hitrate(request.count)
+        res_list = []
+        for hr, cnt in res:
+            res_list.append(pb2.HitStat(hitrate = hr, count = cnt))
+        return pb2.HitRateStatistic(hitrate = res_list)
 
     def get_attributes_of_entity(self, request, context): 
         return self.__cache_memory.get_attributes_of_entity(request.count)

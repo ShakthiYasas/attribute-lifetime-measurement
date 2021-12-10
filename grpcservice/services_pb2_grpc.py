@@ -4,6 +4,7 @@ import grpc
 
 import grpcservice.services_pb2 as services__pb2
 
+
 class CacheServiceStub(object):
     """Cache Memory Service
     """
@@ -42,12 +43,12 @@ class CacheServiceStub(object):
         self.get_statistics_all = channel.unary_unary(
                 '/CacheService/get_statistics_all',
                 request_serializer=services__pb2.Empty.SerializeToString,
-                response_deserializer=services__pb2.FrequencyTable.FromString,
+                response_deserializer=services__pb2.JSONString.FromString,
                 )
         self.get_last_hitrate = channel.unary_unary(
                 '/CacheService/get_last_hitrate',
                 request_serializer=services__pb2.CacheResponse.SerializeToString,
-                response_deserializer=services__pb2.ListOfFloat.FromString,
+                response_deserializer=services__pb2.HitRateStatistic.FromString,
                 )
         self.get_statistics = channel.unary_unary(
                 '/CacheService/get_statistics',
@@ -67,7 +68,7 @@ class CacheServiceStub(object):
         self.get_statistics_entity = channel.unary_unary(
                 '/CacheService/get_statistics_entity',
                 request_serializer=services__pb2.CacheResponse.SerializeToString,
-                response_deserializer=services__pb2.FrequencyTable.FromString,
+                response_deserializer=services__pb2.JSONString.FromString,
                 )
         self.get_attributes_of_entity = channel.unary_unary(
                 '/CacheService/get_attributes_of_entity',
@@ -216,12 +217,12 @@ def add_CacheServiceServicer_to_server(servicer, server):
             'get_statistics_all': grpc.unary_unary_rpc_method_handler(
                     servicer.get_statistics_all,
                     request_deserializer=services__pb2.Empty.FromString,
-                    response_serializer=services__pb2.FrequencyTable.SerializeToString,
+                    response_serializer=services__pb2.JSONString.SerializeToString,
             ),
             'get_last_hitrate': grpc.unary_unary_rpc_method_handler(
                     servicer.get_last_hitrate,
                     request_deserializer=services__pb2.CacheResponse.FromString,
-                    response_serializer=services__pb2.ListOfFloat.SerializeToString,
+                    response_serializer=services__pb2.HitRateStatistic.SerializeToString,
             ),
             'get_statistics': grpc.unary_unary_rpc_method_handler(
                     servicer.get_statistics,
@@ -241,7 +242,7 @@ def add_CacheServiceServicer_to_server(servicer, server):
             'get_statistics_entity': grpc.unary_unary_rpc_method_handler(
                     servicer.get_statistics_entity,
                     request_deserializer=services__pb2.CacheResponse.FromString,
-                    response_serializer=services__pb2.FrequencyTable.SerializeToString,
+                    response_serializer=services__pb2.JSONString.SerializeToString,
             ),
             'get_attributes_of_entity': grpc.unary_unary_rpc_method_handler(
                     servicer.get_attributes_of_entity,
@@ -372,7 +373,7 @@ class CacheService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/CacheService/get_statistics_all',
             services__pb2.Empty.SerializeToString,
-            services__pb2.FrequencyTable.FromString,
+            services__pb2.JSONString.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -389,7 +390,7 @@ class CacheService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/CacheService/get_last_hitrate',
             services__pb2.CacheResponse.SerializeToString,
-            services__pb2.ListOfFloat.FromString,
+            services__pb2.HitRateStatistic.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -457,7 +458,7 @@ class CacheService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/CacheService/get_statistics_entity',
             services__pb2.CacheResponse.SerializeToString,
-            services__pb2.FrequencyTable.FromString,
+            services__pb2.JSONString.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

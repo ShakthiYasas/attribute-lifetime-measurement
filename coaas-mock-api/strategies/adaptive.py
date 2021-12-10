@@ -380,7 +380,8 @@ class Adaptive(Strategy):
             if(self.__isstatic):
                 lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)          
 
-            if(entityid in self.cache_memory.run('get_statistics_all')):
+            cache_result = self.cache_memory.run('get_statistics_all')
+            if(entityid in cache_result):
                 reference = None
                 # Entity is cached
                 # Atleast one of the attributes of the entity is already cached 
@@ -1359,7 +1360,7 @@ class Adaptive(Strategy):
     def get_current_cost(self):
         hit_rate = 0
         if(self.__window_counter >= self.trend_ranges[1]):
-            hr = self.cache_memory.run('get_last_hitrate',(1,))
+            hr = self.cache_memory.run('get_last_hitrate',(1,))[0]
             hit_rate = hr[0] if isinstance(hr,Tuple) else hr
         
         sla = self.__sla_trend.get_last()

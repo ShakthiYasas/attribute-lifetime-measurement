@@ -1,23 +1,25 @@
 import sys, os
+import traceback
 sys.path.append(os.path.abspath(os.path.join('..')))
 
+import json
 import grpc
 import grpcservice.services_pb2 as pb2
 import grpcservice.services_pb2_grpc as pb2_grpc
 
 class GRPCClient:
     caller_strategy = None
-
-    def __int__(self):
+    def __init__(self):
         self.__channel = grpc.insecure_channel("localhost:8040")
 
     def run(self, func, args=None):
-        with pb2_grpc.CacheServiceStub(self.__channel) as stub:
+        stub = pb2_grpc.CacheServiceStub(self.__channel) 
+        try:
             if(func == 'save'):
                 stub.save(pb2.CacheItem(entityid = args[0], cacheitems = args[1]))
             if(func == 'get_statistics_all'):
                 response = stub.get_statistics_all(pb2.Empty())
-                return response.attributes
+                return json.loads(response.string)
             if(func == 'are_all_atts_cached'):
                 response = stub.are_all_atts_cached(pb2.EntityAttributeList(entityId = args[0], attributes = args[1]))
                 return (response.isCached, response.attributeList)
@@ -35,11 +37,14 @@ class GRPCClient:
                 return stub.get_attributes_of_entity(pb2.CacheResponse(count = args[0]))
             if(func == 'get_statistics_entity'):
                 response = stub.get_statistics_entity(pb2.CacheResponse(count = args[0]))
-                return response.attributes
+                return json.loads(response.string)
             if(func == 'get_last_hitrate'):
-                return stub.get_last_hitrate(pb2.CacheResponse(count = args[0]))
+                res = stub.get_last_hitrate(pb2.CacheResponse(count = args[0]))
+                return [(x.hitrate, x.count) for x in res.hitrate]
             if(func == 'get_hitrate_trend'):
                 return stub.get_hitrate_trend(pb2.Empty())
+        except Exception:
+            print('An error occured : ' + traceback.format_exc())
 
     def __close_connection(self):
         self.__channel.unsubscribe(self.__close)
