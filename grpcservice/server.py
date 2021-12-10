@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('..')))
+
 import time
 import configparser
 from pathlib import Path
@@ -19,13 +22,13 @@ config.read('config.ini')
 default_config = config['DEFAULT']
 
 # Connecting to DB instances
-__service_registry = SQLLiteClient(default_config['SQLDBName'])
-__db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
+service_registry = SQLLiteClient(default_config['SQLDBName'])
+db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class Listener(pb2_grpc.CacheServiceServicer):
     def __init__(self): 
-        __cache_fac = CacheFactory(CacheConfiguration(default_config), __service_registry)
-        self.__cache_memory = __cache_fac.get_cache_memory(__db)
+        __cache_fac = CacheFactory(CacheConfiguration(default_config), service_registry)
+        self.__cache_memory = __cache_fac.get_cache_memory(db)
 
     def save(self, request, context):
         self.__cache_memory.save(request.entityid, request.cacheitems)

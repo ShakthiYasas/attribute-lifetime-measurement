@@ -2,8 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import services_pb2 as services__pb2
-
+import grpcservice.services_pb2 as services__pb2
 
 class CacheServiceStub(object):
     """Cache Memory Service

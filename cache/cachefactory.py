@@ -2,7 +2,7 @@ from cache.cacheagent import CacheAgent
 from cache.cloudcache import CloudCache
 from cache.inmemcache import InMemoryCache
 
-from configurations.cacheconfig import CacheConfiguration
+from cache.configurations.cacheconfig import CacheConfiguration
 
 # Instantiate a cache memory instance according to configuration
 class CacheFactory:

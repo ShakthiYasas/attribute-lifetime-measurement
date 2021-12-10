@@ -1,4 +1,4 @@
-from configurations.configuration import Configuration
+from  cache.configurations.configuration import Configuration
 
 # Configuration of the Cache Memory
 class CacheConfiguration(Configuration):

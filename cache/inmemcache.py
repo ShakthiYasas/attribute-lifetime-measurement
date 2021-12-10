@@ -34,6 +34,10 @@ class InMemoryCache(CacheAgent):
 
         # Inialize Eviction Algorithm
         self.__evictor = EvictorFactory(config.eviction_algo, self).getevictor()
+
+        # Set Current Session
+        last_session = self.__db.read_last('sessions')
+        self.__session = last_session['token']
         
         # Initializing background thread to calculate current hit rate.
         thread = threading.Thread(target=self.run, args=())
@@ -103,7 +107,7 @@ class InMemoryCache(CacheAgent):
         self.__hitrate_trend.push((current_hitrate,len(local)))
 
         _thread.start_new_thread(self.__db.insert_one, ('hit-rate-variation',{
-            'session': self.caller_strategy.session,
+            'session': self.__session,
             'hitrate': current_hitrate,
             'requests': len(local)
         }))

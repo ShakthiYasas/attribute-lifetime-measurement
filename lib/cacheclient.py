@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join('..')))
+
 import grpc
 import grpcservice.services_pb2 as pb2
 import grpcservice.services_pb2_grpc as pb2_grpc
@@ -11,7 +14,7 @@ class GRPCClient:
     def run(self, func, args=None):
         with pb2_grpc.CacheServiceStub(self.__channel) as stub:
             if(func == 'save'):
-                stub.save(pb2.CacheItem(entityid = args[0], cacheitems = args[1]))  # Remain
+                stub.save(pb2.CacheItem(entityid = args[0], cacheitems = args[1]))
             if(func == 'get_statistics_all'):
                 response = stub.get_statistics_all(pb2.Empty())
                 return response.attributes

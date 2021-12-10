@@ -11,3 +11,4 @@ coaas-mock-api/agents/saved-models/actor-model/variables/variables.index
 coaas-mock-api/ServiceRegistry.db
 coaas-mock-api/ServiceRegistry.db-journal
 coaas-mock-api/agents/saved-models/*
+ServiceRegistry.db

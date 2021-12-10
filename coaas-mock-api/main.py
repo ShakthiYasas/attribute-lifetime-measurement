@@ -1,6 +1,4 @@
 import sys, os
-
-from lib.cacheclient import GRPCClient
 sys.path.append(os.path.abspath(os.path.join('..')))
 
 
@@ -15,14 +13,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from flask import Flask, request
 from flask_restful import Resource, Api
+
+from lib.cacheclient import GRPCClient
 from lib.mongoclient import MongoClient
 from lib.response import parse_response
 from lib.sqlliteclient import SQLLiteClient
 
-from cache.cachefactory import CacheFactory
+from agents.agentfactory import AgentFactory
 from strategies.strategyfactory import StrategyFactory
 
-from agents.agentfactory import AgentFactory
+
 
 app = Flask(__name__)
 api = Api(app)
