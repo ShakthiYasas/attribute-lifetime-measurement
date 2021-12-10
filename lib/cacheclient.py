@@ -16,7 +16,7 @@ class GRPCClient:
         stub = pb2_grpc.CacheServiceStub(self.__channel) 
         try:
             if(func == 'save'):
-                stub.save(pb2.CacheItem(entityid = args[0], cacheitems = args[1]))
+                stub.save(pb2.CacheItem(entityid = args[0], cacheitems = json.dumps(args[1], default=str)))
             if(func == 'get_statistics_all'):
                 response = stub.get_statistics_all(pb2.Empty())
                 return json.loads(response.string)
@@ -28,12 +28,11 @@ class GRPCClient:
             if(func == 'get_values_for_entity'):
                 response = stub.get_values_for_entity(pb2.EntityAttributeList(entityId = args[0], attributes = args[1]))
                 return response.attributes
-            if(func == 'addcachedlifetime'):
-                entity_att_pair = pb2.EntityAttributePair(entityId = args[0][0], attribute = args[0][1])
-                stub.addcachedlifetime(pb2.CachedLife(action = entity_att_pair, cacheLife = args[1]))
+            if(func == 'addcachedlifetime'):  
+                stub.addcachedlifetime(pb2.CachedLife(entityId = args[0][0], attribute = args[0][1], cacheLife = args[1].strftime("%m/%d/%Y, %H:%M:%S")))
             if(func == 'get_statistics'):
                 response = stub.get_statistics(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
-                if(response.isAvailable):
+                if(response.isAvailable == False):
                     return None
                 return (response.datelist, response.cachedTime)
             if(func == 'get_attributes_of_entity'):

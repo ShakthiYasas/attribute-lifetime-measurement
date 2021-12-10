@@ -23,7 +23,7 @@ service CacheService {
 
 message CacheItem {
     int32 entityid = 1;
-    map<string, ListOfTriplets> cacheitems = 2;
+    string cacheitems = 2;
 }
 
 message BoolType {
@@ -62,8 +62,9 @@ message Triplet{
 }
 
 message CachedLife{
-    EntityAttributePair action = 1;
-    google.protobuf.Timestamp cacheLife = 2;
+    int32 entityId = 1;
+    string attribute = 2;
+    string cacheLife = 3;
 }
 
 message EntityAttributePair{

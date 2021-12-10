@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys, os
 sys.path.append(os.path.abspath(os.path.join('..')))
 
@@ -35,25 +36,30 @@ class Listener(pb2_grpc.CacheServiceServicer):
     def get_statistics_all(self, request, context): 
         try:
             result = self.__cache_memory.get_statistics_all()
-            return pb2.JSONString(string = json.dumps(result))
+            return pb2.JSONString(string = json.dumps(result, default=str))
         except Exception:
             print('An error occured : ' + traceback.format_exc())
     
     # Fine
     def save(self, request, context):
-        self.__cache_memory.save(request.entityid, request.cacheitems)
+        self.__cache_memory.save(request.entityid, json.loads(request.cacheitems))
+        return pb2.Empty()
 
     def addcachedlifetime(self, request, context):
-        self.__cache_memory.addcachedlifetime(request.action, request.cacheLife)
+        self.__cache_memory.addcachedlifetime((request.entityId, request.attribute), request.cacheLife)
+        return pb2.Empty()
 
     def updatecachedlifetime(self, request, context):
         self.__cache_memory.updatecachedlifetime(request.action, request.cacheLife)
+        return pb2.Empty()
 
     def removeentitycachedlifetime(self, request, context): 
         self.__cache_memory.removeentitycachedlifetime(request.count)
+        return pb2.Empty()
 
     def removecachedlifetime(self, request, context): 
         self.__cache_memory.removecachedlifetime(request.entityId, request.attribute)
+        return pb2.Empty()
     
     def get_statistics(self, request, context): 
         try:
@@ -66,7 +72,7 @@ class Listener(pb2_grpc.CacheServiceServicer):
     
     def get_statistics_entity(self, request, context): 
         result = self.__cache_memory.get_statistics_entity(request.count)
-        return pb2.JSONString(string = json.dumps(result))
+        return pb2.JSONString(string = json.dumps(result, default=str))
     
     def get_last_hitrate(self, request, context):
         res = self.__cache_memory.get_last_hitrate(request.count)
