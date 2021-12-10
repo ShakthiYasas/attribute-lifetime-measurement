@@ -56,12 +56,24 @@ class Listener(pb2_grpc.CacheServiceServicer):
         self.__cache_memory.removecachedlifetime(request.entityId, request.attribute)
     
     def get_statistics(self, request, context): 
-        response = self.__cache_memory.get_statistics(request.entityId, request.attribute)
-        return pb2.Statistic(datelist = response[0], cachedTime = response[1])
+        try:
+            response = self.__cache_memory.get_statistics(request.entityId, request.attribute)
+            if(response == None):
+                return pb2.Statistic(datelist = [], cachedTime = None, isAvailable = False)
+            return pb2.Statistic(datelist = response[0], cachedTime = response[1], isAvailable = True)
+        except Exception:
+            print('An error occured : ' + traceback.format_exc())
     
     def get_statistics_entity(self, request, context): 
         result = self.__cache_memory.get_statistics_entity(request.count)
         return pb2.JSONString(string = json.dumps(result))
+    
+    def get_last_hitrate(self, request, context):
+        res = self.__cache_memory.get_last_hitrate(request.count)
+        res_list = []
+        for hr, cnt in res:
+            res_list.append(pb2.HitStat(hitrate = hr, count = cnt))
+        return pb2.HitRateStatistic(hitrate = res_list)
 
     # Should be fine
     def is_cached(self, request, context):
@@ -71,13 +83,6 @@ class Listener(pb2_grpc.CacheServiceServicer):
     # Not sure
     def get_hitrate_trend(self, request, context): 
         return self.__cache_memory.get_hitrate_trend()
-
-    def get_last_hitrate(self, request, context):
-        res = self.__cache_memory.get_last_hitrate(request.count)
-        res_list = []
-        for hr, cnt in res:
-            res_list.append(pb2.HitStat(hitrate = hr, count = cnt))
-        return pb2.HitRateStatistic(hitrate = res_list)
 
     def get_attributes_of_entity(self, request, context): 
         return self.__cache_memory.get_attributes_of_entity(request.count)

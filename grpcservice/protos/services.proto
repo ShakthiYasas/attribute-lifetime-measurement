@@ -94,6 +94,7 @@ message CachedRecords {
 message Statistic {
     repeated google.protobuf.Timestamp datelist = 1;
     google.protobuf.Timestamp cachedTime = 2;
+    bool isAvailable = 3;
 }
 
 message JSONString {

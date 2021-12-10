@@ -32,7 +32,10 @@ class GRPCClient:
                 entity_att_pair = pb2.EntityAttributePair(entityId = args[0][0], attribute = args[0][1])
                 stub.addcachedlifetime(pb2.CachedLife(action = entity_att_pair, cacheLife = args[1]))
             if(func == 'get_statistics'):
-                return stub.get_statistics(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
+                response = stub.get_statistics(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
+                if(response.isAvailable):
+                    return None
+                return (response.datelist, response.cachedTime)
             if(func == 'get_attributes_of_entity'):
                 return stub.get_attributes_of_entity(pb2.CacheResponse(count = args[0]))
             if(func == 'get_statistics_entity'):
