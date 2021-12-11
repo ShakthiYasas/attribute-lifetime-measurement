@@ -24,12 +24,13 @@ class GRPCClient:
                 response = stub.are_all_atts_cached(pb2.EntityAttributeList(entityId = args[0], attributes = args[1]))
                 return (response.isCached, response.attributeList)
             if(func == 'get_value_by_key'):
-                return stub.get_value_by_key(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
+                response = stub.get_value_by_key(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
+                return [(res.prodid, res.response, res.cachedTime, res.recencybit) for res in response]
             if(func == 'get_values_for_entity'):
                 response = stub.get_values_for_entity(pb2.EntityAttributeList(entityId = args[0], attributes = args[1]))
                 return response.attributes
             if(func == 'addcachedlifetime'):  
-                stub.addcachedlifetime(pb2.CachedLife(entityId = args[0][0], attribute = args[0][1], cacheLife = args[1].strftime("%m/%d/%Y, %H:%M:%S")))
+                stub.addcachedlifetime(pb2.CachedLife(entityId = args[0][0], attribute = args[0][1], cacheLife = args[1].strftime("%Y-%m-%d %H:%M:%S")))
             if(func == 'get_statistics'):
                 response = stub.get_statistics(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
                 if(response.isAvailable == False):

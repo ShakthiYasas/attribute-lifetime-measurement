@@ -27,7 +27,7 @@ db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
 class CarParkContext(Resource):
     # Saving the current session 
-    current_session = db.insert_one('simulator-sessions', {'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
+    current_session = db.insert_one('simulator-sessions', {'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
 
     # Setting up configuration
     configuration = CarParkConfiguration(current_session, sample_size = int(default_config['SampleSize']), 

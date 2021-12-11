@@ -402,6 +402,7 @@ class Adaptive(Strategy):
                         if(not self.__isstatic):
                             for prodid,val,lastret, rec_bit in att_in_cache:
                                 # Estimated lifetime of the attribute
+                                lastret = datetime.fromtimestamp(time.mktime(time.strptime(lastret, '%Y-%m-%d %H:%M:%S')))
                                 mean_for_att = self.__profiler.get_mean(str(entityid)+'.'+str(prodid)+'.'+att_name)  
                                 extime = mean_for_att * (1 - fthresh[0])
                                 time_at_expire = lastret + datetime.timedelta(milisseconds=extime)
@@ -415,6 +416,7 @@ class Adaptive(Strategy):
                             # Checking if any of the attributes are not fresh
                             #print('Entity = '+ str(entityid) + ' and attribute = '+ att_name)
                             for prodid,val,lastret,rec_bit in att_in_cache:
+                                lastret = datetime.fromtimestamp(time.mktime(time.strptime(lastret, '%Y-%m-%d %H:%M:%S')))
                                 if(prodid in lifetimes):
                                     lt = lifetimes[prodid]['lifetimes'][att_name]
                                     #print('Lifetime: '+str(lt))
@@ -461,6 +463,7 @@ class Adaptive(Strategy):
                                     lt = lifetimes[prodid]['lifetimes'][att_name]
                                     if(lt >= 0):
                                         extime = lt * (1 - fthresh[0])
+                                        lastret = datetime.fromtimestamp(time.mktime(time.strptime(lastret, '%Y-%m-%d %H:%M:%S')))
                                         time_at_expire = lastret + datetime.timedelta(seconds=extime)
                                         if(now > time_at_expire):
                                             ishit = 0

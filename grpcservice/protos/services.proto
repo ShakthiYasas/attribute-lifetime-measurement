@@ -1,5 +1,4 @@
 syntax = "proto3";
-import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
 // Cache Memory Service
@@ -39,10 +38,6 @@ message EntityAttributeList {
     ListOfString attributes = 2;
 } 
 
-message ListOfTriplets {
-    repeated Triplet tuple = 1;
-}
-
 message ListOfString {
     repeated string string = 1;
 }
@@ -53,12 +48,6 @@ message ListOfFloat {
 
 message ListOfValues {
     repeated google.protobuf.Value values = 1;
-}
-
-message Triplet{
-    int32 prodid = 1;
-    google.protobuf.Value cachableitem = 2;
-    google.protobuf.Timestamp cachedtime = 3;
 }
 
 message CachedLife{
@@ -80,7 +69,7 @@ message CachedAttributes{
 message CachedItem {
     int32 prodid = 1;
     google.protobuf.Value response = 2;
-    google.protobuf.Timestamp cachedTime = 3;
+    string cachedTime = 3;
     bool recencybit = 4;
 }
 
@@ -93,8 +82,8 @@ message CachedRecords {
 }
 
 message Statistic {
-    repeated google.protobuf.Timestamp datelist = 1;
-    google.protobuf.Timestamp cachedTime = 2;
+    repeated string datelist = 1;
+    string cachedTime = 2;
     bool isAvailable = 3;
 }
 

@@ -17,7 +17,7 @@ import grpcservice.services_pb2_grpc as pb2_grpc
 from lib.mongoclient import MongoClient
 from lib.sqlliteclient import SQLLiteClient
 
-MAX_WORKERS = 20
+MAX_WORKERS = 4
 
 # Global variables
 config = configparser.ConfigParser()
@@ -66,7 +66,8 @@ class Listener(pb2_grpc.CacheServiceServicer):
             response = self.__cache_memory.get_statistics(request.entityId, request.attribute)
             if(response == None):
                 return pb2.Statistic(datelist = [], cachedTime = None, isAvailable = False)
-            return pb2.Statistic(datelist = response[0], cachedTime = response[1], isAvailable = True)
+            return pb2.Statistic(datelist = [ts.strftime('%Y-%m-%d %H:%M:%S') for ts in response[0].getlist()], 
+                cachedTime = response[1].strftime('%Y-%m-%d %H:%M:%S'), isAvailable = True)
         except Exception:
             print('An error occured : ' + traceback.format_exc())
     
@@ -100,8 +101,8 @@ class Listener(pb2_grpc.CacheServiceServicer):
             values.append(pb2.CachedItem(
                 prodid = prodid,
                 response = response_val,
-                cachedTime = cachedtime,
-                recencybit = recencybit
+                recencybit = recencybit,
+                cachedTime = cachedtime.strftime("%Y-%m-%d %H:%M:%S")
             ))
 
         return values

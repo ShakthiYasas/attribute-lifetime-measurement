@@ -48,7 +48,7 @@ class PlatformMock(Resource):
         {
             'strategy': strategy, 
             'token': __token,
-            'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
     
     # Create an instance of the refreshing strategy
