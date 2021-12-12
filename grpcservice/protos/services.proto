@@ -1,5 +1,4 @@
 syntax = "proto3";
-import "google/protobuf/struct.proto";
 
 // Cache Memory Service
 service CacheService {
@@ -16,7 +15,7 @@ service CacheService {
     rpc get_statistics_entity(CacheResponse) returns (JSONString) {} 
     rpc get_attributes_of_entity(CacheResponse) returns (ListOfString) {} 
     rpc get_value_by_key(EntityAttributePair) returns (ListOfCachedItems) {}  
-    rpc get_values_for_entity(EntityAttributeList) returns (CachedRecords) {} 
+    rpc get_values_for_entity(EntityAttributeList) returns (JSONString) {} 
     rpc are_all_atts_cached(EntityAttributeList) returns (CachedAttributes) {}    
 }
 
@@ -46,10 +45,6 @@ message ListOfFloat {
     repeated float realNumber = 1;
 }
 
-message ListOfValues {
-    repeated google.protobuf.Value values = 1;
-}
-
 message CachedLife{
     int32 entityId = 1;
     string attribute = 2;
@@ -68,7 +63,7 @@ message CachedAttributes{
 
 message CachedItem {
     int32 prodid = 1;
-    google.protobuf.Value response = 2;
+    string response = 2;
     string cachedTime = 3;
     bool recencybit = 4;
 }
@@ -78,7 +73,7 @@ message ListOfCachedItems {
 }
 
 message CachedRecords {
-    map<string, google.protobuf.Value> attributes = 1;
+    map<string, string> attributes = 1;
 }
 
 message Statistic {

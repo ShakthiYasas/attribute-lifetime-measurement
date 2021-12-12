@@ -51,19 +51,20 @@ class InMemoryCache(CacheAgent):
             self.__calculate_hitrate()
 
             # Items are evicted every each window
-            if(self.__evictor and self.__entityhash.is_full()):
-                items_to_evict = self.__evictor.select_for_evict()
-                if(isinstance(items_to_evict,list)):
-                    if(all(isinstance(item, tuple) for item in items_to_evict)):
-                        for ent,att in items_to_evict:
-                            self.__evict_attribute(ent, att)
-                            if(not len(self.__entityhash[ent])):
-                                self.__evict(ent)
-                    else:
-                        for ent in items_to_evict:
-                            self.__evict(ent)
-                else:
-                    self.__evict(items_to_evict)
+            # if(self.__evictor and self.__entityhash.is_full()):
+            #    print('Starting to evict!')
+            #    items_to_evict = self.__evictor.select_for_evict()
+            #    if(isinstance(items_to_evict,list)):
+            #        if(all(isinstance(item, tuple) for item in items_to_evict)):
+            #            for ent,att in items_to_evict:
+            #                self.__evict_attribute(ent, att)
+            #                if(not len(self.__entityhash[ent])):
+            #                    self.__evict(ent)
+            #        else:
+            #            for ent in items_to_evict:
+            #               self.__evict(ent)
+            #    else:
+            #        self.__evict(items_to_evict)
 
             # self.__reset_provider_recency()          
     
@@ -289,7 +290,7 @@ class InMemoryCache(CacheAgent):
                 uncached.add(attribute)
 
         if(len(uncached)>0): 
-            return False, uncached
+            return False, list(uncached)
         return True, []
 
     # Read from cache using key
@@ -306,7 +307,7 @@ class InMemoryCache(CacheAgent):
             ent_stat[0].push(datetime.now())
             self.__entityhash.freq_table[entityid] = tuple(ent_stat)
 
-            self.__entityhash[entityid][attribute] = [(data[0], data[1], data[2], True) for data in self.__entityhash[entityid][attribute]]
+            self.__entityhash[entityid][attribute] = [(data[0], str(data[1]), data[2], True) for data in self.__entityhash[entityid][attribute]]
             return self.__entityhash[entityid][attribute]
         else:
             return None

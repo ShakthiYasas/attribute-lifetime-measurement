@@ -83,7 +83,7 @@ class CacheServiceStub(object):
         self.get_values_for_entity = channel.unary_unary(
                 '/CacheService/get_values_for_entity',
                 request_serializer=services__pb2.EntityAttributeList.SerializeToString,
-                response_deserializer=services__pb2.CachedRecords.FromString,
+                response_deserializer=services__pb2.JSONString.FromString,
                 )
         self.are_all_atts_cached = channel.unary_unary(
                 '/CacheService/are_all_atts_cached',
@@ -257,7 +257,7 @@ def add_CacheServiceServicer_to_server(servicer, server):
             'get_values_for_entity': grpc.unary_unary_rpc_method_handler(
                     servicer.get_values_for_entity,
                     request_deserializer=services__pb2.EntityAttributeList.FromString,
-                    response_serializer=services__pb2.CachedRecords.SerializeToString,
+                    response_serializer=services__pb2.JSONString.SerializeToString,
             ),
             'are_all_atts_cached': grpc.unary_unary_rpc_method_handler(
                     servicer.are_all_atts_cached,
@@ -509,7 +509,7 @@ class CacheService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/CacheService/get_values_for_entity',
             services__pb2.EntityAttributeList.SerializeToString,
-            services__pb2.CachedRecords.FromString,
+            services__pb2.JSONString.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

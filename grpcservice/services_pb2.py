@@ -11,7 +11,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
@@ -20,9 +19,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0eservices.proto\x1a\x1cgoogle/protobuf/struct.proto\"1\n\tCacheItem\x12\x10\n\x08\x65ntityid\x18\x01 \x01(\x05\x12\x12\n\ncacheitems\x18\x02 \x01(\t\"\x1a\n\x08\x42oolType\x12\x0e\n\x06status\x18\x01 \x01(\x08\"\x1e\n\rCacheResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x05\"J\n\x13\x45ntityAttributeList\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12!\n\nattributes\x18\x02 \x01(\x0b\x32\r.ListOfString\"\x1e\n\x0cListOfString\x12\x0e\n\x06string\x18\x01 \x03(\t\"!\n\x0bListOfFloat\x12\x12\n\nrealNumber\x18\x01 \x03(\x02\"6\n\x0cListOfValues\x12&\n\x06values\x18\x01 \x03(\x0b\x32\x16.google.protobuf.Value\"D\n\nCachedLife\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12\x11\n\tattribute\x18\x02 \x01(\t\x12\x11\n\tcacheLife\x18\x03 \x01(\t\":\n\x13\x45ntityAttributePair\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12\x11\n\tattribute\x18\x02 \x01(\t\"J\n\x10\x43\x61\x63hedAttributes\x12\x10\n\x08isCached\x18\x01 \x01(\x08\x12$\n\rattributeList\x18\x02 \x01(\x0b\x32\r.ListOfString\"n\n\nCachedItem\x12\x0e\n\x06prodid\x18\x01 \x01(\x05\x12(\n\x08response\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value\x12\x12\n\ncachedTime\x18\x03 \x01(\t\x12\x12\n\nrecencybit\x18\x04 \x01(\x08\"0\n\x11ListOfCachedItems\x12\x1b\n\x06values\x18\x01 \x03(\x0b\x32\x0b.CachedItem\"\x8e\x01\n\rCachedRecords\x12\x32\n\nattributes\x18\x01 \x03(\x0b\x32\x1e.CachedRecords.AttributesEntry\x1aI\n\x0f\x41ttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.Value:\x02\x38\x01\"F\n\tStatistic\x12\x10\n\x08\x64\x61telist\x18\x01 \x03(\t\x12\x12\n\ncachedTime\x18\x02 \x01(\t\x12\x13\n\x0bisAvailable\x18\x03 \x01(\x08\"\x1c\n\nJSONString\x12\x0e\n\x06string\x18\x01 \x01(\t\"-\n\x10HitRateStatistic\x12\x19\n\x07hitrate\x18\x01 \x03(\x0b\x32\x08.HitStat\")\n\x07HitStat\x12\x0f\n\x07hitrate\x18\x01 \x01(\x02\x12\r\n\x05\x63ount\x18\x02 \x01(\x05\"\x07\n\x05\x45mpty2\xa8\x06\n\x0c\x43\x61\x63heService\x12\x1c\n\x04save\x12\n.CacheItem\x1a\x06.Empty\"\x00\x12*\n\x11\x61\x64\x64\x63\x61\x63hedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12+\n\x11get_hitrate_trend\x12\x06.Empty\x1a\x0c.ListOfFloat\"\x00\x12-\n\x14updatecachedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12.\n\tis_cached\x12\x14.EntityAttributePair\x1a\t.BoolType\"\x00\x12+\n\x12get_statistics_all\x12\x06.Empty\x1a\x0b.JSONString\"\x00\x12\x37\n\x10get_last_hitrate\x12\x0e.CacheResponse\x1a\x11.HitRateStatistic\"\x00\x12\x34\n\x0eget_statistics\x12\x14.EntityAttributePair\x1a\n.Statistic\"\x00\x12\x36\n\x1aremoveentitycachedlifetime\x12\x0e.CacheResponse\x1a\x06.Empty\"\x00\x12\x36\n\x14removecachedlifetime\x12\x14.EntityAttributePair\x1a\x06.Empty\"\x00\x12\x36\n\x15get_statistics_entity\x12\x0e.CacheResponse\x1a\x0b.JSONString\"\x00\x12;\n\x18get_attributes_of_entity\x12\x0e.CacheResponse\x1a\r.ListOfString\"\x00\x12>\n\x10get_value_by_key\x12\x14.EntityAttributePair\x1a\x12.ListOfCachedItems\"\x00\x12?\n\x15get_values_for_entity\x12\x14.EntityAttributeList\x1a\x0e.CachedRecords\"\x00\x12@\n\x13\x61re_all_atts_cached\x12\x14.EntityAttributeList\x1a\x11.CachedAttributes\"\x00\x62\x06proto3'
-  ,
-  dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,])
+  serialized_pb=b'\n\x0eservices.proto\"1\n\tCacheItem\x12\x10\n\x08\x65ntityid\x18\x01 \x01(\x05\x12\x12\n\ncacheitems\x18\x02 \x01(\t\"\x1a\n\x08\x42oolType\x12\x0e\n\x06status\x18\x01 \x01(\x08\"\x1e\n\rCacheResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x05\"J\n\x13\x45ntityAttributeList\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12!\n\nattributes\x18\x02 \x01(\x0b\x32\r.ListOfString\"\x1e\n\x0cListOfString\x12\x0e\n\x06string\x18\x01 \x03(\t\"!\n\x0bListOfFloat\x12\x12\n\nrealNumber\x18\x01 \x03(\x02\"D\n\nCachedLife\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12\x11\n\tattribute\x18\x02 \x01(\t\x12\x11\n\tcacheLife\x18\x03 \x01(\t\":\n\x13\x45ntityAttributePair\x12\x10\n\x08\x65ntityId\x18\x01 \x01(\x05\x12\x11\n\tattribute\x18\x02 \x01(\t\"J\n\x10\x43\x61\x63hedAttributes\x12\x10\n\x08isCached\x18\x01 \x01(\x08\x12$\n\rattributeList\x18\x02 \x01(\x0b\x32\r.ListOfString\"V\n\nCachedItem\x12\x0e\n\x06prodid\x18\x01 \x01(\x05\x12\x10\n\x08response\x18\x02 \x01(\t\x12\x12\n\ncachedTime\x18\x03 \x01(\t\x12\x12\n\nrecencybit\x18\x04 \x01(\x08\"0\n\x11ListOfCachedItems\x12\x1b\n\x06values\x18\x01 \x03(\x0b\x32\x0b.CachedItem\"v\n\rCachedRecords\x12\x32\n\nattributes\x18\x01 \x03(\x0b\x32\x1e.CachedRecords.AttributesEntry\x1a\x31\n\x0f\x41ttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"F\n\tStatistic\x12\x10\n\x08\x64\x61telist\x18\x01 \x03(\t\x12\x12\n\ncachedTime\x18\x02 \x01(\t\x12\x13\n\x0bisAvailable\x18\x03 \x01(\x08\"\x1c\n\nJSONString\x12\x0e\n\x06string\x18\x01 \x01(\t\"-\n\x10HitRateStatistic\x12\x19\n\x07hitrate\x18\x01 \x03(\x0b\x32\x08.HitStat\")\n\x07HitStat\x12\x0f\n\x07hitrate\x18\x01 \x01(\x02\x12\r\n\x05\x63ount\x18\x02 \x01(\x05\"\x07\n\x05\x45mpty2\xa5\x06\n\x0c\x43\x61\x63heService\x12\x1c\n\x04save\x12\n.CacheItem\x1a\x06.Empty\"\x00\x12*\n\x11\x61\x64\x64\x63\x61\x63hedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12+\n\x11get_hitrate_trend\x12\x06.Empty\x1a\x0c.ListOfFloat\"\x00\x12-\n\x14updatecachedlifetime\x12\x0b.CachedLife\x1a\x06.Empty\"\x00\x12.\n\tis_cached\x12\x14.EntityAttributePair\x1a\t.BoolType\"\x00\x12+\n\x12get_statistics_all\x12\x06.Empty\x1a\x0b.JSONString\"\x00\x12\x37\n\x10get_last_hitrate\x12\x0e.CacheResponse\x1a\x11.HitRateStatistic\"\x00\x12\x34\n\x0eget_statistics\x12\x14.EntityAttributePair\x1a\n.Statistic\"\x00\x12\x36\n\x1aremoveentitycachedlifetime\x12\x0e.CacheResponse\x1a\x06.Empty\"\x00\x12\x36\n\x14removecachedlifetime\x12\x14.EntityAttributePair\x1a\x06.Empty\"\x00\x12\x36\n\x15get_statistics_entity\x12\x0e.CacheResponse\x1a\x0b.JSONString\"\x00\x12;\n\x18get_attributes_of_entity\x12\x0e.CacheResponse\x1a\r.ListOfString\"\x00\x12>\n\x10get_value_by_key\x12\x14.EntityAttributePair\x1a\x12.ListOfCachedItems\"\x00\x12<\n\x15get_values_for_entity\x12\x14.EntityAttributeList\x1a\x0b.JSONString\"\x00\x12@\n\x13\x61re_all_atts_cached\x12\x14.EntityAttributeList\x1a\x11.CachedAttributes\"\x00\x62\x06proto3'
+)
 
 
 
@@ -61,8 +59,8 @@ _CACHEITEM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=48,
-  serialized_end=97,
+  serialized_start=18,
+  serialized_end=67,
 )
 
 
@@ -93,8 +91,8 @@ _BOOLTYPE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=99,
-  serialized_end=125,
+  serialized_start=69,
+  serialized_end=95,
 )
 
 
@@ -125,8 +123,8 @@ _CACHERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=127,
-  serialized_end=157,
+  serialized_start=97,
+  serialized_end=127,
 )
 
 
@@ -164,8 +162,8 @@ _ENTITYATTRIBUTELIST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=159,
-  serialized_end=233,
+  serialized_start=129,
+  serialized_end=203,
 )
 
 
@@ -196,8 +194,8 @@ _LISTOFSTRING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=235,
-  serialized_end=265,
+  serialized_start=205,
+  serialized_end=235,
 )
 
 
@@ -228,40 +226,8 @@ _LISTOFFLOAT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=267,
-  serialized_end=300,
-)
-
-
-_LISTOFVALUES = _descriptor.Descriptor(
-  name='ListOfValues',
-  full_name='ListOfValues',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='values', full_name='ListOfValues.values', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=302,
-  serialized_end=356,
+  serialized_start=237,
+  serialized_end=270,
 )
 
 
@@ -306,8 +272,8 @@ _CACHEDLIFE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=358,
-  serialized_end=426,
+  serialized_start=272,
+  serialized_end=340,
 )
 
 
@@ -345,8 +311,8 @@ _ENTITYATTRIBUTEPAIR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=428,
-  serialized_end=486,
+  serialized_start=342,
+  serialized_end=400,
 )
 
 
@@ -384,8 +350,8 @@ _CACHEDATTRIBUTES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=488,
-  serialized_end=562,
+  serialized_start=402,
+  serialized_end=476,
 )
 
 
@@ -406,8 +372,8 @@ _CACHEDITEM = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='response', full_name='CachedItem.response', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -437,8 +403,8 @@ _CACHEDITEM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=564,
-  serialized_end=674,
+  serialized_start=478,
+  serialized_end=564,
 )
 
 
@@ -469,8 +435,8 @@ _LISTOFCACHEDITEMS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=676,
-  serialized_end=724,
+  serialized_start=566,
+  serialized_end=614,
 )
 
 
@@ -491,8 +457,8 @@ _CACHEDRECORDS_ATTRIBUTESENTRY = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='value', full_name='CachedRecords.AttributesEntry.value', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -508,8 +474,8 @@ _CACHEDRECORDS_ATTRIBUTESENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=796,
-  serialized_end=869,
+  serialized_start=685,
+  serialized_end=734,
 )
 
 _CACHEDRECORDS = _descriptor.Descriptor(
@@ -539,8 +505,8 @@ _CACHEDRECORDS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=727,
-  serialized_end=869,
+  serialized_start=616,
+  serialized_end=734,
 )
 
 
@@ -585,8 +551,8 @@ _STATISTIC = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=871,
-  serialized_end=941,
+  serialized_start=736,
+  serialized_end=806,
 )
 
 
@@ -617,8 +583,8 @@ _JSONSTRING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=943,
-  serialized_end=971,
+  serialized_start=808,
+  serialized_end=836,
 )
 
 
@@ -649,8 +615,8 @@ _HITRATESTATISTIC = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=973,
-  serialized_end=1018,
+  serialized_start=838,
+  serialized_end=883,
 )
 
 
@@ -688,8 +654,8 @@ _HITSTAT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1020,
-  serialized_end=1061,
+  serialized_start=885,
+  serialized_end=926,
 )
 
 
@@ -713,16 +679,13 @@ _EMPTY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1063,
-  serialized_end=1070,
+  serialized_start=928,
+  serialized_end=935,
 )
 
 _ENTITYATTRIBUTELIST.fields_by_name['attributes'].message_type = _LISTOFSTRING
-_LISTOFVALUES.fields_by_name['values'].message_type = google_dot_protobuf_dot_struct__pb2._VALUE
 _CACHEDATTRIBUTES.fields_by_name['attributeList'].message_type = _LISTOFSTRING
-_CACHEDITEM.fields_by_name['response'].message_type = google_dot_protobuf_dot_struct__pb2._VALUE
 _LISTOFCACHEDITEMS.fields_by_name['values'].message_type = _CACHEDITEM
-_CACHEDRECORDS_ATTRIBUTESENTRY.fields_by_name['value'].message_type = google_dot_protobuf_dot_struct__pb2._VALUE
 _CACHEDRECORDS_ATTRIBUTESENTRY.containing_type = _CACHEDRECORDS
 _CACHEDRECORDS.fields_by_name['attributes'].message_type = _CACHEDRECORDS_ATTRIBUTESENTRY
 _HITRATESTATISTIC.fields_by_name['hitrate'].message_type = _HITSTAT
@@ -732,7 +695,6 @@ DESCRIPTOR.message_types_by_name['CacheResponse'] = _CACHERESPONSE
 DESCRIPTOR.message_types_by_name['EntityAttributeList'] = _ENTITYATTRIBUTELIST
 DESCRIPTOR.message_types_by_name['ListOfString'] = _LISTOFSTRING
 DESCRIPTOR.message_types_by_name['ListOfFloat'] = _LISTOFFLOAT
-DESCRIPTOR.message_types_by_name['ListOfValues'] = _LISTOFVALUES
 DESCRIPTOR.message_types_by_name['CachedLife'] = _CACHEDLIFE
 DESCRIPTOR.message_types_by_name['EntityAttributePair'] = _ENTITYATTRIBUTEPAIR
 DESCRIPTOR.message_types_by_name['CachedAttributes'] = _CACHEDATTRIBUTES
@@ -787,13 +749,6 @@ ListOfFloat = _reflection.GeneratedProtocolMessageType('ListOfFloat', (_message.
   # @@protoc_insertion_point(class_scope:ListOfFloat)
   })
 _sym_db.RegisterMessage(ListOfFloat)
-
-ListOfValues = _reflection.GeneratedProtocolMessageType('ListOfValues', (_message.Message,), {
-  'DESCRIPTOR' : _LISTOFVALUES,
-  '__module__' : 'services_pb2'
-  # @@protoc_insertion_point(class_scope:ListOfValues)
-  })
-_sym_db.RegisterMessage(ListOfValues)
 
 CachedLife = _reflection.GeneratedProtocolMessageType('CachedLife', (_message.Message,), {
   'DESCRIPTOR' : _CACHEDLIFE,
@@ -890,8 +845,8 @@ _CACHESERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1073,
-  serialized_end=1881,
+  serialized_start=938,
+  serialized_end=1743,
   methods=[
   _descriptor.MethodDescriptor(
     name='save',
@@ -1029,7 +984,7 @@ _CACHESERVICE = _descriptor.ServiceDescriptor(
     index=13,
     containing_service=None,
     input_type=_ENTITYATTRIBUTELIST,
-    output_type=_CACHEDRECORDS,
+    output_type=_JSONSTRING,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

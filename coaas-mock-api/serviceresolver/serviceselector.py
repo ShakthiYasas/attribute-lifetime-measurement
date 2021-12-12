@@ -61,10 +61,10 @@ class ServiceSelector:
             for att in attributes:
                 if(att in meta_data.keys()):
                     if(not (att in output)):
-                        output[att] = [(prodid,meta_data[att],0)]
+                        output[att] = [(prodid,meta_data[att],now)]
                     else:
                         self.__stats_lock.acquire()
-                        output[att].append((prodid,meta_data[att], 0))
+                        output[att].append((prodid,meta_data[att],now))
                         self.__stats_lock.release()
             attributes = set(attributes) - set(meta_data.keys())
 

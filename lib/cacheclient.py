@@ -16,19 +16,21 @@ class GRPCClient:
         stub = pb2_grpc.CacheServiceStub(self.__channel) 
         try:
             if(func == 'save'):
-                stub.save(pb2.CacheItem(entityid = args[0], cacheitems = json.dumps(args[1], default=str)))
+                items = json.dumps(args[1], default=str)
+                stub.save(pb2.CacheItem(entityid = args[0], cacheitems = items))
             if(func == 'get_statistics_all'):
                 response = stub.get_statistics_all(pb2.Empty())
-                return json.loads(response.string)
+                json_res = json.loads(response.string)
+                return {int(k): v for k, v in json_res.items()}
             if(func == 'are_all_atts_cached'):
-                response = stub.are_all_atts_cached(pb2.EntityAttributeList(entityId = args[0], attributes = args[1]))
-                return (response.isCached, response.attributeList)
+                response = stub.are_all_atts_cached(pb2.EntityAttributeList(entityId = args[0], attributes = pb2.ListOfString(string = args[1])))
+                return (response.isCached, set(response.attributeList.string))
             if(func == 'get_value_by_key'):
                 response = stub.get_value_by_key(pb2.EntityAttributePair(entityId = args[0], attribute = args[1]))
-                return [(res.prodid, res.response, res.cachedTime, res.recencybit) for res in response]
+                return [(res.prodid, res.response, res.cachedTime, res.recencybit) for res in response.values]
             if(func == 'get_values_for_entity'):
-                response = stub.get_values_for_entity(pb2.EntityAttributeList(entityId = args[0], attributes = args[1]))
-                return response.attributes
+                response = stub.get_values_for_entity(pb2.EntityAttributeList(entityId = args[0], attributes = pb2.ListOfString(string = args[1])))
+                return json.loads(response.string)
             if(func == 'addcachedlifetime'):  
                 stub.addcachedlifetime(pb2.CachedLife(entityId = args[0][0], attribute = args[0][1], cacheLife = args[1].strftime("%Y-%m-%d %H:%M:%S")))
             if(func == 'get_statistics'):

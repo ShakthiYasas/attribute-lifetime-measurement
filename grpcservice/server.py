@@ -1,5 +1,6 @@
 from datetime import datetime
 import sys, os
+import re
 sys.path.append(os.path.abspath(os.path.join('..')))
 
 import time
@@ -18,6 +19,7 @@ from lib.mongoclient import MongoClient
 from lib.sqlliteclient import SQLLiteClient
 
 MAX_WORKERS = 4
+REGEX = r"\..+"
 
 # Global variables
 config = configparser.ConfigParser()
@@ -38,12 +40,15 @@ class Listener(pb2_grpc.CacheServiceServicer):
             result = self.__cache_memory.get_statistics_all()
             return pb2.JSONString(string = json.dumps(result, default=str))
         except Exception:
-            print('An error occured : ' + traceback.format_exc())
+            print(traceback.format_exc())
     
     # Fine
     def save(self, request, context):
-        self.__cache_memory.save(request.entityid, json.loads(request.cacheitems))
-        return pb2.Empty()
+        try:
+            self.__cache_memory.save(request.entityid, json.loads(request.cacheitems))
+            return pb2.Empty()
+        except Exception:
+            print(traceback.format_exc())
 
     def addcachedlifetime(self, request, context):
         self.__cache_memory.addcachedlifetime((request.entityId, request.attribute), request.cacheLife)
@@ -69,18 +74,21 @@ class Listener(pb2_grpc.CacheServiceServicer):
             return pb2.Statistic(datelist = [ts.strftime('%Y-%m-%d %H:%M:%S') for ts in response[0].getlist()], 
                 cachedTime = response[1].strftime('%Y-%m-%d %H:%M:%S'), isAvailable = True)
         except Exception:
-            print('An error occured : ' + traceback.format_exc())
+            print(traceback.format_exc())
     
     def get_statistics_entity(self, request, context): 
         result = self.__cache_memory.get_statistics_entity(request.count)
         return pb2.JSONString(string = json.dumps(result, default=str))
     
     def get_last_hitrate(self, request, context):
-        res = self.__cache_memory.get_last_hitrate(request.count)
-        res_list = []
-        for hr, cnt in res:
-            res_list.append(pb2.HitStat(hitrate = hr, count = cnt))
-        return pb2.HitRateStatistic(hitrate = res_list)
+        try:
+            res = self.__cache_memory.get_last_hitrate(request.count)
+            res_list = []
+            for hr, cnt in res:
+                res_list.append(pb2.HitStat(hitrate = hr, count = cnt))
+            return pb2.HitRateStatistic(hitrate = res_list)
+        except Exception:
+            print(traceback.format_exc())
 
     # Should be fine
     def is_cached(self, request, context):
@@ -95,25 +103,28 @@ class Listener(pb2_grpc.CacheServiceServicer):
         return self.__cache_memory.get_attributes_of_entity(request.count)
 
     def get_value_by_key(self, request, context): 
-        values = []
-        response = self.__cache_memory.get_value_by_key(request.entityId, request.attribute)
-        for prodid, response_val, cachedtime, recencybit in response:
-            values.append(pb2.CachedItem(
-                prodid = prodid,
-                response = response_val,
-                recencybit = recencybit,
-                cachedTime = cachedtime.strftime("%Y-%m-%d %H:%M:%S")
-            ))
-
-        return values
+        try:
+            values = []
+            response = self.__cache_memory.get_value_by_key(request.entityId, request.attribute)
+            for prodid, response_val, cachedtime, recencybit in response:
+                values.append(pb2.CachedItem(
+                    prodid = prodid,
+                    response = response_val,
+                    recencybit = recencybit,
+                    cachedTime = re.sub(REGEX,'',cachedtime) #.strftime('%Y-%m-%d %H:%M:%S')
+                ))
+            return pb2.ListOfCachedItems(values = values) 
+        except Exception:
+            print(traceback.format_exc())
 
     def get_values_for_entity(self, request, context): 
-        response = self.__cache_memory.get_values_for_entity(request.entityId, request.attribute)
-        return pb2.CachedRecords(attributes = response)
+        response = self.__cache_memory.get_values_for_entity(request.entityId, request.attributes.string)
+        return pb2.JSONString(string = json.dumps(response, default=str))
+        # return pb2.CachedRecords(attributes = response)
 
     def are_all_atts_cached(self, request, context): 
-        response = self.__cache_memory.are_all_atts_cached(request.entityId, request.attributes)
-        return pb2.CachedAttributes(isCached = response[0], attributeList = response[1])
+        response = self.__cache_memory.are_all_atts_cached(request.entityId, request.attributes.string)
+        return pb2.CachedAttributes(isCached = response[0], attributeList = pb2.ListOfString(string = response[1]))
 
 # Starting Server
 def serve():
