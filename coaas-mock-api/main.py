@@ -102,10 +102,13 @@ class PlatformMock(Resource):
                 # Return message and 401 Error code
                 return parse_response({'message':'Unauthorized'}), 401  
 
+            # Sub Query Identifier
+            query_id = json_obj['identifier']
+
             # Start to process the request
             data = selected_algo.get_result(json_obj['query'], fthr, req_id)
             response = parse_response(data, self.__token)
-            _thread.start_new_thread(self.__save_rp_stats, (self.__token, response, start, rtmax, fthr[1], fthr[2]))
+            _thread.start_new_thread(self.__save_rp_stats, (self.__token, response, start, rtmax, fthr[1], fthr[2], query_id))
                 
             # Return data and 200 OK code
             return response, 200    
@@ -115,7 +118,7 @@ class PlatformMock(Resource):
             # Return message and 400 Error code
             return parse_response({'message':'An error occured'}), 400 
 
-    def __save_rp_stats(self, token,response,start, rtmax, price, penalty):
+    def __save_rp_stats(self, token, response, start, rtmax, price, penalty, query_id):
         # Statistics
         res_time = (datetime.now() - start).total_seconds()
         db.insert_one('responses-history', 
@@ -125,7 +128,8 @@ class PlatformMock(Resource):
                 'response_time': res_time,
                 'is_delayed': bool(res_time >= rtmax) if rtmax > 0 else False,
                 'price': price,
-                'penalty': penalty
+                'penalty': penalty,
+                'query_id': query_id
             })
 
 class Statistics(Resource):

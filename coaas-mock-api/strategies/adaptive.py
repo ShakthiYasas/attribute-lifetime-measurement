@@ -1,9 +1,10 @@
-import secrets
 import time
+import secrets
 import _thread
 import datetime
 import threading
 import statistics
+import collections
 from typing import Tuple
 
 import numpy as np
@@ -100,6 +101,11 @@ class Adaptive(Strategy):
         
         setattr(self.cache_memory, 'caller_strategy', self)
         self.__is_simple_agent = isinstance(self.selective_cache_agent, SimpleAgent)
+
+        # Extrapolation ranges 
+        self.__short = self.trend_ranges[0]*(self.__moving_window/1000)
+        self.__mid = self.trend_ranges[1]*(self.__moving_window/1000)
+        self.__long = self.trend_ranges[2]*(self.__moving_window/1000)
 
         # Initializing background thread clear observations.
         thread = threading.Thread(target=self.run, args=())
@@ -578,7 +584,7 @@ class Adaptive(Strategy):
         actions = []
         now = datetime.datetime.now()
         for att in attributes:
-            if(self.__check_delay(entityid, att) or self.__is_spike(entityid, att)):
+            if((self.__check_delay(entityid, att) or self.__is_spike(entityid, att)) and not self.__waiting_to_retrive.is_enqued(entityid, att)):
                 # print('There is a spike or no delay restriction!')
                 # Translate the entity,attribute pair to a state
                 observation = self.__translate_to_state(entityid,att)
@@ -636,7 +642,7 @@ class Adaptive(Strategy):
         if(not (entityid in self.__evaluated)):
             # Entity hasn't been evaluted in this window before
             for att in attributes.keys():
-                checker = self.__check_delay(entityid, att) or self.__is_spike(entityid, att)
+                checker = (self.__check_delay(entityid, att) or self.__is_spike(entityid, att)) and not self.__waiting_to_retrive.is_enqued(entityid, att)
                 # print('There is a spike or no delay restriction!')
                 if(checker):
                     observation = self.__translate_to_state(entityid,att)
@@ -900,6 +906,37 @@ class Adaptive(Strategy):
     def get_feature_vector(self, entityid, att):
         return self.__translate_to_state(entityid, att)
 
+    # Select the closet range boundary for the current state 
+    def __closest_point(self, c_life):
+        s_dis = abs(self.__short - c_life)
+        m_dis = abs(self.__mid - c_life)
+        l_dis = abs(self.__long - c_life)
+
+        closest = self.__short
+        if(m_dis<s_dis or m_dis==s_dis):
+            closest = self.__mid
+            if(l_dis<m_dis or l_dis==m_dis):
+                closest = self.__long
+
+        return closest
+
+    def __expected_life(self, lt_list):
+        exp_life_dict = {}
+        for c_life in lt_list:
+            closest = self.__closest_point(c_life)
+            if(closest in exp_life_dict):
+                exp_life_dict[closest] += 1
+            else: 
+                exp_life_dict[closest] = 1
+        
+        list_len = len(lt_list)
+        exp_life_dict.update((k,v/list_len) for k,v in exp_life_dict)
+        
+        out_1 = collections.OrderedDict(sorted(exp_life_dict.items()))
+        expected_life = sorted(out_1.items(), key=lambda item: item[1])[-1][0]
+
+        return expected_life
+        
     # Translating an observation to a state
     def __translate_to_state(self, entityid, att):
         isobserved = self.__isobserved(entityid, att)
@@ -1386,6 +1423,9 @@ class Adaptive(Strategy):
 
     def get_hit_rate_variation(self):
         return self.cache_memory.run('get_hitrate_trend')
+
+    def is_waiting_to_retrive(self, entity, attribute):
+        self.__waiting_to_retrive
 
 class LearningThread (threading.Thread):
     def __init__(self):
