@@ -1,3 +1,4 @@
+import os
 import time
 import queue
 import threading
@@ -15,6 +16,7 @@ from tensorflow import keras
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.layers import Input, Dense
+import tensorflow.python.keras.backend as K
 from tensorflow.python.framework.ops import disable_eager_execution
 
 from agents.classifier.linkedcluster import LinkedCluster
@@ -111,13 +113,15 @@ class ACAgent(threading.Thread, Agent):
     # Actor: state is input and probability of each action is output of model
     def __build_actor_critic(self):
         # NN Layers  
-        input_layer = Input(shape=(self.__n_features,))
+        input_layer = Input(shape=(self.__n_features,), name='input_layer')
         hidden_layer = Dense(LAYER_1_NEURONS, activation='relu')(input_layer)
         hidden_layer_2 = Dense(LAYER_2_NEURONS, activation='relu')(hidden_layer)
         value_layer = Dense(self.__value_size, activation='linear')(hidden_layer_2)
         output_layer = Dense(len(self.action_space), activation='softmax')(hidden_layer_2)
         
-        try:
+        if(os.path.isdir('agents/saved-models/ac')):
+            print('Models exist and using them!')
+            # session = K.get_session()
             # Loading Existing Models
             # Useful for Fault recovery and re-starts
             actor = keras.models.load_model(ACTOR_MODEL_PATH)
@@ -125,7 +129,10 @@ class ACAgent(threading.Thread, Agent):
             policy = keras.models.load_model(POLICY_MODEL_PATH)
 
             return actor, policy, critic
-        except(Exception):
+        else:
+            print('Models do not exist!')
+            # kb.clear_session()
+            # session = K.get_session()
             # Actor Model
             delta = Input(shape=[1])
             actor = Model(inputs=[input_layer,delta], outputs=[output_layer])
@@ -182,6 +189,7 @@ class ACAgent(threading.Thread, Agent):
         if(probabilities[0] > probabilities[1]):
             action = 0
 
+        # print(obs)
         # print(str(action)+' for entity:'+str(entityid)+' and att:'+str(attribute))
         # print()
 
@@ -229,6 +237,12 @@ class ACAgent(threading.Thread, Agent):
         action = parameters[1]
         reward = parameters[2]
         next_state = parameters[3]
+
+        # print('Reward:')
+        # print(reward)
+        # print('Next State:')
+        # print(next_state)
+        # print()
 
         self.reward_history.push(reward)
 

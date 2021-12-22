@@ -65,6 +65,9 @@ class FIFOQueue_2():
                 self.__queue.remove(item)
             except Exception:
                 print('Item not found to remove from the queue!')
+    
+    def isempty(self):
+        return len(self.__queue) == 0
 
     # This is a special method
     def is_enqued(self, key, value):

@@ -8,9 +8,9 @@ import traceback
 import configparser
 from pathlib import Path
 from datetime import datetime
+# from hanging_threads import start_monitoring
 
 import numpy as np
-import matplotlib.pyplot as plt
 from flask import Flask, request
 from flask_restful import Resource, Api
 
@@ -22,10 +22,10 @@ from lib.sqlliteclient import SQLLiteClient
 from agents.agentfactory import AgentFactory
 from strategies.strategyfactory import StrategyFactory
 
-
-
 app = Flask(__name__)
 api = Api(app)
+
+# monitoring_thread = start_monitoring(seconds_frozen=10)
 
 # Global variables
 config = configparser.ConfigParser()
@@ -84,7 +84,7 @@ class PlatformMock(Resource):
             setattr(selected_algo, 'selective_cache_agent', agent_fac.get_agent())
         else:
             setattr(selected_algo, 'selective_agent_factory', agent_fac)
-    
+
     selected_algo.init_cache()
 
     # POST /contexts endpoint

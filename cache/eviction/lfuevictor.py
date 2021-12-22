@@ -1,7 +1,7 @@
 from cache.eviction.evictor import Evictor
 
 class LFUEvictor(Evictor):
-    def __init__(self, cache, threshold = 0.25):
+    def __init__(self, cache, threshold = 1.0):
         self.__cache = cache
         self.__threshold = threshold
     

@@ -51,6 +51,7 @@ class Adaptive(Strategy):
     # Status
     __already_modified = False
     __last_item_to_recieve = None
+    __last_retrival_time = None
 
     # Queues
     __sla_trend = FIFOQueue_2(10)
@@ -146,6 +147,10 @@ class Adaptive(Strategy):
                 self.__already_modified = False
             if(self.__decision_history):
                 _thread.start_new_thread(self.__learning_after_action, ())
+            
+            if(self.__last_retrival_time != None and self.__last_retrival_time<=exp_time 
+                and not self.__waiting_to_retrive.isempty()):
+                self.__forced_caching()
 
         self.__evaluated.clear()
         self.__request_rate_trend.push((self.__reqs_in_window*1000)/self.__moving_window)
@@ -266,6 +271,8 @@ class Adaptive(Strategy):
                 self.__decision_history_lock.release()
 
                 curr_state = self.__translate_to_state(action[0], action[1])
+                if(curr_state == None):
+                    continue
                 diff = self.__window_counter - values[3]
                 reward = self.__calculate_reward(action[0], action[1], values[0], diff)  
                 if(not self.__is_simple_agent):
@@ -529,9 +536,7 @@ class Adaptive(Strategy):
                             res = self.service_selector.get_response_for_entity([att_name], url_list)  
                             output[entityid][att_name] = [x[1] for x in res[att_name]]
                             # Update observed
-                            self.__observedLock.acquire()
                             self.__update_observed(entityid, [att_name])
-                            self.__observedLock.release()
             else:
                 # Even the entity is not cached previously
                 # So, first retrieving the entity
@@ -562,9 +567,7 @@ class Adaptive(Strategy):
         return output
 
     def __evaluate_and_updated_observed_in_thread(self, entityid, out, ref_key):
-        self.__observedLock.acquire()
         self.__update_observed(entityid, list(out.keys()))
-        self.__observedLock.release()
 
         if(self.__window_counter >= self.trend_ranges[1]+1):
             # Run this in the background
@@ -752,6 +755,59 @@ class Adaptive(Strategy):
         self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter, parameters[2] if action == 1 else parameters[3])
         self.__decision_history_lock.release()
 
+    def __forced_caching(self):
+        # This method clears out the waiting to be cached queue if there are no new unique items being requested.
+        # print('Force Cached!')
+        last_observed = self.__last_item_to_recieve
+        self.__last_item_to_recieve = None
+        now = datetime.datetime.now()
+
+        providers = []
+        if(last_observed[6] in self.__temp_entity_att_provider_map):
+            providers =  self.__temp_entity_att_provider_map[last_observed[6]]
+
+        ent_att_pairs = []
+
+        self.__last_retrival_time = now          
+        all_ent_atts = list(filter(lambda x: x[0] == last_observed[0] and x[6] == last_observed[6], self.__waiting_to_retrive.getlist()))
+
+        for current_element in all_ent_atts:
+            entity = current_element[0]
+            attribute = current_element[1]
+            est_c_lifetime = current_element[2]
+            est_delay = current_element[3]
+            action = current_element[4]
+            observation = current_element[5]
+
+            if(action != 0):
+                # The item is to be cached
+                # Could be a random one or an item evulated to be cached
+                wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
+                self.cache_memory.run('addcachedlifetime', ((entity, attribute), wait_time))
+                self.__last_actions.append((entity, attribute))
+                ent_att_pairs.append((entity, attribute))
+            else:                    
+                if(entity in self.__delay_dict):
+                    self.__observedLock.acquire()
+                    self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+                    self.__observedLock.release()
+                else:
+                    self.__observedLock.acquire()
+                    self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
+                    self.__observedLock.release()
+                    self.__update_observed(entity, attribute)                
+
+            self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter, est_c_lifetime if action > 0 else est_delay)
+            if (entity,attribute) in self.__currently_eval: 
+                self.__currently_eval.remove((entity,attribute))
+            
+        self.__waiting_to_retrive.remove_items(all_ent_atts)
+
+        if(ent_att_pairs):
+            self.__cache_entity_attribute_pairs(ent_att_pairs, providers=list(providers)) 
+        if(last_observed[6] in self.__temp_entity_att_provider_map[last_observed[6]]):
+            del self.__temp_entity_att_provider_map[last_observed[6]]
+
     # Subcriber method to cache an item
     def sub_cache_item(self, parameters):
         entity = parameters[0]
@@ -769,7 +825,8 @@ class Adaptive(Strategy):
 
             now = datetime.datetime.now()
             ent_att_pairs = []
-            
+
+            self.__last_retrival_time = now          
             all_ent_atts = list(filter(lambda x: x[0] == last_observed[0] and x[6] == last_observed[6], self.__waiting_to_retrive.getlist()))
 
             for current_element in all_ent_atts:
@@ -787,14 +844,16 @@ class Adaptive(Strategy):
                     self.cache_memory.run('addcachedlifetime', ((entity, attribute), wait_time))
                     self.__last_actions.append((entity, attribute))
                     ent_att_pairs.append((entity, attribute))
-                else:
-                    self.__observedLock.acquire()
+                else:              
                     if(entity in self.__delay_dict):
+                        self.__observedLock.acquire()
                         self.__delay_dict[entity][attribute] = self.__window_counter + est_delay
+                        self.__observedLock.release()
                     else:
+                        self.__observedLock.acquire()
                         self.__delay_dict[entity] = { attribute: self.__window_counter + est_delay }
-                        self.__update_observed(entity, attribute)
-                        self.__observedLock.release()     
+                        self.__observedLock.release()
+                        self.__update_observed(entity, attribute)                
 
                 self.__decision_history[(entity, attribute)] = (observation, action, False, self.__window_counter, est_c_lifetime if action > 0 else est_delay)
                 if (entity,attribute) in self.__currently_eval: 
@@ -882,6 +941,7 @@ class Adaptive(Strategy):
     # Update statistics when an item is transitioned from not cached to cached.
     def __update_observed(self, entityid, attributes):
         now = datetime.datetime.now()
+        self.__observedLock.acquire()
         if(entityid in self.__observed):
             self.__observed[entityid]['req_ts'].append(now)
             for attr in attributes:
@@ -896,7 +956,8 @@ class Adaptive(Strategy):
             self.__observed[entityid] = {
                 'req_ts': [now],
                 'attributes': attrs
-            } 
+            }       
+        self.__observedLock.release()
 
     ###################################################################################
     # Section 05 - Transformation (Feature Vector Generation)
@@ -1277,7 +1338,7 @@ class Adaptive(Strategy):
                 expected_hr.append(curr_hr)
             
             # Expected Values
-            for idx in range(1,diff):
+            for idx in range(0,diff):
                 price = expected_hr[idx]*past_sla[idx][1]  
                 penalty = (1-expected_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
                 retrieval = (1-expected_hr[idx])*past_ret_costs[idx]
@@ -1288,8 +1349,13 @@ class Adaptive(Strategy):
 
             # Observed Values
             observed_vals = []
-            past_ar = self.__attribute_access_trend[entityid][att].get_last_range(diff)
-            for idx in range(0,len(past_ar)):            
+            past_ar = []
+            if(entityid in self.__attribute_access_trend and att in self.__attribute_access_trend[entityid]):
+                past_ar = self.__attribute_access_trend[entityid][att].get_last_range(diff)
+            else:
+                past_ar = [0 for i in range(0,diff)]
+
+            for idx in range(0,diff):            
                 penalty = past_sla[idx][2]*self.__current_delay_probability
                 retrieval = past_ret_costs[idx]
                 out = (1/past_request_rate[idx])*past_ar[idx] if past_request_rate[idx] > 0 else 0
