@@ -26,6 +26,7 @@ MAX_WORKERS = 50
 LAYER_1_NEURONS = 512
 LAYER_2_NEURONS = 256
 
+EGREEDYFILE = 'egreedy.txt'
 ACTOR_MODEL_PATH = 'agents/saved-models/ac/actor-model'
 CRITIC_MODEL_PATH = 'agents/saved-models/ac/critic-model'
 POLICY_MODEL_PATH = 'agents/saved-models/ac/policy-model'
@@ -65,9 +66,14 @@ class ACAgent(threading.Thread, Agent):
 
         # e-Greedy Exploration  
         self.__epsilons = config.e_greedy_init
+
         self.__dynamic_e_greedy_iter = config.dynamic_e_greedy_iter
         if ((config.e_greedy_init is None) or (config.e_greedy_decrement is None)):
             self.__epsilons = self.epsilons_min
+
+        if(os.path.isfile(EGREEDYFILE)):
+            f = open(EGREEDYFILE, "r")
+            self.__epsilons = float(f.read())
         
         # Selecting the algorithem to execute during the exploration phase
         self.__explore_mentor = None
@@ -298,6 +304,10 @@ class ACAgent(threading.Thread, Agent):
                 self.__epsilons = self.epsilons_min
             elif(self.__epsilons > self.__epsilons_max):
                 self.__epsilons = self.__epsilons_max
+
+            f = open("egreedy.txt", "w")
+            f.write(str(self.__epsilons))
+            f.close()
         
         self.__learn_step_counter = 0 if self.__learn_step_counter > 1000 else self.__learn_step_counter + 1
     

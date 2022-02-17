@@ -1,6 +1,6 @@
+import os
 import time
 import queue
-import os.path
 import threading
 from os import path
 
@@ -31,6 +31,7 @@ N_FEATURES = (15,)
 class DDPGACAgent(threading.Thread, Agent):
     def __init__(self, config, caller):
         disable_eager_execution()
+        self.__restored = False
 
         # Thread
         self.__timeout = 1.0/60
@@ -85,41 +86,40 @@ class DDPGACAgent(threading.Thread, Agent):
     
     # Executing the thread
     def run(self):
-        # Initializing Tensorflow Session'
-        if(path.exists(CHECKPOINT_PATH)):
-            with tf.compat.v1.Session() as sess:    
-                self.__session_saver = tf.compat.v1.train.import_meta_graph(CHECKPOINT_PATH+'ddpg-session.meta')
-                self.__session_saver.restore(sess,tf.train.latest_checkpoint(CHECKPOINT_PATH))
-                self.__session = sess
-        else:   
-            self.__session = tf.compat.v1.Session()
+        # Initializing Tensorflow Session
+        if(path.exists(CHECKPOINT_PATH) and os.listdir(CHECKPOINT_PATH)):
+            self.__restored = True
+            print('Restoring previous session!')
+        else:
+            print('Started a new session!')
+        
+        self.__session = tf.compat.v1.Session()
 
-            # Actor-Critic Networks
-            self.__critic = Critic(self.__critic_lr, 'Critic', self.__session)
-            self.__actor = Actor(self.__actor_lr, 'Actor', self.__session, self.__action_bound, self.__batch_size)
+        # Actor-Critic Networks
+        self.__critic = Critic(self.__critic_lr, 'Critic', self.__session, self.__restored)
+        self.__actor = Actor(self.__actor_lr, 'Actor', self.__session, self.__action_bound, self.__batch_size, self.__restored)
             
-            # Target Actor-Critic Networks
-            self.__target_critic = Critic(self.__critic_lr, 'TargetCritic', self.__session)
-            self.__target_actor = Actor(self.__actor_lr, 'TargetActor', self.__session, self.__action_bound, self.__batch_size)
+        # Target Actor-Critic Networks
+        self.__target_critic = Critic(self.__critic_lr, 'TargetCritic', self.__session, self.__restored)
+        self.__target_actor = Actor(self.__actor_lr, 'TargetActor', self.__session, self.__action_bound, self.__batch_size, self.__restored)
+        
+        self.__update_critic = []
+        for i in range(len(self.__target_critic.params)):
+            self.__update_critic.append(self.__target_critic.params[i].assign(
+                    tf.multiply(self.__critic.params[i], self.__tau) + tf.multiply(self.__target_critic.params[i], 1 - self.__tau)))
             
-            # Noise generator for the action space
-            self.__noise = ActionNoise(np.zeros(N_ACTIONS))
+        self.__update_actor= []
+        for i in range(len(self.__target_actor.params)):
+            self.__update_actor.append(self.__target_actor.params[i].assign(
+                    tf.multiply(self.__actor.params[i], self.__tau) + tf.multiply(self.__target_actor.params[i], 1 - self.__tau)))
 
-            self.__update_critic = []
-            for i in range(len(self.__target_critic.params)):
-                self.__update_critic.append(self.__target_critic.params[i].assign(
-                        tf.multiply(self.__critic.params[i], self.__tau) + tf.multiply(self.__target_critic.params[i], 1 - self.__tau)))
+        self.__session.run(tf.compat.v1.global_variables_initializer())
             
-            self.__update_actor= []
-            for i in range(len(self.__target_actor.params)):
-                self.__update_actor.append(self.__target_actor.params[i].assign(
-                        tf.multiply(self.__actor.params[i], self.__tau) + tf.multiply(self.__target_actor.params[i], 1 - self.__tau)))
+        # Session Saver
+        self.__update_network_params(True)
 
-            self.__session.run(tf.compat.v1.global_variables_initializer())
-            
-            # Session Saver
-            self.__session_saver = tf.compat.v1.train.Saver()
-            self.__update_network_params(True)
+        # Noise generator for the action space
+        self.__noise = ActionNoise(np.zeros(N_ACTIONS))
 
         while True:
             try:
@@ -140,8 +140,6 @@ class DDPGACAgent(threading.Thread, Agent):
             self.__tau = tau_copy
         else:
             self.__update_networks()
-        
-        self.__session_saver.save(self.__session, CHECKPOINT_PATH+'ddpg-session')
 
     # Internal method for above
     def __update_networks(self):
@@ -232,6 +230,7 @@ class DDPGACAgent(threading.Thread, Agent):
         self.__update_network_params()
 
         self.__learn_step_counter+=1
+        self.save_models()
 
         # Increasing or Decreasing epsilons
         if self.__learn_step_counter % self.__dynamic_e_greedy_iter == 0:
@@ -286,30 +285,43 @@ class DDPGACAgent(threading.Thread, Agent):
         self.__target_critic.get_last_checkpoint()
     
 class Critic(object):
-    def __init__(self, learning_rate, name, session):
+    def __init__(self, learning_rate, name, session, restore = False):
         self.__name = name
         self.__session = session
+        self.__path = 'Critic/'+name+'/'
         self.__critic_lr = learning_rate
 
         # Build the actor network
-        self.__build_network()
+        self.__checkpoint_file = CHECKPOINT_PATH + self.__name 
+        self.__build_network(restore)
 
         # Persisting the model parameters
         self.params = tf.compat.v1.trainable_variables(scope=self.__name)
-        self.__saver = tf.compat.v1.train.Saver()
-        self.__checkpoint_file = CHECKPOINT_PATH + self.__name + '.ckpt'
-
-        self.__init_policy_grad = tf.gradients(self.__q_value, self.__action_ph)
-        self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__critic_lr).minimize(self.__loss)
+        if(not hasattr(self,'__saver')):
+            self.__saver = tf.compat.v1.train.Saver()
+        
+        if(not restore):
+            self.__init_policy_grad = tf.gradients(self.__q_value, self.__action_ph)
+            self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__critic_lr).minimize(self.__loss)
 
     def get_session(self):
         return self.__session
 
-    def __build_network(self):
+    def __build_network(self, restore = False):   
         with tf.compat.v1.variable_scope(self.__name):
-            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
-            self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
-            self.__q_target = tf.compat.v1.placeholder(tf.float32, shape=[None, 1], name='targets')
+            if(restore):
+                self.__saver = tf.compat.v1.train.import_meta_graph(self.__checkpoint_file + '/' + self.__name + '.meta')
+                self.__saver.restore(self.__session, tf.compat.v1.train.latest_checkpoint(self.__checkpoint_file))
+
+                graph = tf.compat.v1.get_default_graph()             
+                self.__input_ph = graph.get_tensor_by_name(self.__path+'inputs:0')
+                self.__action_ph = graph.get_tensor_by_name(self.__path+'actions:0')
+                self.__q_target = graph.get_tensor_by_name(self.__path+'targets:0')
+                self.__optimizer = graph.get_tensor_by_name(self.__path+'dense/kernel/Adam:0')
+            else:
+                self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
+                self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
+                self.__q_target = tf.compat.v1.placeholder(tf.float32, shape=[None, 1], name='targets')
 
             # Input Layer
             f1 = 1/np.sqrt(LAYER_1_NEURONS)
@@ -336,7 +348,7 @@ class Critic(object):
                                 kernel_initializer=RandomUniform(-f3, f3),
                                 bias_initializer=RandomUniform(-f3, f3),
                                 kernel_regularizer=regularizers.l2(0.01))
-            self.__loss = tf.compat.v1.losses.mean_squared_error(self.__q_target, self.__q_value)
+            self.__loss = tf.compat.v1.losses.mean_squared_error(self.__q_target, self.__q_value) 
 
     # Get the action
     def predict(self, observations, actions):
@@ -365,64 +377,76 @@ class Critic(object):
 
     # Saving the current session in it's current state
     def save_checkpoint(self):
-        self.__saver.save(self.__session, self.__checkpoint_file)
+        self.__saver.save(self.__session, self.__checkpoint_file + '/' + self.__name)
     
     # Restoring an existing session
     def get_last_checkpoint(self):
-        self.__saver.restore(self.__session, self.__checkpoint_file)
+        self.__saver.restore(self.__session, self.__checkpoint_file + '/' + self.__name)
 
 class Actor(object):
-    def __init__(self, learning_rate, name, session, action_bound, batch_size):
+    def __init__(self, learning_rate, name, session, action_bound, batch_size, restore = False):
         self.__name = name
         self.__session = session
         self.__batch_size = batch_size
         self.__actor_lr = learning_rate
         self.__action_bound = action_bound
+        self.__path = 'Critic/'+name+'/'
         
         # Build the actor network
-        self.__build_network()
+        self.__checkpoint_file = CHECKPOINT_PATH + self.__name
+        self.__build_network(restore)
 
         # Persisting the model parameters
         self.params = tf.compat.v1.trainable_variables(scope=self.__name)
-        self.__saver = tf.compat.v1.train.Saver()
-        self.__checkpoint_file = CHECKPOINT_PATH + self.__name + '.ckpt'
+        if(not hasattr(self,'__saver')):
+            self.__saver = tf.compat.v1.train.Saver()
 
         # Initializing Policy Gradient
-        self.__init_policy_grad = tf.gradients(self.__mu, self.params, -self.__action_gradient_ph)
-        self.__actor_gradients = list(map(lambda x: tf.divide(x, self.__batch_size), self.__init_policy_grad))
-        self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__actor_lr).apply_gradients(zip(self.__actor_gradients, self.params))
+        if(not restore):
+            self.__init_policy_grad = tf.gradients(self.__mu, self.params, -self.__action_gradient_ph)
+            self.__actor_gradients = list(map(lambda x: tf.divide(x, self.__batch_size), self.__init_policy_grad[-10:]))
+            self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__actor_lr).apply_gradients(zip(self.__actor_gradients, self.params))
     
     def get_session(self):
         return self.__session
 
-    def __build_network(self):
-        with tf.compat.v1.variable_scope(self.__name):
-            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
-            self.__action_gradient_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
+    def __build_network(self, restore = False):
+            with tf.compat.v1.variable_scope(self.__name):
+                if(restore):
+                    self.__saver = tf.compat.v1.train.import_meta_graph(self.__checkpoint_file + '/' + self.__name + '.meta')
+                    self.__saver.restore(self.__session, tf.compat.v1.train.latest_checkpoint(self.__checkpoint_file))
 
-            # Input Layer
-            f1 = 1/np.sqrt(LAYER_1_NEURONS)
-            input_layer = tf.compat.v1.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
-                                kernel_initializer=RandomUniform(-f1, f1),
-                                bias_initializer=RandomUniform(-f1, f1))
-            batch_1 = tf.compat.v1.layers.batch_normalization(input_layer)
-            input_layer_activation = tf.nn.relu(batch_1)
+                    graph = tf.compat.v1.get_default_graph()
+                    self.__input_ph = graph.get_tensor_by_name(self.__path+'inputs:0')
+                    self.__action_gradient_ph = graph.get_tensor_by_name(self.__path+'actions:0')
+                    self.__optimizer = graph.get_tensor_by_name(self.__path+'dense/kernel/Adam:0')
+                else:
+                    self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
+                    self.__action_gradient_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
 
-            # Hidden Layer
-            f2 = 1/np.sqrt(LAYER_2_NEURONS)
-            hidden_layer = tf.compat.v1.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
-                                kernel_initializer=RandomUniform(-f2, f2),
-                                bias_initializer=RandomUniform(-f2, f2))
-            batch_2 = tf.compat.v1.layers.batch_normalization(hidden_layer)
-            hidden_layer_activation = tf.nn.relu(batch_2)
+                # Input Layer
+                f1 = 1/np.sqrt(LAYER_1_NEURONS)
+                input_layer = tf.compat.v1.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
+                                    kernel_initializer=RandomUniform(-f1, f1),
+                                    bias_initializer=RandomUniform(-f1, f1))
+                batch_1 = tf.compat.v1.layers.batch_normalization(input_layer)
+                input_layer_activation = tf.nn.relu(batch_1)
 
-            # Output Layer
-            f3 = 0.5 # This an intial value
-            output_layer = tf.compat.v1.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
-                                activation='tanh',
-                                kernel_initializer=RandomUniform(-f3, f3),
-                                bias_initializer=RandomUniform(-f3, f3))
-            self.__mu = tf.multiply(output_layer, self.__action_bound)
+                # Hidden Layer
+                f2 = 1/np.sqrt(LAYER_2_NEURONS)
+                hidden_layer = tf.compat.v1.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
+                                    kernel_initializer=RandomUniform(-f2, f2),
+                                    bias_initializer=RandomUniform(-f2, f2))
+                batch_2 = tf.compat.v1.layers.batch_normalization(hidden_layer)
+                hidden_layer_activation = tf.nn.relu(batch_2)
+
+                # Output Layer
+                f3 = 0.5 # This an intial value
+                output_layer = tf.compat.v1.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
+                                    activation='tanh',
+                                    kernel_initializer=RandomUniform(-f3, f3),
+                                    bias_initializer=RandomUniform(-f3, f3))
+                self.__mu = tf.multiply(output_layer, self.__action_bound, name='loss_function')
     
     # Get the action
     def predict(self, observation):
@@ -441,10 +465,10 @@ class Actor(object):
 
     # Saving the current session in it's current state
     def save_checkpoint(self):
-        self.__saver.save(self.__session, self.__checkpoint_file)
+        self.__saver.save(self.__session, self.__checkpoint_file + '/' + self.__name)
     
     # Restoring an existing session
     def get_last_checkpoint(self):
-        self.__saver.restore(self.__session, self.__checkpoint_file)
+        self.__saver.restore(self.__session, self.__checkpoint_file + '/' + self.__name)
     
    
