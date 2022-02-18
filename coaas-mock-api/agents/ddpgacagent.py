@@ -87,7 +87,7 @@ class DDPGACAgent(threading.Thread, Agent):
     # Executing the thread
     def run(self):
         # Initializing Tensorflow Session
-        if(path.exists(CHECKPOINT_PATH) and os.listdir(CHECKPOINT_PATH)):
+        if(path.exists(CHECKPOINT_PATH) and len([f for f in os.listdir(CHECKPOINT_PATH) if not f.startswith('.')]) != 0):
             self.__restored = True
             print('Restoring previous session!')
         else:
@@ -300,8 +300,9 @@ class Critic(object):
         if(not hasattr(self,'__saver')):
             self.__saver = tf.compat.v1.train.Saver()
         
+        self.__init_policy_grad = tf.gradients(self.__q_value, self.__action_ph)
+        
         if(not restore):
-            self.__init_policy_grad = tf.gradients(self.__q_value, self.__action_ph)
             self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__critic_lr).minimize(self.__loss)
 
     def get_session(self):

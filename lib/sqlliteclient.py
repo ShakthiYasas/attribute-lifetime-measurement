@@ -359,14 +359,29 @@ class SQLLiteClient:
                 (33,'windspeed',15,10,'kmph'),\
                 (34,'winddiretion',15,10,'degrees'),\
                 (35,'humidity',15,900,'percentage'),\
-                (36,'availability',17,120,'number')")
+                (36,'availability',17,120,'number'),\
+                (37,'crowdiness',18,10,'description'),\
+                (38,'status',18,10,'description'),\
+                (39,'crowdiness',19,10,'description'),\
+                (40,'status',19,10,'description'),\
+                (41,'crowdiness',20,10,'description'),\
+                (42,'status',20,10,'description'),\
+                (43,'crowdiness',21,10,'description'),\
+                (44,'status',21,10,'description'),\
+                (45,'occupants',25,60,'number'),\
+                (46,'crowd',22,60,'number'),\
+                (47,'crowd',23,300,'number'),\
+                (48,'crowd',24,1800,'number')")
         
         self.__conn.execute(
             "INSERT INTO ContextServiceProducer(serviceId, producerId) VALUES\
                 (1,11),(1,12),(3,13),\
                 (2,1),(2,2),(2,3),(2,4),(2,5),(2,7),(2,8),(2,9),\
                 (3,15),\
-                (4,17)")
+                (4,17),\
+                (5,18),(5,19),(5,20),(5,21),\
+                (6,22),(6,23),(6,24),\
+                (7,25)")
         
         self.__conn.execute(
             "INSERT INTO CurrentRetrievalLatency VALUES (1,0)")
