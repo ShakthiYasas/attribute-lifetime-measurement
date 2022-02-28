@@ -1,0 +1,7 @@
+configparser
+Flask
+Flask_restful
+numpy
+matplotlib
+scipy
+pymongo

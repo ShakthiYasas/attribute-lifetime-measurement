@@ -1,25 +1,22 @@
-FROM python:3.8.2
+FROM ubuntu
 
-# Set up and activate virtual environment
-ENV VIRTUAL_ENV "/venv"
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH "$VIRTUAL_ENV/bin:$PATH"
+# Copying the requirements file to install them
+COPY . /app/sim/
+WORKDIR /app/sim/
 
-# Python commands run inside the virtual environment
-RUN python -m pip install \
-        numpy \
-        scipy \
-        matplotlib \
-        traceback \ 
-        configparser \ 
-        flask \ 
-        flask_restful \ 
-        json \ 
-        threading \ 
-        pymongo \
-        multiprocessing
+# Installing python
+RUN apt-get update -y
+RUN apt-get install -y python3 python3-pip
+RUN pip3 install --upgrade setuptools
+RUN pip3 install --upgrade pip
 
-WORKDIR /usr/src/app
-COPY . .
-COPY .\lib .
-CMD ["main.py"]
+# Change working directory
+WORKDIR /app/sim/
+
+# Install the libaries in reqiurements.txt
+RUN pip3 install -r requirements.txt
+
+ENTRYPOINT [ "python3" ]
+
+# Run simulator
+CMD [ "main.py" ]

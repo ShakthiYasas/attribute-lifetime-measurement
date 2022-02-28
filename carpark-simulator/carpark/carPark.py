@@ -1,8 +1,10 @@
+from math import trunc
 import matplotlib.pyplot as plt
 from configuration import CarParkConfiguration
 from distribution import NormalDistribution, RandomDistribution, SuperImposedDistribution, LinearDistribution, StaticDistribution
 
 class CarPark:
+    # Class variables
     configuration = None
     distribution = []
     
@@ -14,6 +16,8 @@ class CarPark:
             self.configuration = CarParkConfiguration()
 
         print('Initializing Carpark')
+        # Selecting the correct type occupancy data distbution for the car park
+        # based on configuration.
         for count in range(0,len(self.configuration.skew)):
             if(self.configuration.variation[count] == 0):
                 self.distribution.append(RandomDistribution(self.configuration, count, configuration.random_noise))
@@ -29,14 +33,19 @@ class CarPark:
         self.print_distrubtions()
         print('Car park service running!')
 
+    # Produces the current occupancy
     def get_current_status(self, milisecond_diff) -> dict:
-        current_time_step = milisecond_diff/self.configuration.sampling_rate
+        current_time_step = trunc(milisecond_diff/self.configuration.sampling_rate)
         response_obj = dict()
         for idx in range(0,len(self.distribution)):
             response_obj['area_'+str(idx+1)+'_availability'] = self.distribution[idx].get_occupancy_level(current_time_step)
 
         return response_obj
         
+    # Generates a, 
+    #  - Graphical visualization of the generated data distribution
+    #  - CSV file of the discrete lifetimes
+    # The files are saved within the container (or the directory)
     def print_distrubtions(self):
         plt.xlabel('Time Step')
         plt.ylabel('occupancy')
@@ -48,7 +57,8 @@ class CarPark:
 
             plt.plot(dist.time_step, dist.occupancy)
             
-            life_file = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'lifetimes.csv', "a")
+            # Saving the CSV file
+            life_file = open(str(self.configuration.current_session)+'-simulation-area_'+str(self.distribution.index(dist)+1)+'-lifetimes.csv', "a")
             life_file.write('start,end,occupancy,life\n')
 
             start, end = 0, 0
@@ -57,7 +67,7 @@ class CarPark:
                 end = idx
                 if(start != end and curr_value != dist.occupancy[end]):
                     life = (dist.time_step[end] - dist.time_step[start])*self.configuration.sampling_rate
-                    life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx])+','+str(life)+'\n')
+                    life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx-1])+','+str(life)+'\n')
                     start = end
                     curr_value = dist.occupancy[end]
                 elif(idx == len(dist.time_step)-1):
@@ -65,6 +75,7 @@ class CarPark:
                     life_file.write(str(dist.time_step[start])+','+str(dist.time_step[end])+','+str(dist.occupancy[idx])+','+str(life)+'\n')
 
             life_file.close()
-  
+
+        # Generating the graphical representation
         plt.savefig(str(self.configuration.current_session)+'-distribution.png')
 

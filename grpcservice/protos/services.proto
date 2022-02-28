@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+// Cache Memory Service
+service CacheService {
+    rpc save(CacheItem) returns (Empty) {}
+    rpc addcachedlifetime(CachedLife) returns (Empty) {}
+    rpc get_hitrate_trend(Empty) returns (ListOfFloat) {}
+    rpc updatecachedlifetime(CachedLife) returns (Empty) {}
+    rpc is_cached(EntityAttributePair) returns (BoolType) {} 
+    rpc get_statistics_all(Empty) returns (JSONString) {} 
+    rpc get_last_hitrate(CacheResponse) returns (HitRateStatistic) {}
+    rpc get_statistics(EntityAttributePair) returns (Statistic) {}
+    rpc removeentitycachedlifetime(CacheResponse) returns (Empty) {}
+    rpc removecachedlifetime(EntityAttributePair) returns (Empty) {}
+    rpc get_statistics_entity(CacheResponse) returns (JSONString) {} 
+    rpc get_attributes_of_entity(CacheResponse) returns (ListOfString) {} 
+    rpc get_value_by_key(EntityAttributePair) returns (ListOfCachedItems) {}  
+    rpc get_values_for_entity(EntityAttributeList) returns (JSONString) {} 
+    rpc are_all_atts_cached(EntityAttributeList) returns (CachedAttributes) {}    
+}
+
+message CacheItem {
+    int32 entityid = 1;
+    string cacheitems = 2;
+}
+
+message BoolType {
+    bool status = 1;
+}
+
+message CacheResponse {
+    int32 count = 1;
+}
+
+message EntityAttributeList {
+    int32 entityId = 1;
+    ListOfString attributes = 2;
+} 
+
+message ListOfString {
+    repeated string string = 1;
+}
+
+message ListOfFloat {
+    repeated float realNumber = 1;
+}
+
+message CachedLife{
+    int32 entityId = 1;
+    string attribute = 2;
+    string cacheLife = 3;
+}
+
+message EntityAttributePair{
+    int32 entityId = 1;
+    string attribute = 2;
+}
+
+message CachedAttributes{
+    bool isCached = 1;
+    ListOfString attributeList = 2;
+}
+
+message CachedItem {
+    int32 prodid = 1;
+    string response = 2;
+    string cachedTime = 3;
+    bool recencybit = 4;
+}
+
+message ListOfCachedItems {
+    repeated CachedItem values = 1;
+}
+
+message CachedRecords {
+    map<string, string> attributes = 1;
+}
+
+message Statistic {
+    repeated string datelist = 1;
+    string cachedTime = 2;
+    bool isAvailable = 3;
+}
+
+message JSONString {
+    string string = 1;
+}
+
+message HitRateStatistic {
+    repeated HitStat hitrate = 1;
+}
+
+message HitStat {
+    float hitrate = 1;
+    int32 count = 2;
+}
+
+message Empty { }
+
+// Compiling 
+// python -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/services.proto

@@ -1,84 +1,178 @@
 import sys, os
-sys.path.append(os.path.abspath(os.path.join('.')))
+sys.path.append(os.path.abspath(os.path.join('..')))
 
-import time
-import json
+
+import _thread
+import secrets
 import traceback
 import configparser
-from cache import Cache
+from pathlib import Path
 from datetime import datetime
-import matplotlib.pyplot as plt
+# from hanging_threads import start_monitoring
+
+import numpy as np
 from flask import Flask, request
-from lib.mongoclient import MongoClient
 from flask_restful import Resource, Api
+
+from lib.cacheclient import GRPCClient
+from lib.mongoclient import MongoClient
 from lib.response import parse_response
+from lib.sqlliteclient import SQLLiteClient
+
+from agents.agentfactory import AgentFactory
 from strategies.strategyfactory import StrategyFactory
 
 app = Flask(__name__)
 api = Api(app)
 
+# monitoring_thread = start_monitoring(seconds_frozen=10)
+
+# Global variables
 config = configparser.ConfigParser()
-config.read(os.getcwd()+'/coaas-mock-api/config.ini')
+config.read('config.ini')
 default_config = config['DEFAULT']
+
+# Connecting to a monogo DB instance 
 db = MongoClient(default_config['ConnectionString'], default_config['DBName'])
 
+# Selected Strategy
+strategy = None
+selected_algo = None
+
 class PlatformMock(Resource):
+    # Initialize this session
+    __token = secrets.token_hex(nbytes=16)
+    global strategy
     strategy = default_config['Strategy'].lower()
-    current_session = db.insert_one(strategy+'-sessions', {'strategy': strategy, 'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
+    db.insert_one('sessions', 
+        {
+            'strategy': strategy, 
+            'token': __token,
+            'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
     
-    strategy_factory = StrategyFactory(strategy, default_config['Attributes'].lower().split(','), default_config['BaseURL'], db, int(default_config['MovingWindow']))
-
-    selected_algo = strategy_factory.selected_algo
-    setattr(selected_algo, 'session', str(current_session))
-    setattr(selected_algo, 'attributes', int(default_config['NoOfAttributes']))
-
-    if(strategy != 'reactive'):
-        cache_size = int(default_config['CacheSize'])
-        if(cache_size < selected_algo.attributes):
-            cache_size = selected_algo.attributes
-            print('Initializing cache with '+ str(selected_algo.attributes) + ' slots.')
+    # Create an instance of the refreshing strategy
+    __strategy_factory = StrategyFactory(strategy, db, int(default_config['MovingWindow']), 
+            True if default_config['IsStaticLife'] == 'True' else False, int(default_config['LearningCycle']), 
+            True if default_config['SkipExploration'] == 'True' else False)
+    
+    global selected_algo
+    selected_algo = __strategy_factory.get_retrieval_strategy()
+    setattr(selected_algo, 'trend_ranges', [int(default_config['ShortWindow']), int(default_config['MidWindow']), int(default_config['LongWindow'])])
         
-        setattr(selected_algo, 'cache_memory', Cache(cache_size))
-        selected_algo.init_cache()
+    # Set current session token
+    setattr(selected_algo, 'session', __token)
 
+    # Initalize the SQLLite Instance 
+    __service_registry = SQLLiteClient(default_config['SQLDBName'])
+    db_file = Path(default_config['SQLDBName']+'.db')
+    if(not db_file.is_file()):
+        __service_registry.seed_db_at_start()
+    setattr(selected_algo, 'service_registry', __service_registry)
+
+    # "Reactive" strategy do not need a cache memory. 
+    # Therefore, skipping cache initializing for "Reactive".
+    isCaching = default_config['IsCaching'] 
+    if(strategy != 'reactive' or isCaching != 'True'):
+        #Initializing cache memory
+        setattr(selected_algo, 'cache_memory', GRPCClient())
+
+        # Initialize the Selective Caching Agent
+        agent_fac = AgentFactory(default_config['RLAgent'], config, selected_algo)
+        if(default_config['RLAgent'].lower() == 'simple'):
+            agent = agent_fac.get_agent()
+            setattr(selected_algo, 'selective_cache_agent', agent_fac.get_agent())
+        else:
+            setattr(selected_algo, 'selective_agent_factory', agent_fac)
+
+    selected_algo.init_cache()
+
+    # POST /contexts endpoint
+    # Retrives context data. 
     def post(self):
         try:
-            start = time.time()
+            start = datetime.now()
             json_obj = request.get_json()
-            data = self.selected_algo.get_result(default_config['BaseURL'], json_obj, str(self.current_session))
-    
-            elapsed_time = time.time() - start
-            response = parse_response(data, str(self.current_session))
-            db.insert_one(self.strategy+'-responses', {'session': str(self.current_session), 'strategy': self.strategy, 'data': response, 'time': elapsed_time})
+            req_id = secrets.token_hex(nbytes=8)
 
-            return response, 200  # return data and 200 OK code
+            # Simple Authenticator
+            consumer = json_obj['requester']
+            fthr, rtmax = self.__service_registry.get_freshness_for_consumer(consumer['id'],consumer['sla'])
+            if(fthr == None):
+                # Return message and 401 Error code
+                return parse_response({'message':'Unauthorized'}), 401  
+
+            # Sub Query Identifier
+            query_id = json_obj['identifier']
+
+            # Start to process the request
+            data = selected_algo.get_result(json_obj['query'], fthr, req_id)
+            response = parse_response(data, self.__token)
+            _thread.start_new_thread(self.__save_rp_stats, (self.__token, response, start, rtmax, fthr[1], fthr[2], query_id))
+                
+            # Return data and 200 OK code
+            return response, 200    
+                
         except(Exception):
             print('An error occured : ' + traceback.format_exc())
-            return parse_response({'message':'An error occured'}), 400  # return message and 400 Error code
+            # Return message and 400 Error code
+            return parse_response({'message':'An error occured'}), 400 
 
-    def get(self):
-        session = request.args.get('session')
-        if(session == None):
-            session = str(db.read_last(self.strategy+'-sessions')._id)
+    def __save_rp_stats(self, token, response, start, rtmax, price, penalty, query_id):
+        # Statistics
+        res_time = (datetime.now() - start).total_seconds()
+        db.insert_one('responses-history', 
+            {
+                'session': token,
+                'data': str(response), 
+                'response_time': res_time,
+                'is_delayed': bool(res_time >= rtmax) if rtmax > 0 else False,
+                'price': price,
+                'penalty': penalty,
+                'query_id': query_id
+            })
 
-        plt.xlabel('Request')
-        plt.ylabel('Response Time')
-        
-        responses = db.read_all(self.strategy+'-responses', {'session': str(self.current_session) if session == None else session, 'strategy': self.strategy})
-
-        requests = []
-        responsetimes = []
-        for res in responses:
-            requests.append(str(res._id))
-            responsetimes.append(res.time)
-
-        plt.plot(requests, responsetimes)  
-        filename = str(self.current_session)+'-responsetime.png'
-        plt.savefig(filename)
-
-        return {'fileName': filename}, 200 # file saved
+class Statistics(Resource):
+    # GET /statistics endpoint.
+    # Retrives the details (metadata & statistics) of the current session in progress. 
+    def get(self, name):
+        global strategy
+        global selected_algo
+        if(name == 'caches'):
+            if(strategy == 'reactive'):
+                return 404
+            ent_id = int(request.args.get('id'))
+            data = selected_algo.get_cache_statistics(ent_id)
+            return data, 200   
+        if(name == 'entities'):
+            if(strategy == 'reactive'):
+                return 404
+            data = selected_algo.get_currently_cached_entities()
+            return data, 200   
+        if(name == 'hit-rates'):
+            if(strategy == 'reactive'):
+                return 404
+            data = selected_algo.get_hit_rate_variation()
+            return data, 200 
+        elif(name == 'returns'):
+            is_curr = str(request.args.get('current')).lower()
+            if(is_curr == 'true'):
+                data = selected_algo.get_current_cost()
+                return {
+                    'cost': data
+                }, 200   
+            else:
+                session = str(request.args.get('session'))
+                data = selected_algo.get_cost_variation(session)
+                return {
+                    'variation': data,
+                    'schema': 'index : return (gain or loss)'
+                }, 200   
+        else:
+            return {'message': 'Invalid URL'}, 404   
 
 api.add_resource(PlatformMock, '/contexts')
+api.add_resource(Statistics, '/statistics/<string:name>')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+    app.run(debug=False, port=5001)

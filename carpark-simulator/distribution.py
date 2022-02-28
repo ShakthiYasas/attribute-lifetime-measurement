@@ -12,8 +12,12 @@ class Distribution(object):
     """"Base class of all distributions"""
     pass
 
+# NormalDistribution class 
+# Generates a standard normal distribution that is guranteed skewed.
+# Config Value: up, down
 class NormalDistribution(Distribution):
     def __init__(self, configuration, index, noise=False):
+        # Class Variables
         self.time_step = []
         self.occupancy = []
         
@@ -23,18 +27,25 @@ class NormalDistribution(Distribution):
 
         if(isinstance(configuration,CarParkConfiguration)):
             print('Starting to create a skewed normal distribution.')
+
+            # Generate a random distribution
             linspace = np.linspace(start=0, stop=configuration.sample_size, num=configuration.no_of_refreshes)
             init_dist = skewnorm.pdf(linspace, a=configuration.skew[index], scale=configuration.standard_deviation[index])
         
+            # Normalize the distribution 
             distributions = normalizing_distribution(init_dist, configuration.sample_size)
             self.time_step = distributions[0]
+
+            # Smoothening the curve
             self.occupancy = smooth(distributions[1],configuration.standard_deviation[index])
 
+            # Discretizing the distribtution into time steps
             if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
                 res = trim_distribution(configuration.selected_periods,self.occupancy)
                 self.time_step = res[0]
                 self.occupancy = res[1]
             
+            # Add random noise to the distribution if set True
             if(noise):
                 self.occupancy = randomnoiser(self.occupancy, configuration.sample_size, configuration.noise_percentage)
 
@@ -42,26 +53,23 @@ class NormalDistribution(Distribution):
         else:
             raise ValueConfigurationError()
 
+    # Get the current occupnacy of the car-park
     def get_occupancy_level(self, step):
-        closest_step = min(self.time_step, key=lambda x:abs(x-step))
-        idx = self.time_step.index(closest_step)
-
-        if(closest_step>step):
-            if(self.variation>0):
-                return self.occupancy[idx-1]
-            else:
-                return self.sample_size - self.occupancy[idx-1]
+        idx = self.time_step.index(step)     
+        # Mapping continuous time into discrete timesteps 
+        if(self.variation>0):
+            return self.occupancy[idx]
         else:
-            if(self.variation>0):
-                return self.occupancy[idx]
-            else:
-                return self.sample_size - self.occupancy[idx]
+            return self.sample_size - self.occupancy[idx]
 
+# RandomDistribution class 
+# Generates a standard normal distribution that is guranteed no-skew.
+# Config Value: random
 class RandomDistribution(Distribution):
     def __init__(self, configuration, index, noise=False):
-
         print('Starting to create a random normal distribution.')
 
+        # Class variable
         self.time_step = []
         self.occupancy = []
         self.sample_size = configuration.sample_size
@@ -90,43 +98,48 @@ class RandomDistribution(Distribution):
                         current_frequency = 0
                         current_index = idx
                         break
-            
+
+            # Discretizing the distribtution into time steps
             if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
                 res = trim_distribution(configuration.selected_periods, self.occupancy)
                 self.time_step = res[0]
                 self.occupancy = res[1]
 
+            # Smoothing the curve
             self.occupancy = smooth(self.occupancy, configuration.standard_deviation[index])
             
         except(Exception):
             print('End of distribution')
 
-        self.occupancy = list(map(lambda x: configuration.sample_size if x > configuration.sample_size else x, smooth(self.occupancy, configuration.standard_deviation[index])))
+        self.occupancy = list(map(lambda x: configuration.sample_size if x > configuration.sample_size else x, 
+                                smooth(self.occupancy, configuration.standard_deviation[index])))
+        
+        # Add random noise to the distribution if set True
         if(noise):
                 self.occupancy = randomnoiser(self.occupancy, self.sample_size, configuration.noise_percentage)
 
     def get_occupancy_level(self, step):
-        closest_step = min(self.time_step, key=lambda x:abs(x-step))
-        idx = self.time_step.index(closest_step)
-        if(closest_step>step):
-            if(self.variation>0):
-                return self.occupancy[idx-1]
-            else:
-                return self.sample_size - self.occupancy[idx-1]
+        idx = self.time_step.index(step)     
+        # Mapping continuous time into discrete timesteps 
+        if(self.variation>0):
+            return self.occupancy[idx]
         else:
-            if(self.variation>0):
-                return self.occupancy[idx]
-            else:
-                return self.sample_size - self.occupancy[idx]
+            return self.sample_size - self.occupancy[idx]
 
+# SuperImposedDistribution class
+# Superimposes skewed normal distribution with a un-skewed normal distibution to produce
+# a shifted normal distibution, having higher variance.
+# Config Value: super-up, super-down
 class SuperImposedDistribution(Distribution):
         def __init__(self, configuration, index, noise=False):  
+            # Class variables
             self.time_step = []
             self.occupancy = []
             
             self.sample_size = configuration.sample_size
             self.variation = configuration.variation[index]
 
+            # Creating thhe baseline distributions
             random = RandomDistribution(configuration, index)
             norm = NormalDistribution(configuration, index)
 
@@ -134,21 +147,22 @@ class SuperImposedDistribution(Distribution):
             self.time_step = res[0]
             self.occupancy = res[1]
 
+            # Add random noise to the distribution if set True
+            if(noise):
+                self.occupancy = randomnoiser(self.occupancy, self.sample_size, configuration.noise_percentage)
+
+        # Get current occupnacy of the carpark
         def get_occupancy_level(self, step):
-            closest_step = min(self.time_step, key=lambda x:abs(x-step))
-            idx = self.time_step.index(closest_step)
-
-            if(closest_step>step):
-                if(self.variation>0):
-                    return self.occupancy[idx-1]
-                else:
-                    return self.sample_size - self.occupancy[idx-1]
+            idx = self.time_step.index(step)     
+            # Mapping continuous time into discrete timesteps 
+            if(self.variation>0):
+                return self.occupancy[idx]
             else:
-                if(self.variation>0):
-                    return self.occupancy[idx]
-                else:
-                    return self.sample_size - self.occupancy[idx]
+                return self.sample_size - self.occupancy[idx]
 
+# StaticDistribution class
+# Generates a linear distribution where gradient = 0 (i.e. y=n where n is real number)
+# Config Value: static-line
 class StaticDistribution(Distribution):
     def __init__(self, configuration, noise = False):
         if(isinstance(configuration,CarParkConfiguration)):
@@ -161,6 +175,7 @@ class StaticDistribution(Distribution):
                 self.time_step = res[0]
                 self.occupancy = res[1]
             
+            # Add random noise to the distribution if set True
             if(noise):
                 self.occupancy = randomnoiser(self.occupancy, configuration.sample_size, configuration.noise_percentage)
 
@@ -168,9 +183,13 @@ class StaticDistribution(Distribution):
         else:
             raise ValueConfigurationError()
 
+    # Get current occupnacy of the carpark
     def get_occupancy_level(self, step = None):
         return self.occupancy[0]
 
+# LinearDistribution class
+# Generates a linear distribution where gradient > 0 or gradient < = (i.e. y=mx+c)
+# Config Value: gradient-line
 class LinearDistribution(Distribution):
     def __init__(self, configuration, noise=False):
         if(isinstance(configuration,CarParkConfiguration)):
@@ -181,11 +200,13 @@ class LinearDistribution(Distribution):
 
             self.occupancy = list(map(lambda z : round(z), occupancy))
 
+            # Discretizing the distribtution into time steps
             if(len(configuration.selected_periods) > 1 or (not(configuration.selected_periods[0][0] == 1 and configuration.selected_periods[0][1] == configuration.no_of_refreshes))):
                 res = trim_distribution(configuration.selected_periods,self.occupancy)
                 self.time_step = res[0]
                 self.occupancy = res[1]
             
+            # Add random noise to the distribution if set True
             if(noise):
                 self.occupancy = randomnoiser(self.occupancy, configuration.sample_size, configuration.noise_percentage)
 
@@ -193,16 +214,14 @@ class LinearDistribution(Distribution):
         else:
             raise ValueConfigurationError()
 
+    # Get current occupnacy of the carpark
     def get_occupancy_level(self, step):
-        closest_step = min(self.time_step, key=lambda x:abs(x-step))
-        idx = self.time_step.index(closest_step)
+        idx = self.time_step.index(step) 
+        return self.occupancy[idx]
 
-        if(closest_step>step):
-            return self.occupancy[idx-1]
-        else:
-            return self.occupancy[idx]
-
-#Static Method
+# Static Method
+# Takes 2 distributions and merges them into a single distribution.
+# paramters: dist1, dist2 = series of numbers
 def super_impose(dist1, dist2):
     dists = []
     dists.extend(list(map(lambda x: (x, dist1.occupancy[dist1.time_step.index(x)]), dist1.time_step)))
@@ -220,6 +239,9 @@ def super_impose(dist1, dist2):
     return list(map(lambda x : x[0], d.items())), list(map(lambda x : round(x[1][1]), d.items()))
 
 # Static Method
+# Builds the normal distribution from the random data collection
+# normalizes that with in the given parameters (fitting).
+# parameters: init_dist = random data collection, sample_size = maximum value of representive slots
 def normalizing_distribution(init_dist, sample_size):
     constant = sample_size/sum(init_dist)
     dist = map(lambda x: x * constant, init_dist)
@@ -241,6 +263,9 @@ def normalizing_distribution(init_dist, sample_size):
 
     return (time_step_list, occupancy_list)
 
+# Static Method
+# Trims the distributions into selected discrete planning periods 
+# parameters: selections = indexes of the selected planning periods, dist = full distribution 
 def trim_distribution(selections, dist):
     occupancy = []
     for sel in selections:
@@ -248,10 +273,15 @@ def trim_distribution(selections, dist):
     time_step = range(1,len(occupancy)+1)
     return (occupancy,time_step)
 
+# Static Method
+# Smooths the curve using Gaussian 1-D filtering
 def smooth(x,std):
     y = gaussian_filter1d(x, std)
     return list(map(lambda z : round(z), y))
 
+# Static Method
+# Adds random noise to the distribution
+# parameters: x = distribution, up_bound = max value of the noise, coverage = percentage of noise in the distbution
 def randomnoiser(x, up_bound, coverage):
     if(coverage <= 1.0 and coverage > 0.0):  
         noise = np.random.normal(0,2,len(x))   
@@ -262,6 +292,7 @@ def randomnoiser(x, up_bound, coverage):
     else:
         return x
 
+# Static Method
 def check_value(x, up_bound):
     if(x<0):
         return 0

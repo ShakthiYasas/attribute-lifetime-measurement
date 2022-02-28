@@ -1,1 +1,14 @@
 __pycache__/
+coaas-mock-api/agents/saved-models/actor-model/saved_model.pb
+coaas-mock-api/agents/saved-models/actor-model/variables/variables.data-00000-of-00001
+coaas-mock-api/agents/saved-models/policy-model/variables/variables.index
+coaas-mock-api/agents/saved-models/policy-model/variables/variables.data-00000-of-00001
+coaas-mock-api/agents/saved-models/policy-model/saved_model.pb
+coaas-mock-api/agents/saved-models/critic-model/variables/variables.index
+coaas-mock-api/agents/saved-models/critic-model/variables/variables.data-00000-of-00001
+coaas-mock-api/agents/saved-models/critic-model/saved_model.pb
+coaas-mock-api/agents/saved-models/actor-model/variables/variables.index
+coaas-mock-api/ServiceRegistry.db
+coaas-mock-api/ServiceRegistry.db-journal
+coaas-mock-api/agents/saved-models/*
+ServiceRegistry.db
