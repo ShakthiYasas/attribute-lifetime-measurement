@@ -137,3 +137,19 @@ class DDPGConfiguration(Configuration):
         self.pair_similarity_maximum = float(defaults['MaxPairSimilarity'])
         self.cluster_similarity_threshold = float(defaults['ClusterSimilarityThreshold'])
         self.subcluster_similarity_threshold = float(defaults['SubClusterSimilarityThreshold'])
+
+# Configuration for the Himadri Agent
+class HimadriConfiguration(Configuration):
+    explore_mentor = 'Random'
+
+    def __init__(self, config):
+        defaults = config['DEFAULT']
+        hyper_params = config['HYPER']
+
+        self.mid = int(defaults['MidWindow'])
+        self.long = int(defaults['LongWindow'])
+        
+        self.window = int(defaults['MovingWindow'])
+        self.e_greedy_init = float(hyper_params['Epsilon'])
+        self.reward_threshold = float(defaults['MaxReward'])
+        self.explore_mentor = defaults['ExplorationAlgorithm']

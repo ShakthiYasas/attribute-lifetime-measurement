@@ -15,6 +15,7 @@ from lib.event import subscribe
 from agents.dqnagent import DQNAgent
 from lib.fifoqueue import FIFOQueue_2
 from agents.simpleagent import SimpleAgent
+from agents.himadriagent import HimadriAgent
 
 from strategies.strategy import Strategy
 from serviceresolver.serviceselector import ServiceSelector
@@ -35,6 +36,7 @@ class Adaptive(Strategy):
     # Dictionaries
     __delay_dict = {}
     __decision_history = {}
+    __entity_access_trend = {}
     __attribute_access_trend = {}
     __cached_hit_access_trend = {}
     __cached_attribute_access_trend = {}
@@ -56,12 +58,14 @@ class Adaptive(Strategy):
     # Queues
     __sla_trend = FIFOQueue_2(10)
     __waiting_to_retrive = FIFOQueue_2()
-    __entity_access_trend = FIFOQueue_2(100)
+    __entity_accesses = FIFOQueue_2(100)
     __request_rate_trend = FIFOQueue_2(1000)
     __retrieval_cost_trend = FIFOQueue_2(10)
     
     __observedLock = threading.Lock()
     __decision_history_lock = threading.Lock()
+
+    __is_himadri = False
 
     def __init__(self, db, window, isstatic=True, learncycle = 20, skip_random=False): 
         self.__db = db
@@ -102,6 +106,7 @@ class Adaptive(Strategy):
         
         setattr(self.cache_memory, 'caller_strategy', self)
         self.__is_simple_agent = isinstance(self.selective_cache_agent, SimpleAgent)
+        self.__is_himadri = isinstance(self.selective_cache_agent, HimadriAgent)
 
         # Extrapolation ranges 
         self.__short = self.trend_ranges[0]*(self.__moving_window/1000)
@@ -179,21 +184,30 @@ class Adaptive(Strategy):
                     del self.__observed[key]
                 if(key in self.__attribute_access_trend):
                     del self.__attribute_access_trend[key]
+                    del self.__entity_access_trend[key]
             else:
                 self.__update_attribute_access_trend(exp_time, key, value, __reqs_in_window)
 
     def __update_attribute_access_trend(self, exp_time, key, value, __reqs_in_window=None):
+        # Clearing any invalid entiries
         __reqs_in_window = self.__reqs_in_window if not __reqs_in_window else __reqs_in_window
         invalidtss = [num for num in value['req_ts'] if num < exp_time]
         for i in range(0,len(invalidtss)):
             value['req_ts'].pop(0)
 
+        # Calculating AR using the valid entires
         validtss = value['req_ts']
         access_freq = 0
         if(__reqs_in_window>0):
             access_freq = 1 if len(validtss) > __reqs_in_window else len(validtss)/__reqs_in_window 
-        self.__entity_access_trend.push(access_freq)
-                
+        self.__entity_accesses.push(access_freq)
+        if(key in self.__entity_access_trend):
+            self.__entity_access_trend[key].push(access_freq)
+        else:
+            que = FIFOQueue_2(1000)
+            que.push(access_freq)
+            self.__entity_access_trend[key] = que
+
         for curr_attr, access_list in value['attributes'].items():
             invalidtss = [num for num in access_list if num <= exp_time]
             for i in range(0,len(invalidtss)):
@@ -256,90 +270,92 @@ class Adaptive(Strategy):
 
     # Executes learning the agent (parameter synchornization)
     def __learning_after_action(self):     
-        prev_decisions = self.__decision_history.copy().items()   
-        for action, values in prev_decisions:
-            entityid = action[0]
-            att = action[1]
-            if((not values[2]) and ((values[1] == 0 and values[3] <= self.__window_counter + self.__learning_skip) 
-                    or (values[1]>0 and entityid in self.__cached_hit_access_trend and 
-                        att in self.__cached_hit_access_trend[entityid] and 
-                        self.__cached_hit_access_trend[entityid][att].isfull()))):
-                self.__decision_history_lock.acquire()
-                updated_val = list(values)
-                updated_val[2] = True
-                self.__decision_history[action] = tuple(updated_val)
-                self.__decision_history_lock.release()
+        if(not self.__is_himadri):
+            prev_decisions = self.__decision_history.copy().items()   
+            for action, values in prev_decisions:
+                entityid = action[0]
+                att = action[1]
+                if((not values[2]) and ((values[1] == 0 and values[3] <= self.__window_counter + self.__learning_skip) 
+                        or (values[1]>0 and entityid in self.__cached_hit_access_trend and 
+                            att in self.__cached_hit_access_trend[entityid] and 
+                            self.__cached_hit_access_trend[entityid][att].isfull()))):
+                    self.__decision_history_lock.acquire()
+                    updated_val = list(values)
+                    updated_val[2] = True
+                    self.__decision_history[action] = tuple(updated_val)
+                    self.__decision_history_lock.release()
 
-                curr_state = self.__translate_to_state(action[0], action[1])
-                if(curr_state == None):
-                    continue
-                diff = self.__window_counter - values[3]
-                reward = self.__calculate_reward(action[0], action[1], values[0], diff)  
-                if(not self.__is_simple_agent):
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward[0], curr_state, values[4]))
-                else:
-                    self.selective_cache_agent.set_to_reward_history(reward[0])
-
-                self.__decision_history_lock.acquire()
-                del self.__decision_history[action]
-                self.__decision_history_lock.release()
-    
-    def __update_reward_evicted_early(self, entity, attribute):
-        action = (entity, attribute)
-        if(action in self.__decision_history):
-            decision = self.__decision_history[action]
-            diff = self.__window_counter - decision[3]
-
-            curr_state = self.__translate_to_state(action[0], action[1])
-
-            if(curr_state == None):
-                reward = -10
-                if(not self.__is_simple_agent):
-                    self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward, {'features':decision[0]}, decision[4]))
-                else:
-                    self.selective_cache_agent.set_to_reward_history(reward)
-            else:
-                if(self.__window_counter >= decision[3]+3):
-                    reward = self.__calculate_reward(action[0], action[1], decision[0], diff)  
-
+                    curr_state = self.__translate_to_state(action[0], action[1], self.__is_himadri)
+                    if(curr_state == None):
+                        continue
+                    diff = self.__window_counter - values[3]
+                    reward = self.__calculate_reward(action[0], action[1], values[0], diff)  
                     if(not self.__is_simple_agent):
-                        self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (values[0], values[1], reward[0], curr_state, values[4]))
                     else:
                         self.selective_cache_agent.set_to_reward_history(reward[0])
+
+                    self.__decision_history_lock.acquire()
+                    del self.__decision_history[action]
+                    self.__decision_history_lock.release()
+    
+    def __update_reward_evicted_early(self, entity, attribute):
+        if(not self.__is_himadri):
+            action = (entity, attribute)
+            if(action in self.__decision_history):
+                decision = self.__decision_history[action]
+                diff = self.__window_counter - decision[3]
+
+                curr_state = self.__translate_to_state(action[0], action[1], self.__is_himadri)
+
+                if(curr_state == None):
+                    reward = -10
+                    if(not self.__is_simple_agent):
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward, {'features':decision[0]}, decision[4]))
+                    else:
+                        self.selective_cache_agent.set_to_reward_history(reward)
                 else:
-                    past_sla = self.__sla_trend.get_last_range(diff)
-                    past_ret_costs = self.__retrieval_cost_trend.get_last_range(diff)
-                    past_request_rate = self.__request_rate_trend.get_last_range(diff)
-                    
-                    total_gain = 0
-                    total_requests = 0
+                    if(self.__window_counter >= decision[3]+3):
+                        reward = self.__calculate_reward(action[0], action[1], decision[0], diff)  
 
-                    if(entity in self.__cached_attribute_access_trend and 
-                            attribute in self.__cached_attribute_access_trend[entity]):
-                        # This item has been cached in the last decision epoch 
-                        past_hr = self.__cached_hit_access_trend[entity][attribute].get_last_range(diff)
-                        past_ar = self.__cached_attribute_access_trend[entity][attribute].get_last_range(diff)
-
-                        for idx in range(0,len(past_ar)):
-                            price = past_hr[idx]*past_sla[idx][1]
-                            penalty = (1-past_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
-                            out = (1/past_request_rate[idx])*past_ar[idx]
-                            retrieval = (1-past_hr[idx])*past_ret_costs[idx]
-
-                            total_requests += out
-                            total_gain += out*(price - penalty - retrieval)
-                        
-                        # This returns the gain or loss of caching an item per request
-                        reward = round(total_gain/total_requests,3) if total_requests>0 else -10
                         if(not self.__is_simple_agent):
                             self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
                         else:
                             self.selective_cache_agent.set_to_reward_history(reward[0])
+                    else:
+                        past_sla = self.__sla_trend.get_last_range(diff)
+                        past_ret_costs = self.__retrieval_cost_trend.get_last_range(diff)
+                        past_request_rate = self.__request_rate_trend.get_last_range(diff)
+                        
+                        total_gain = 0
+                        total_requests = 0
 
-            if(action in self.__decision_history):
-                self.__decision_history_lock.acquire()
-                del self.__decision_history[action]
-                self.__decision_history_lock.release()
+                        if(entity in self.__cached_attribute_access_trend and 
+                                attribute in self.__cached_attribute_access_trend[entity]):
+                            # This item has been cached in the last decision epoch 
+                            past_hr = self.__cached_hit_access_trend[entity][attribute].get_last_range(diff)
+                            past_ar = self.__cached_attribute_access_trend[entity][attribute].get_last_range(diff)
+
+                            for idx in range(0,len(past_ar)):
+                                price = past_hr[idx]*past_sla[idx][1]
+                                penalty = (1-past_hr[idx])*past_sla[idx][2]*self.__current_delay_probability
+                                out = (1/past_request_rate[idx])*past_ar[idx]
+                                retrieval = (1-past_hr[idx])*past_ret_costs[idx]
+
+                                total_requests += out
+                                total_gain += out*(price - penalty - retrieval)
+                            
+                            # This returns the gain or loss of caching an item per request
+                            reward = round(total_gain/total_requests,3) if total_requests>0 else -10
+                            if(not self.__is_simple_agent):
+                                self.selective_cache_agent.onThread(self.selective_cache_agent.learn, (decision[0], decision[1], reward[0], curr_state, decision[4]))
+                            else:
+                                self.selective_cache_agent.set_to_reward_history(reward[0])
+
+                if(action in self.__decision_history):
+                    self.__decision_history_lock.acquire()
+                    del self.__decision_history[action]
+                    self.__decision_history_lock.release()
 
     ###################################################################################
     # Section 02 - Retrive Context
@@ -564,16 +580,7 @@ class Adaptive(Strategy):
                 _thread.start_new_thread(self.selective_cache_agent.modify_dicount_rate, ())
                 _thread.start_new_thread(self.selective_cache_agent.modify_epsilon, (self.__learning_counter,))
 
-        return output
-
-    def __evaluate_and_updated_observed_in_thread(self, entityid, out, ref_key):
-        self.__update_observed(entityid, list(out.keys()))
-
-        if(self.__window_counter >= self.trend_ranges[1]+1):
-            # Run this in the background
-            self.__evaluate_for_caching(entityid, out, ref_key)
-            self.__evaluated.add(entityid)
-            
+        return output         
 
     ###################################################################################
     # Section 03 - Evluating to Cache
@@ -590,7 +597,7 @@ class Adaptive(Strategy):
             if((self.__check_delay(entityid, att) or self.__is_spike(entityid, att)) and not self.__waiting_to_retrive.is_enqued(entityid, att)):
                 # print('There is a spike or no delay restriction!')
                 # Translate the entity,attribute pair to a state
-                observation = self.__translate_to_state(entityid,att)
+                observation = self.__translate_to_state(entityid,att, self.__is_himadri)
                 if(observation==None):
                     if(entityid in self.__delay_dict):
                         self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -635,6 +642,15 @@ class Adaptive(Strategy):
 
         return actions         
 
+    # Evaluate an entity for caching
+    def __evaluate_and_updated_observed_in_thread(self, entityid, out, ref_key):
+        self.__update_observed(entityid, list(out.keys()))
+
+        if(self.__window_counter >= self.trend_ranges[1]+1):
+            # Run this in the background
+            self.__evaluate_for_caching(entityid, out, ref_key)
+            self.__evaluated.add(entityid)
+    
     def __evaluate_for_caching(self, entityid, attributes:dict, ref_key):
         # Check if this entity has been evaluated for caching in this window
         # Evaluate if the entity can be cached
@@ -648,7 +664,7 @@ class Adaptive(Strategy):
                 checker = (self.__check_delay(entityid, att) or self.__is_spike(entityid, att)) and not self.__waiting_to_retrive.is_enqued(entityid, att)
                 # print('There is a spike or no delay restriction!')
                 if(checker):
-                    observation = self.__translate_to_state(entityid,att)
+                    observation = self.__translate_to_state(entityid,att, self.__is_himadri)
                     if(observation == None):
                         if(entityid in self.__delay_dict):
                             self.__delay_dict[entityid][att] = self.__window_counter + 1
@@ -705,7 +721,7 @@ class Adaptive(Strategy):
                 self.cache_memory.run('addcachedlifetime', (action, wait_time))
                 self.__last_actions.append((entity, att))
             self.__cache_entity_attribute_pairs(random_one, is_random=True)
-    
+
     # Check if the context attribute has been evaluated to be delayed for caching
     def __check_delay(self,entity,attr):
         if(entity in self.__delay_dict and attr in self.__delay_dict[entity]):
@@ -965,7 +981,7 @@ class Adaptive(Strategy):
     ###################################################################################
 
     def get_feature_vector(self, entityid, att):
-        return self.__translate_to_state(entityid, att)
+        return self.__translate_to_state(entityid, att, self.__is_himadri)
 
     # Select the closet range boundary for the current state 
     def __closest_point(self, c_life):
@@ -999,48 +1015,57 @@ class Adaptive(Strategy):
         return expected_life
         
     # Translating an observation to a state
-    def __translate_to_state(self, entityid, att):
-        isobserved = self.__isobserved(entityid, att)
-        iscached = self.cache_memory.run('get_statistics',(entityid, att))
-        # Access Rates [0-5]
-        fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
-        # Hit Rates and Expectations [6-11]
-        lifetimes = self.service_registry.get_context_producers(entityid,[att])
-        # The above step could be optimzed by using a view (in SQL that updates by a trigger)
-        new_feas, avg_latency = self.__calculate_hitrate_features(bool(not iscached and isobserved), entityid, att, lifetimes)
-        
-        if((new_feas, avg_latency) == (None, None)):
-            return None
-
-        fea_vec = fea_vec + new_feas
-        # Average Cached Lifetime [12]
-        cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
-                    'entity': entityid,
-                    'attribute': att
-                },10)
-        if(cached_lt_res):
-            avg_lts = list(map(lambda x: x['c_lifetime'], cached_lt_res))
-            if(not self.__is_simple_agent):
-                # The following calculation makes the avergae cache lifetime propotional to the long range
-                avg_lts = statistics.mean(avg_lts)/(self.trend_ranges[2]*(self.__moving_window/1000))
-                fea_vec.append(round(avg_lts,3))
-            else:
-                fea_vec.append(round(statistics.mean(avg_lts),3))
+    def __translate_to_state(self, entityid, att, himadri = False):     
+        if(himadri):
+            isobserved = self.__isobserved(entityid, att)
+            prob = self.__calculate_probability_to_cache(isobserved, entityid, att)
+            return {
+                'entityid': entityid,
+                'attribute': att,
+                'prob': prob
+            }
         else:
-            fea_vec.append(0)
+            isobserved = self.__isobserved(entityid, att)
+            iscached = self.cache_memory.run('get_statistics',(entityid, att))
+            # Access Rates [0-5]
+            fea_vec = self.__calculate_access_rates(isobserved, entityid, att)
+            # Hit Rates and Expectations [6-11]
+            lifetimes = self.service_registry.get_context_producers(entityid,[att])
+            # The above step could be optimzed by using a view (in SQL that updates by a trigger)
+            new_feas, avg_latency = self.__calculate_hitrate_features(bool(not iscached and isobserved), entityid, att, lifetimes)
+            
+            if((new_feas, avg_latency) == (None, None)):
+                return None
 
-        # Latency [13]
-        fea_vec.append(round(avg_latency,3))
+            fea_vec = fea_vec + new_feas
+            # Average Cached Lifetime [12]
+            cached_lt_res = self.__db.read_all_with_limit('attribute-cached-lifetime',{
+                        'entity': entityid,
+                        'attribute': att
+                    },10)
+            if(cached_lt_res):
+                avg_lts = list(map(lambda x: x['c_lifetime'], cached_lt_res))
+                if(not self.__is_simple_agent):
+                    # The following calculation makes the avergae cache lifetime propotional to the long range
+                    avg_lts = statistics.mean(avg_lts)/(self.trend_ranges[2]*(self.__moving_window/1000))
+                    fea_vec.append(round(avg_lts,3))
+                else:
+                    fea_vec.append(round(statistics.mean(avg_lts),3))
+            else:
+                fea_vec.append(0)
 
-        # Average Retriveal Cost [14]
-        avg_ret_cost = statistics.mean([values['cost'] for values in lifetimes.values()]) if(lifetimes) else 9999
-        fea_vec.append(round(avg_ret_cost,3))
+            # Latency [13]
+            fea_vec.append(round(avg_latency,3))
 
-        return {
-            'entityid': entityid,
-            'attribute': att,
-            'features': fea_vec
-        }
+            # Average Retriveal Cost [14]
+            avg_ret_cost = statistics.mean([values['cost'] for values in lifetimes.values()]) if(lifetimes) else 9999
+            fea_vec.append(round(avg_ret_cost,3))
+
+            return {
+                'entityid': entityid,
+                'attribute': att,
+                'features': fea_vec
+            }
 
     # Calculates the access rates for the given observation
     def __calculate_access_rates(self, isobserved, entityid, att):
@@ -1108,6 +1133,128 @@ class Adaptive(Strategy):
             fea_vec = [0,0,0,0,0,0]
 
         return fea_vec
+    
+    # Calculates Himadri's Probability of Caching
+    def __calculate_probability_to_cache(self, isobserved, entityid, att):
+        if(isobserved):
+            # Actual and Expected Access Rates 
+            if(not (entityid in self.__entity_access_trend) or not (att in self.__attribute_access_trend[entityid])):
+                exp_time = datetime.datetime.now()-datetime.timedelta(seconds=self.__moving_window/1000)
+                self.__update_attribute_access_trend(exp_time, entityid, self.__observed[entityid])
+
+            # Entity Access Trend
+            entity_trend = self.__entity_access_trend[entityid]
+            entity_trend_size = entity_trend.get_queue_size()
+            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            yi = entity_trend.getlist()
+            if(entity_trend_size<3):
+                diff = 3 - len(yi)
+                last_val = yi[-1]
+                for i in range(0,diff):
+                    yi.append(last_val)
+
+            s = InterpolatedUnivariateSpline(xi, yi, k=2)
+            total_size = entity_trend_size + 1
+            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            exp_entity_ar = round(extrapolation[entity_trend_size-1],3) 
+            if(exp_entity_ar < 0):
+                exp_entity_ar = 0
+            elif(exp_entity_ar > 1):
+                exp_entity_ar = 1
+
+            # For Attributes
+            ar_of_att = 0
+            sum_of_attr_ars = 0
+            for attribute, value in self.__attribute_access_trend[entityid]:
+                attribute_trend = self.__attribute_access_trend[entityid][attribute]
+                trend_size = attribute_trend.get_queue_size()
+
+                xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+                yi = attribute_trend.getlist()
+                if(trend_size<3):
+                    diff = 3 - len(yi)
+                    last_val = yi[-1]
+                    for i in range(0,diff):
+                        yi.append(last_val)
+
+                s = InterpolatedUnivariateSpline(xi, yi, k=2)
+                total_size = trend_size + self.trend_ranges[2]
+                extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+                exp_attr_ar = round(extrapolation[trend_size-1],3)
+                if(exp_attr_ar < 0):
+                    exp_attr_ar = 0
+                elif(exp_attr_ar > 1):
+                    exp_attr_ar = 1
+
+                if(attribute == att):
+                    ar_of_att = exp_attr_ar
+                sum_of_attr_ars += ar_of_att
+
+            prob_of_caching = exp_entity_ar * (ar_of_att/sum_of_attr_ars)
+            return prob_of_caching
+        
+        elif(entityid in self.__cached_attribute_access_trend 
+            and att in self.__cached_attribute_access_trend[entityid]):
+            # The item is rather cached
+            # Entity Access Trend
+            entity_trend = self.__entity_access_trend[entityid]
+            entity_trend_size = entity_trend.get_queue_size()
+            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            yi = entity_trend.getlist()
+            if(entity_trend_size<3):
+                diff = 3 - len(yi)
+                last_val = yi[-1]
+                for i in range(0,diff):
+                    yi.append(last_val)
+
+            s = InterpolatedUnivariateSpline(xi, yi, k=2)
+            total_size = entity_trend_size + 1
+            extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+            exp_entity_ar = round(extrapolation[entity_trend_size-1],3) 
+            if(exp_entity_ar < 0):
+                exp_entity_ar = 0
+            elif(exp_entity_ar > 1):
+                exp_entity_ar = 1
+
+            # For Attributes
+            ar_of_att = 0
+            sum_of_attr_ars = 0
+            for attribute, value in self.__attribute_access_trend[entityid]:
+                attribute_trend = self.__attribute_access_trend[entityid][attribute]
+                trend_size = attribute_trend.get_queue_size()
+
+                xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+                yi = attribute_trend.getlist()
+                if(trend_size<3):
+                    diff = 3 - len(yi)
+                    last_val = yi[-1]
+                    for i in range(0,diff):
+                        yi.append(last_val)
+
+                s = InterpolatedUnivariateSpline(xi, yi, k=2)
+                total_size = trend_size + self.trend_ranges[2]
+                extrapolation = (s(np.linspace(0, total_size, total_size+1))).tolist()
+
+                exp_attr_ar = round(extrapolation[trend_size-1],3)
+                if(exp_attr_ar < 0):
+                    exp_attr_ar = 0
+                elif(exp_attr_ar > 1):
+                    exp_attr_ar = 1
+
+                if(attribute == att):
+                    ar_of_att = exp_attr_ar
+                sum_of_attr_ars += ar_of_att
+
+            prob_of_caching = exp_entity_ar * (ar_of_att/sum_of_attr_ars)
+            return prob_of_caching
+                
+        else:
+            # Actual and Expected Access Rates 
+            # No actual or expected access rates becasue the item is already cached
+            return 0
     
     # Calculates the hit rates for the given observation
     def __calculate_hitrate_features(self, isnotcached, entityid, att, lifetimes):
@@ -1269,7 +1416,7 @@ class Adaptive(Strategy):
             return True
         return False
 
-     # Get attributes not cached for the entity
+    # Get attributes not cached for the entity
     def __get_attributes_not_cached(self, entityid, attributes):
         return list(set(attributes) - set(self.cache_memory.run('get_attributes_of_entity', (entityid,))))
 
@@ -1391,7 +1538,7 @@ class Adaptive(Strategy):
     # Reevaluating the nessecity to continue caching an item for the eviction algorithm.
     def reevaluate_for_eviction(self, entityid, att):
         try:
-            observation = self.__translate_to_state(entityid,att)
+            observation = self.__translate_to_state(entityid,att, self.__is_himadri)
             
             action = None
             if(self.__is_simple_agent):

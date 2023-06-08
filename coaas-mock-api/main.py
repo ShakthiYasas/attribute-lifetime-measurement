@@ -81,7 +81,7 @@ class PlatformMock(Resource):
         agent_fac = AgentFactory(default_config['RLAgent'], config, selected_algo)
         if(default_config['RLAgent'].lower() == 'simple'):
             agent = agent_fac.get_agent()
-            setattr(selected_algo, 'selective_cache_agent', agent_fac.get_agent())
+            setattr(selected_algo, 'selective_cache_agent', agent)
         else:
             setattr(selected_algo, 'selective_agent_factory', agent_fac)
 

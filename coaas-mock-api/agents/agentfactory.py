@@ -4,9 +4,10 @@ from agents.dqnagent import DQNAgent
 from agents.a3cagent import A3CAgent
 from agents.simpleagent import SimpleAgent
 from agents.ddpgacagent import DDPGACAgent
+from agents.himadriagent import HimadriAgent
 
 # from configurations.agentconfig import DQNConfiguration, A3CConfiguration,
-from configurations.agentconfig import ACConfiguration, SimpleConfiguration, DDPGConfiguration
+from configurations.agentconfig import ACConfiguration, SimpleConfiguration, DDPGConfiguration, HimadriConfiguration
 
 # Instantiate a singleton agent instance according to configuration
 class AgentFactory:
@@ -24,6 +25,8 @@ class AgentFactory:
                 self.__configuration = ACConfiguration(configuration)
             elif(type == 'ddpg'):
                 self.__configuration = DDPGConfiguration(configuration)
+            elif(type == 'himadri'):
+                self.__configuration = HimadriConfiguration(configuration)
             # elif(type == 'a3c'):
             #     self.__configuration = A3CConfiguration(configuration)
             # elif(type == 'dqn'):
@@ -43,6 +46,9 @@ class AgentFactory:
             elif(self.__configuration != None and isinstance(self.__configuration,DDPGConfiguration)):
                 print('Initializing a Deep-Detterministic-Policy-Gradient-Actor-Critic based RL agent for selective context caching.')
                 self.__agent = DDPGACAgent(self.__configuration, self.__caller)
+            elif(self.__configuration != None and isinstance(self.__configuration,HimadriConfiguration)):
+                print('Initializing an agent based on Himadris Technique.')
+                self.__agent = HimadriAgent(self.__configuration, self.__caller)
             # elif(self.__configuration != None and isinstance(self.__configuration,DQNConfiguration)):
             #    print('Initializing a DQN based RL agent for selective context caching.')
             #    self.__agent = DQNAgent(self.__configuration, self.__caller)
