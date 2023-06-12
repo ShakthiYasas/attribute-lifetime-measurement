@@ -412,7 +412,7 @@ class Adaptive(Strategy):
                 lifetimes = self.service_registry.get_context_producers(entityid,ent['attributes'],conditions)          
 
             cache_result = self.cache_memory.run('get_statistics_all')
-            if(entityid in cache_result):
+            if(cache_result != None and entityid in cache_result):
                 reference = None
                 # Entity is cached
                 # Atleast one of the attributes of the entity is already cached 
