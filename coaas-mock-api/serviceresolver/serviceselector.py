@@ -107,6 +107,8 @@ class ServiceSelector:
             else:
                 # This producer is either invalid or currently having issues
                 # Could be skipped for a few retrievals
+                print()
+                print(url)
                 print('Context Provider is Invalid or Unavilable.')
 
     def get_average_responsetime_for_provider(self, prodid):
