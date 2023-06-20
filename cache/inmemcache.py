@@ -18,6 +18,10 @@ class InMemoryCache(CacheAgent):
         self.__cache_size = config.cache_size
         self.is_auto_evicting = config.isevict
         self.is_limited_cache = config.limited_cache
+        if(self.is_limited_cache):
+            print('Limited Sized Cache Memory.')
+        else:
+            print('Scalable Cache Memory.')
         self.__entityhash = LimitedSizeDict(size_limit = self.__cache_size)
         self.__cache_write_lock = threading.Lock()
 

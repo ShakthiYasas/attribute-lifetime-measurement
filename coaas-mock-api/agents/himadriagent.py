@@ -93,24 +93,26 @@ class HimadriAgent(threading.Thread, Agent):
         if(action == 0):
             # Item is defenitly not to be cached
             delay_time = self.__calculate_delay(obs)
-            post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, observation['features'], ref_key))
+            post_event_with_params("subscribed_actions", (entityid, attribute, 0, delay_time, 0, 
+                                                          observation['features'] if 'features' in observation else obs, ref_key))
 
-            random_value = np.random.uniform()
-            if(random_value <= self.__epsilons and not skip_random):
-                if(isinstance(self.__explore_mentor,MFUAgent)):
-                    action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
-                    if(action != (0,0)):
-                        observation = self.__caller.get_feature_vector(action[0], action[1])
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation, ref_key))
-                else:
-                    action = self.__explore_mentor.choose_action(self.__caller.get_observed())
-                    if(action != (0,0)):
-                        observation = self.__caller.get_feature_vector(action[0], action[1])
-                        post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation, ref_key)) 
+            #random_value = np.random.uniform()
+            #if(random_value <= self.__epsilons and not skip_random):
+            #    if(isinstance(self.__explore_mentor,MFUAgent)):
+            #        action = self.__explore_mentor.choose_action(self.__caller.get_attribute_access_trend())
+            #        if(action != (0,0)):
+            #            observation = self.__caller.get_feature_vector(action[0], action[1])
+            #            post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation, ref_key))
+            #    else:
+            #        action = self.__explore_mentor.choose_action(self.__caller.get_observed())
+            #        if(action != (0,0)):
+            #            observation = self.__caller.get_feature_vector(action[0], action[1])
+            #            post_event_with_params("subscribed_actions", (action[0], action[1], self.__midtime, 0, 1, observation, ref_key)) 
         else:
             # Decided to be cached
             cached_lifetime = self.__calculate_expected_cached_lifetime(entityid, attribute, obs)
-            post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, observation['features'], ref_key))
+            post_event_with_params("subscribed_actions", (entityid, attribute, cached_lifetime, 0, 1, 
+                                                          observation['features'] if 'features' in observation else obs, ref_key))
 
         return 0
 
@@ -121,9 +123,9 @@ class HimadriAgent(threading.Thread, Agent):
                 },10)
         if(cached_lt_res):
             avg_lt = statistics.mean(list(map(lambda x: x['c_lifetime'], cached_lt_res)))
-            return (avg_lt/self.__decision_threshold)*(prob-self.__decision_threshold)
+            return avg_lt*((prob-self.__decision_threshold)/self.__decision_threshold)
         else:
             return self.__midtime
     
     def __calculate_delay(self, prob):
-        return (self.__longtime/self.__decision_threshold)*(self.__decision_threshold-self.__decision_threshold)
+        return self.__longtime*((self.__decision_threshold-prob)/self.__decision_threshold)

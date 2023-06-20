@@ -38,7 +38,9 @@ class CarPark:
         current_time_step = trunc(milisecond_diff/self.configuration.sampling_rate)
         response_obj = dict()
         for idx in range(0,len(self.distribution)):
-            response_obj['area_'+str(idx+1)+'_availability'] = self.distribution[idx].get_occupancy_level(current_time_step)
+            response_obj['availability'] = self.distribution[idx].get_occupancy_level(current_time_step)
+            response_obj['price'] = 5
+            #response_obj['area_'+str(idx+1)+'_availability'] = self.distribution[idx].get_occupancy_level(current_time_step)
 
         return response_obj
         

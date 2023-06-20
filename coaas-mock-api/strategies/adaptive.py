@@ -550,6 +550,9 @@ class Adaptive(Strategy):
                         if(lifetimes):
                             url_list = list(map(lambda k: (k[0],k[1]['url']), lifetimes.items()))
                             res = self.service_selector.get_response_for_entity([att_name], url_list)  
+                            #print(url_list)
+                            #print(res)
+                            #print()
                             output[entityid][att_name] = [x[1] for x in res[att_name]]
                             # Update observed
                             self.__update_observed(entityid, [att_name])
@@ -607,7 +610,9 @@ class Adaptive(Strategy):
                     # Select the action for the state using the RL Agent
                     action, (est_c_lifetime, est_delay) = None, (None, None)
                     if(self.__is_simple_agent):
+                        start = datetime.datetime.now()
                         action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)                
+                        _thread.start_new_thread(self.__save_rp_stats, (start,entityid))
                         if(action != (0,0)):
                             wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
                             self.cache_memory.run('addcachedlifetime', (action, wait_time))
@@ -638,7 +643,9 @@ class Adaptive(Strategy):
                     else:
                         # if(not((entityid, att) in self.__currently_eval)):
                         self.__currently_eval.add((entityid,att))
-                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation, self.__skiprandom, ref_key))                
+                        start = datetime.datetime.now()
+                        self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation, self.__skiprandom, ref_key))    
+                        _thread.start_new_thread(self.__save_rp_stats, (start,entityid))            
 
         return actions         
 
@@ -673,8 +680,9 @@ class Adaptive(Strategy):
                     else:
                         action, (est_c_lifetime, est_delay) = None, (None, None)
                         if(self.__is_simple_agent):
+                            start = datetime.datetime.now()
                             action, (est_c_lifetime, est_delay) = self.selective_cache_agent.choose_action(observation, skip_random=self.__skiprandom)
-
+                            _thread.start_new_thread(self.__save_rp_stats, (start,entityid))   
                             if(action != (0,0) and action[0] == entityid):
                                 updated_attr_dict.append(action[1])
                                 wait_time = now + datetime.timedelta(seconds=est_c_lifetime)
@@ -691,8 +699,9 @@ class Adaptive(Strategy):
                         else:
                             #if(not((entityid, att) in self.__currently_eval)):
                             self.__currently_eval.add((entityid,att))
+                            start = datetime.datetime.now()
                             self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation, self.__skiprandom, ref_key))  
-                                          
+                            _thread.start_new_thread(self.__save_rp_stats, (start,entityid))                
         if(is_caching):
             # Add to cache 
             self.__last_actions += [(entityid, x) for x in updated_attr_dict]
@@ -1145,7 +1154,7 @@ class Adaptive(Strategy):
             # Entity Access Trend
             entity_trend = self.__entity_access_trend[entityid]
             entity_trend_size = entity_trend.get_queue_size()
-            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            xi = np.array(range(0,entity_trend_size if entity_trend_size>=3 else 3))
             yi = entity_trend.getlist()
             if(entity_trend_size<3):
                 diff = 3 - len(yi)
@@ -1166,8 +1175,12 @@ class Adaptive(Strategy):
             # For Attributes
             ar_of_att = 0
             sum_of_attr_ars = 0
-            for attribute, value in self.__attribute_access_trend[entityid]:
+            for attribute in self.__attribute_access_trend[entityid]:
+                #print()
+                #print(attribute)
                 attribute_trend = self.__attribute_access_trend[entityid][attribute]
+                #print(attribute_trend)
+                #print()
                 trend_size = attribute_trend.get_queue_size()
 
                 xi = np.array(range(0,trend_size if trend_size>=3 else 3))
@@ -1191,17 +1204,21 @@ class Adaptive(Strategy):
                 if(attribute == att):
                     ar_of_att = exp_attr_ar
                 sum_of_attr_ars += ar_of_att
+
+            if(ar_of_att == 0 or sum_of_attr_ars == 0):
+                return 0
 
             prob_of_caching = exp_entity_ar * (ar_of_att/sum_of_attr_ars)
             return prob_of_caching
         
-        elif(entityid in self.__cached_attribute_access_trend 
-            and att in self.__cached_attribute_access_trend[entityid]):
+        elif(entityid in self.__entity_access_trend and 
+             entityid in self.__cached_attribute_access_trend and
+             att in self.__cached_attribute_access_trend[entityid]):
             # The item is rather cached
             # Entity Access Trend
             entity_trend = self.__entity_access_trend[entityid]
             entity_trend_size = entity_trend.get_queue_size()
-            xi = np.array(range(0,trend_size if trend_size>=3 else 3))
+            xi = np.array(range(0,entity_trend_size if entity_trend_size>=3 else 3))
             yi = entity_trend.getlist()
             if(entity_trend_size<3):
                 diff = 3 - len(yi)
@@ -1222,7 +1239,7 @@ class Adaptive(Strategy):
             # For Attributes
             ar_of_att = 0
             sum_of_attr_ars = 0
-            for attribute, value in self.__attribute_access_trend[entityid]:
+            for attribute in self.__attribute_access_trend[entityid]:
                 attribute_trend = self.__attribute_access_trend[entityid][attribute]
                 trend_size = attribute_trend.get_queue_size()
 
@@ -1248,7 +1265,13 @@ class Adaptive(Strategy):
                     ar_of_att = exp_attr_ar
                 sum_of_attr_ars += ar_of_att
 
+            if(ar_of_att == 0 or sum_of_attr_ars == 0):
+                return 0
+            
             prob_of_caching = exp_entity_ar * (ar_of_att/sum_of_attr_ars)
+            #print()
+            #print('Probability of Caching:')
+            #print(prob_of_caching)
             return prob_of_caching
                 
         else:
@@ -1541,11 +1564,12 @@ class Adaptive(Strategy):
             observation = self.__translate_to_state(entityid,att, self.__is_himadri)
             
             action = None
+            start = datetime.datetime.now()
             if(self.__is_simple_agent):
-                action = self.selective_cache_agent.choose_action(observation, skipRandom = True)
+                action = self.selective_cache_agent.choose_action(observation, skipRandom = True) 
             else:
                 self.selective_cache_agent.onThread(self.selective_cache_agent.choose_action, (observation, True))
-
+            _thread.start_new_thread(self.__save_rp_stats, (start,entityid))  
             return action
         except Exception:
             return ((0,0),(0,0))  
@@ -1639,6 +1663,14 @@ class Adaptive(Strategy):
 
     def is_waiting_to_retrive(self, entity, attribute):
         self.__waiting_to_retrive
+
+    def __save_rp_stats(self, start, entityid):
+        # Statistics
+        res_time = (datetime.datetime.now() - start).total_seconds()
+        self.__db.insert_one('agent-performance',
+            {
+                'response_time': res_time
+            })
 
 class LearningThread (threading.Thread):
     def __init__(self):
