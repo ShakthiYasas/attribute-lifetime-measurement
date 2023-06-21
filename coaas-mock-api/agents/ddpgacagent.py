@@ -1,7 +1,10 @@
 import os
+import re
 import time
 import queue
+import warnings
 import threading
+import traceback
 from os import path
 
 import numpy as np 
@@ -28,8 +31,15 @@ CRITIC_MODEL_PATH = 'agents/saved-models/ddpg/critic-model'
 N_ACTIONS = 1 # Becuase, it's continous
 N_FEATURES = (15,)
 
+graph = None
+all_names = None
+
+warnings.filterwarnings('ignore')
+
 class DDPGACAgent(threading.Thread, Agent):
     def __init__(self, config, caller):
+        global graph
+        global all_names 
         disable_eager_execution()
         self.__restored = False
 
@@ -288,7 +298,7 @@ class Critic(object):
     def __init__(self, learning_rate, name, session, restore = False):
         self.__name = name
         self.__session = session
-        self.__path = 'Critic/'+name+'/'
+        self.__path = name+'/'
         self.__critic_lr = learning_rate
 
         # Build the actor network
@@ -297,8 +307,12 @@ class Critic(object):
 
         # Persisting the model parameters
         self.params = tf.compat.v1.trainable_variables(scope=self.__name)
-        if(not hasattr(self,'__saver')):
-            self.__saver = tf.compat.v1.train.Saver()
+        try:
+            if(not hasattr(self,'__saver')):
+                self.__saver = tf.compat.v1.train.Saver()
+        except Exception as ex:
+            print('Saver already exists for ' + self.__name + '!')
+            print(ex)
         
         self.__init_policy_grad = tf.gradients(self.__q_value, self.__action_ph)
         
@@ -310,15 +324,48 @@ class Critic(object):
 
     def __build_network(self, restore = False):   
         with tf.compat.v1.variable_scope(self.__name):
+            status = False
             if(restore):
-                self.__saver = tf.compat.v1.train.import_meta_graph(self.__checkpoint_file + '/' + self.__name + '.meta')
-                self.__saver.restore(self.__session, tf.compat.v1.train.latest_checkpoint(self.__checkpoint_file))
+                try:
+                    self.__saver = tf.compat.v1.train.import_meta_graph(self.__checkpoint_file + '/' + self.__name + '.meta')
+                    self.__saver.restore(self.__session, tf.compat.v1.train.latest_checkpoint(self.__checkpoint_file))
+                    
+                    global graph
+                    global all_names
+                    if(graph == None and all_names == None):
+                        graph = tf.compat.v1.get_default_graph()
+                        all_names = [n.name for n in graph.get_operations()]
 
-                graph = tf.compat.v1.get_default_graph()             
-                self.__input_ph = graph.get_tensor_by_name(self.__path+'inputs:0')
-                self.__action_ph = graph.get_tensor_by_name(self.__path+'actions:0')
-                self.__q_target = graph.get_tensor_by_name(self.__path+'targets:0')
-                self.__optimizer = graph.get_tensor_by_name(self.__path+'dense/kernel/Adam:0')
+                    try: 
+                        candi_1 = [s for s in all_names if self.__path + 'inputs' in s] 
+                        if candi_1: 
+                            self.__input_ph = graph.get_tensor_by_name(candi_1[0]+':0')
+                        else:
+                            self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
+
+                        candi_2 = [s for s in all_names if self.__path + 'actions' in s] 
+                        if candi_2:
+                            self.__action_ph = graph.get_tensor_by_name(candi_2[0]+':0')
+                        else:
+                            self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
+
+                        candi_3 = [s for s in all_names if self.__path + 'targets' in s] 
+                        if candi_3:
+                            self.__q_target = graph.get_tensor_by_name(candi_3[0]+':0')
+                        else:
+                            self.__q_target = tf.compat.v1.placeholder(tf.float32, shape=[None, 1], name='targets')
+
+                        candi_4 = [s for s in all_names if self.__path + 'dense/kernel/Adam' in s] 
+                        if candi_4:
+                            self.__optimizer = graph.get_tensor_by_name(candi_4[0]+':0')
+                        else:
+                            status = True
+                    except Exception:
+                        print('An error occured : ' + traceback.format_exc())
+                except Exception:
+                    self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
+                    self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
+                    self.__q_target = tf.compat.v1.placeholder(tf.float32, shape=[None, 1], name='targets')
             else:
                 self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
                 self.__action_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
@@ -350,6 +397,9 @@ class Critic(object):
                                 bias_initializer=RandomUniform(-f3, f3),
                                 kernel_regularizer=regularizers.l2(0.01))
             self.__loss = tf.compat.v1.losses.mean_squared_error(self.__q_target, self.__q_value) 
+
+            if status:
+                self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__critic_lr).minimize(self.__loss)
 
     # Get the action
     def predict(self, observations, actions):
@@ -391,7 +441,7 @@ class Actor(object):
         self.__batch_size = batch_size
         self.__actor_lr = learning_rate
         self.__action_bound = action_bound
-        self.__path = 'Critic/'+name+'/'
+        self.__path = name+'/'
         
         # Build the actor network
         self.__checkpoint_file = CHECKPOINT_PATH + self.__name
@@ -399,55 +449,79 @@ class Actor(object):
 
         # Persisting the model parameters
         self.params = tf.compat.v1.trainable_variables(scope=self.__name)
-        if(not hasattr(self,'__saver')):
-            self.__saver = tf.compat.v1.train.Saver()
+        try:
+            if(not hasattr(self,'__saver')):
+                self.__saver = tf.compat.v1.train.Saver()
+        except Exception as ex:
+            print('Saver already existant for ' + self.__name + '!')
+            print(ex)
 
         # Initializing Policy Gradient
         if(not restore):
             self.__init_policy_grad = tf.gradients(self.__mu, self.params, -self.__action_gradient_ph)
             self.__actor_gradients = list(map(lambda x: tf.divide(x, self.__batch_size), self.__init_policy_grad[-10:]))
+
             self.__optimizer = tf.compat.v1.train.AdamOptimizer(self.__actor_lr).apply_gradients(zip(self.__actor_gradients, self.params))
     
     def get_session(self):
         return self.__session
 
     def __build_network(self, restore = False):
-            with tf.compat.v1.variable_scope(self.__name):
-                if(restore):
+        with tf.compat.v1.variable_scope(self.__name):
+            if(restore):
+                try:
                     self.__saver = tf.compat.v1.train.import_meta_graph(self.__checkpoint_file + '/' + self.__name + '.meta')
                     self.__saver.restore(self.__session, tf.compat.v1.train.latest_checkpoint(self.__checkpoint_file))
 
-                    graph = tf.compat.v1.get_default_graph()
-                    self.__input_ph = graph.get_tensor_by_name(self.__path+'inputs:0')
-                    self.__action_gradient_ph = graph.get_tensor_by_name(self.__path+'actions:0')
-                    self.__optimizer = graph.get_tensor_by_name(self.__path+'dense/kernel/Adam:0')
-                else:
+                    global graph
+                    global all_names
+                    if(graph == None or all_names == None):
+                        graph = tf.compat.v1.get_default_graph()
+                        all_names = [n.name for n in graph.get_operations()]
+
+                    try:
+                        candi_1 = [s for s in all_names if self.__path+'inputs' in s] 
+                        self.__input_ph = graph.get_tensor_by_name(candi_1[0]+':0' if candi_1 else self.__path + 'inputs:0')
+
+                        candi_2 = [s for s in all_names if self.__path+'actions' in s] 
+                        self.__action_gradient_ph = graph.get_tensor_by_name(candi_2[0]+':0' if candi_2 else self.__path + 'actions:0')
+                        
+                        candi_3 = [s for s in all_names if self.__path+'dense/kernel/Adam' in s] 
+                        self.__optimizer = graph.get_tensor_by_name(candi_3[0]+':0' if candi_3 else self.__path + 'dense/kernel/Adam:0')
+
+                    except Exception:
+                        print('An error occured : ' + traceback.format_exc())
+                except Exception:
                     self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
                     self.__action_gradient_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
 
-                # Input Layer
-                f1 = 1/np.sqrt(LAYER_1_NEURONS)
-                input_layer = tf.compat.v1.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
-                                    kernel_initializer=RandomUniform(-f1, f1),
-                                    bias_initializer=RandomUniform(-f1, f1))
-                batch_1 = tf.compat.v1.layers.batch_normalization(input_layer)
-                input_layer_activation = tf.nn.relu(batch_1)
+            else:
+                self.__input_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, *N_FEATURES], name='inputs')
+                self.__action_gradient_ph = tf.compat.v1.placeholder(tf.float32, shape=[None, N_ACTIONS], name='actions')
 
-                # Hidden Layer
-                f2 = 1/np.sqrt(LAYER_2_NEURONS)
-                hidden_layer = tf.compat.v1.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
-                                    kernel_initializer=RandomUniform(-f2, f2),
-                                    bias_initializer=RandomUniform(-f2, f2))
-                batch_2 = tf.compat.v1.layers.batch_normalization(hidden_layer)
-                hidden_layer_activation = tf.nn.relu(batch_2)
+            # Input Layer
+            f1 = 1/np.sqrt(LAYER_1_NEURONS)
+            input_layer = tf.compat.v1.layers.dense(self.__input_ph, units=LAYER_1_NEURONS, 
+                                kernel_initializer=RandomUniform(-f1, f1),
+                                bias_initializer=RandomUniform(-f1, f1))
+            batch_1 = tf.compat.v1.layers.batch_normalization(input_layer)
+            input_layer_activation = tf.nn.relu(batch_1)
 
-                # Output Layer
-                f3 = 0.5 # This an intial value
-                output_layer = tf.compat.v1.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
-                                    activation='tanh',
-                                    kernel_initializer=RandomUniform(-f3, f3),
-                                    bias_initializer=RandomUniform(-f3, f3))
-                self.__mu = tf.multiply(output_layer, self.__action_bound, name='loss_function')
+            # Hidden Layer
+            f2 = 1/np.sqrt(LAYER_2_NEURONS)
+            hidden_layer = tf.compat.v1.layers.dense(input_layer_activation, units=LAYER_2_NEURONS, 
+                                kernel_initializer=RandomUniform(-f2, f2),
+                                bias_initializer=RandomUniform(-f2, f2))
+            batch_2 = tf.compat.v1.layers.batch_normalization(hidden_layer)
+            hidden_layer_activation = tf.nn.relu(batch_2)
+
+            # Output Layer
+            f3 = 0.5 # This an intial value
+            output_layer = tf.compat.v1.layers.dense(hidden_layer_activation, units=N_ACTIONS, 
+                                activation='tanh',
+                                kernel_initializer=RandomUniform(-f3, f3),
+                                bias_initializer=RandomUniform(-f3, f3))
+            self.__mu = tf.multiply(output_layer, self.__action_bound, name='loss_function')
     
     # Get the action
     def predict(self, observation):
