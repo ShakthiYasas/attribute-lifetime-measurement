@@ -1,0 +1,931 @@
+[{
+  "info": {
+    "name": "Application01",
+    "username": "App01",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 01."
+  },
+  "sla": {
+    "price": {
+      "value": 0.3,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": true,
+      "fthresh": 0.7,
+      "criticality": {
+        "severe": {
+          "price": {
+            "value": 1.5,
+            "unit": "aud"
+          },
+          "rtmax": {
+            "value": 500,
+            "unit": "ms",
+            "penalty": {
+              "value": 0.5,
+              "unit": "aud"
+            }
+          },
+          "fthresh": [
+            {
+              "@context": "https://mobivoc.org",
+              "@type": "ParkingFacility",
+              "attribute": [
+                {
+                  "name": "availability",
+                  "type": "Number"
+                }
+              ],
+              "value": 0.8
+            }
+          ]
+        },
+        "moderate": {
+          "rtmax": {
+            "value": 1000,
+            "unit": "ms",
+            "penalty": {
+              "value": 0.5,
+              "unit": "aud"
+            }
+          }
+        },
+        "low": {
+          "rtmax": {
+            "value": 1500,
+            "unit": "ms",
+            "penalty": {
+              "value": 0.2,
+              "unit": "aud"
+            }
+          }
+        }
+      },
+      "rtmax": {
+        "value": 2400,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.5,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 2
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-04-18T10:49:29.387+00:00",
+  "updatedDate": "2022-04-18T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application02",
+    "username": "App02",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 02."
+  },
+  "sla": {
+    "price": {
+      "value": 0.5,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.8,
+      "rtmax": {
+        "value": 1800,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.75,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 1
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application03",
+    "username": "App03",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 03."
+  },
+  "sla": {
+    "price": {
+      "value": 0.6,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.9,
+      "rtmax": {
+        "value": 1440,
+        "unit": "ms",
+        "penalty": {
+          "value": 1,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application04",
+    "username": "App04",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 04."
+  },
+  "sla": {
+    "price": {
+      "value": 0.6,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.85,
+      "rtmax": {
+        "value": 1800,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.8,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 2
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application05",
+    "username": "App05",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 05."
+  },
+  "sla": {
+    "price": {
+      "value": 0.25,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.8,
+      "rtmax": {
+        "value": 2100,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.75,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application06",
+    "username": "App06",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 06."
+  },
+  "sla": {
+    "price": {
+      "value": 0.1,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.7,
+      "rtmax": {
+        "value": 2400,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.25,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 2
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application07",
+    "username": "App07",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 07."
+  },
+  "sla": {
+    "price": {
+      "value": 0.125,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.6,
+      "rtmax": {
+        "value": 3000,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.2,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application08",
+    "username": "App08",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 08."
+  },
+  "sla": {
+    "price": {
+      "value": 0.75,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.75,
+      "rtmax": {
+        "value": 1500,
+        "unit": "ms",
+        "penalty": {
+          "value": 1,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 1
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application09",
+    "username": "App09",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 09."
+  },
+  "sla": {
+    "price": {
+      "value": 0.1,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.6,
+      "rtmax": {
+        "value": 2400,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.4,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 0
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application10",
+    "username": "App10",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 10."
+  },
+  "sla": {
+    "price": {
+      "value": 0.07,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.5,
+      "rtmax": {
+        "value": 3600,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.1,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 0
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application11",
+    "username": "App11",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 11."
+  },
+  "sla": {
+    "price": {
+      "value": 1,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.7,
+      "rtmax": {
+        "value": 2160,
+        "unit": "ms",
+        "penalty": {
+          "value": 1,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 2
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application12",
+    "username": "App12",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 12."
+  },
+  "sla": {
+    "price": {
+      "value": 0.8,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.75,
+      "rtmax": {
+        "value": 2400,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.5,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 1
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application13",
+    "username": "App13",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 13."
+  },
+  "sla": {
+    "price": {
+      "value": 0.1,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.8,
+      "rtmax": {
+        "value": 2400,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.5,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 4
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application14",
+    "username": "App14",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 14."
+  },
+  "sla": {
+    "price": {
+      "value": 1.25,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.85,
+      "rtmax": {
+        "value": 1800,
+        "unit": "ms",
+        "penalty": {
+          "value": 1.2,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application15",
+    "username": "App15",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 15."
+  },
+  "sla": {
+    "price": {
+      "value": 1.4,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.9,
+      "rtmax": {
+        "value": 1500,
+        "unit": "ms",
+        "penalty": {
+          "value": 2,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 4
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application16",
+    "username": "App16",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 16."
+  },
+  "sla": {
+    "price": {
+      "value": 0.4,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.6,
+      "rtmax": {
+        "value": 3600,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.2,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application17",
+    "username": "App17",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 17."
+  },
+  "sla": {
+    "price": {
+      "value": 0.5,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.7,
+      "rtmax": {
+        "value": 2400,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.6,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 2
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application18",
+    "username": "App18",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 18."
+  },
+  "sla": {
+    "price": {
+      "value": 0.3,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.8,
+      "rtmax": {
+        "value": 1800,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.7,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 1
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application19",
+    "username": "App19",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 19."
+  },
+  "sla": {
+    "price": {
+      "value": 0.75,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.8,
+      "rtmax": {
+        "value": 1680,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.9,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "*"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+},
+{
+  "info": {
+    "name": "Application20",
+    "username": "App20",
+    "password": "fHYGqQ+lOK4SwPyH0oeK1g==",
+    "description": "This is is car park recommendation application 20."
+  },
+  "sla": {
+    "price": {
+      "value": 0.5,
+      "unit": "aud"
+    },
+    "qos": {
+      "staged": false,
+      "fthresh": 0.7,
+      "rtmax": {
+        "value": 2160,
+        "unit": "ms",
+        "penalty": {
+          "value": 0.5,
+          "unit": "aud"
+        }
+      }
+    },
+    "qoc": {
+      "attributes": [
+        "latitude",
+        "longitude",
+        "temperature"
+      ],
+      "precision": {
+        "condition": "mt\"",
+        "type": "decimalPoints",
+        "value": 3
+      }
+    }
+  },
+  "auth": {
+    "scope": [
+      "*"
+    ]
+  },
+  "status": true,
+  "createdDate": "2022-12-05T10:49:29.387+00:00",
+  "updatedDate": "2022-12-05T10:49:29.387+00:00"
+}]
