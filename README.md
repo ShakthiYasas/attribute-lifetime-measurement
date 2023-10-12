@@ -10,6 +10,8 @@ This code repository contains the ACOCA-A Prototype.
 ### Datasets 
 Dataset used to simulate the behaviours of the entities involved in the use case can be found at /datasets. 
 Datasets related to carparks, vehicles, weather, and places can be found here. 
+These datasets can be simulated using the entitySimulator found in the code OR using the IoT dats simulator (https://github.com/IBA-Group-IT/IoT-data-simulator/tree/master).
+
 Context consumer SLAs are available in contextConsumer.json.
 All the registered Context Providers are available in contextService.json.
 
