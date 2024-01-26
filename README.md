@@ -1,5 +1,6 @@
 # ACOCA-A PROTOTYPE 
 This code repository contains the ACOCA-A Prototype. 
+Please use the "microservices" branch as not all artifacts mentioned below may NOT be available in the "master".
 
 ## Publications arising from the repository:
 1) S. Weerasinghe, A. Zaslavsky, S. W. Loke, A. Medvedev, and A. Abken, ‘Estimating the Lifetime of Transient Context for Adaptive Caching in IoT Applications’, in ACM Symposium on Applied Computing, Brno, Czech Republic: ACM, Apr. 2022, p. 10. doi: 10.1145/3477314.3507075.
